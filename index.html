@@ -72,9 +72,7 @@
     letter-spacing: -0.2px;
   }
 
-  .logo-text span {
-    color: var(--teal);
-  }
+  .logo-text span { color: var(--teal); }
 
   .header-badge {
     font-family: 'DM Mono', monospace;
@@ -88,187 +86,35 @@
     letter-spacing: 0.5px;
   }
 
-  /* ── HERO ── */
-  .hero {
-    padding: 72px 48px 56px;
+  /* ── MAIN ── */
+  .main {
     max-width: 1200px;
     margin: 0 auto;
+    padding: 48px 48px 80px;
   }
 
-  .hero-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--teal);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 20px;
+  /* ── TITOLO TOP ── */
+  .page-title {
+    margin-bottom: 32px;
   }
 
-  .hero-eyebrow::before {
-    content: '';
-    display: block;
-    width: 20px;
-    height: 2px;
-    background: var(--teal);
-    border-radius: 2px;
-  }
-
-  .hero h1 {
-    font-size: clamp(32px, 4vw, 52px);
+  .page-title h1 {
+    font-size: 28px;
     font-weight: 300;
     color: var(--ink);
-    line-height: 1.15;
-    letter-spacing: -1.5px;
-    margin-bottom: 20px;
-    max-width: 680px;
+    letter-spacing: -0.8px;
+    margin-bottom: 6px;
   }
 
-  .hero h1 strong {
+  .page-title h1 strong {
     font-weight: 600;
     color: var(--teal);
   }
 
-  .hero-sub {
-    font-size: 16px;
-    font-weight: 400;
-    color: var(--muted);
-    line-height: 1.7;
-    max-width: 560px;
-    margin-bottom: 40px;
-  }
-
-  /* ── HOW TO ── */
-  /* ── GUIDA USO ── */
-  .howto {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px 32px;
-    max-width: 860px;
-  }
-
-  .howto-title {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--teal);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .howto-title::before {
-    content: '';
-    display: block;
-    width: 16px;
-    height: 2px;
-    background: var(--teal);
-    border-radius: 2px;
-  }
-
-  .howto-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .howto-step {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--border);
-    position: relative;
-  }
-
-  .howto-step:last-child { border-bottom: none; padding-bottom: 0; }
-  .howto-step:first-child { padding-top: 0; }
-
-  .step-left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    flex-shrink: 0;
-    width: 32px;
-  }
-
-  .step-num {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--teal);
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .step-line {
-    width: 2px;
-    flex: 1;
-    min-height: 16px;
-    background: var(--border);
-    margin-top: 6px;
-  }
-
-  .howto-step:last-child .step-line { display: none; }
-
-  .step-right { flex: 1; padding-top: 4px; }
-
-  .step-right strong {
-    display: block;
+  .page-title p {
     font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 4px;
-  }
-
-  .step-right p {
-    font-size: 13px;
     color: var(--muted);
-    line-height: 1.6;
-    margin: 0;
   }
-
-  .step-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 20px;
-    margin-right: 4px;
-    vertical-align: middle;
-    white-space: nowrap;
-  }
-
-  .sb-blue   { background: #dbeafe; color: #1d4ed8; }
-  .sb-purple { background: #ede9fe; color: #5b21b6; }
-  .sb-green  { background: #d1fae9; color: #065f46; }
-  .sb-amber  { background: #fef3c7; color: #92400e; }
-
-  .howto-note {
-    margin-top: 20px;
-    padding: 12px 16px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: #78350f;
-    line-height: 1.6;
-  }
-
-  .howto-note strong { font-weight: 600; }
 
   /* ── SECTION LABEL ── */
   .section-label {
@@ -277,16 +123,9 @@
     text-transform: uppercase;
     letter-spacing: 1.2px;
     color: var(--muted);
-    margin-bottom: 20px;
-    padding-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
-  }
-
-  /* ── MAIN GRID ── */
-  .main {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 48px 80px;
   }
 
   /* ── PANNELLI PRINCIPALI ── */
@@ -294,7 +133,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    margin-bottom: 48px;
+    margin-bottom: 20px;
   }
 
   .panel-card {
@@ -313,7 +152,7 @@
   }
 
   .panel-card-top {
-    padding: 28px 28px 20px;
+    padding: 24px 24px 18px;
     border-bottom: 1px solid var(--border);
     flex: 1;
   }
@@ -325,7 +164,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     font-size: 20px;
   }
 
@@ -341,14 +180,14 @@
     font-family: 'DM Mono', monospace;
     font-size: 11px;
     color: var(--muted);
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .panel-card p {
-    font-size: 13.5px;
+    font-size: 13px;
     color: var(--muted);
-    line-height: 1.65;
-    margin-bottom: 14px;
+    line-height: 1.6;
+    margin-bottom: 12px;
   }
 
   .tag-list {
@@ -366,10 +205,7 @@
   }
 
   .panel-card-bottom {
-    padding: 16px 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 16px 24px;
     background: var(--bg);
   }
 
@@ -381,43 +217,165 @@
     color: var(--muted);
   }
 
-  .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-
-  .dot.green { background: var(--green); }
-  .dot.amber { background: var(--amber); }
-  .dot.gray  { background: var(--border); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot.green  { background: var(--green); }
+  .dot.amber  { background: var(--amber); }
 
   .open-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 500;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    font-size: 15px;
+    font-weight: 600;
     color: var(--white);
     background: var(--teal);
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
+    border-radius: 10px;
+    padding: 14px;
     cursor: pointer;
     text-decoration: none;
     transition: background 0.15s;
   }
 
   .open-btn:hover { background: var(--teal-dark); }
+  .open-btn svg { width: 15px; height: 15px; }
 
-  .open-btn svg { width: 13px; height: 13px; }
+  /* ── COLORI PANNELLI ── */
+  .c-blue   { background: #eef5ff; }
+  .c-blue   .panel-icon { background: #dbeafe; }
+  .c-green  { background: #edfaf4; }
+  .c-green  .panel-icon { background: #d1fae9; }
+  .c-purple { background: #f3f0ff; }
+  .c-purple .panel-icon { background: #ede9fe; }
 
-  /* ── SERVIZI CARD ── */
-  .services-section { margin-bottom: 48px; }
+  .tag-blue   { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+  .tag-green  { background: #d1fae9; color: #065f46; border-color: #a7f3d0; }
+  .tag-purple { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
 
+  /* ── GUIDA IN ROSSO ── */
+  .guida {
+    background: #fff5f5;
+    border: 2px solid #fca5a5;
+    border-radius: 14px;
+    padding: 24px 28px;
+    margin-bottom: 48px;
+  }
+
+  .guida-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #b91c1c;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .guida-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .guida-step {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .guida-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #b91c1c;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .guida-step strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: #7f1d1d;
+    line-height: 1.3;
+  }
+
+  .guida-step p {
+    font-size: 12px;
+    color: #991b1b;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .guida-note {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #fca5a5;
+    font-size: 12px;
+    color: #b91c1c;
+    font-weight: 500;
+  }
+
+  /* ── FLOWCHART ── */
+  .flows-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 48px;
+    transition: box-shadow 0.2s;
+  }
+
+  .flows-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+
+  .flows-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .flows-info p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .flows-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .chip {
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  /* ── SERVIZI ── */
   .services-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 12px;
+    margin-bottom: 48px;
   }
 
   .service-pill {
@@ -432,12 +390,7 @@
   }
 
   .service-pill .s-icon { font-size: 22px; }
-
-  .service-pill .s-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-  }
+  .service-pill .s-name { font-size: 13px; font-weight: 600; color: var(--ink); }
 
   .service-pill .s-status {
     font-size: 11px;
@@ -446,66 +399,18 @@
     font-weight: 500;
   }
 
-  .s-done   { background: #e6f7f1; color: #0a7a52; border: 1px solid #9de0c6; }
-  .s-wip    { background: #fff8e6; color: #92580a; border: 1px solid #f5d08a; }
-  .s-todo   { background: #f0f4f7; color: var(--muted); border: 1px solid var(--border); }
-
-  /* ── FLUSSI ── */
-  .flows-section { margin-bottom: 48px; }
-
-  .flows-card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    transition: box-shadow 0.2s;
-  }
-
-  .flows-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-
-  .flows-info { flex: 1; }
-  .flows-info h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 6px;
-  }
-  .flows-info p {
-    font-size: 13.5px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .flows-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 12px;
-  }
-
-  .chip {
-    font-size: 11px;
-    font-weight: 500;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--ink-2);
-    padding: 3px 10px;
-    border-radius: 20px;
-  }
+  .s-done { background: #e6f7f1; color: #0a7a52; border: 1px solid #9de0c6; }
+  .s-wip  { background: #fff8e6; color: #92580a; border: 1px solid #f5d08a; }
+  .s-todo { background: #f0f4f7; color: var(--muted); border: 1px solid var(--border); }
 
   /* ── BUS INFO ── */
   .bus-section {
     background: var(--ink);
     border-radius: 16px;
-    padding: 32px 36px;
+    padding: 28px 32px;
     display: flex;
     gap: 40px;
     align-items: flex-start;
-    margin-bottom: 48px;
   }
 
   .bus-left { flex: 1; }
@@ -516,11 +421,7 @@
     color: var(--teal-mid);
     margin-bottom: 8px;
   }
-  .bus-left p {
-    font-size: 13.5px;
-    color: #8aa3b0;
-    line-height: 1.65;
-  }
+  .bus-left p { font-size: 13px; color: #8aa3b0; line-height: 1.65; }
 
   .bus-events {
     flex: 1;
@@ -539,12 +440,7 @@
     gap: 8px;
   }
 
-  .bus-event .ev-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+  .bus-event .ev-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
   .ev-teal   { background: rgba(30,159,216,0.15); color: #5dc8f0; }
   .ev-teal   .ev-dot { background: #1e9fd8; }
@@ -557,25 +453,12 @@
   .ev-amber  { background: rgba(217,119,6,0.15); color: #f5c26e; }
   .ev-amber  .ev-dot { background: #d97706; }
 
-  /* ── COLORS per pannelli ── */
-  .c-blue   { background: #eef5ff; }
-  .c-blue   .panel-icon { background: #dbeafe; }
-  .c-green  { background: #edfaf4; }
-  .c-green  .panel-icon { background: #d1fae9; }
-  .c-purple { background: #f3f0ff; }
-  .c-purple .panel-icon { background: #ede9fe; }
-
-  .tag-blue   { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
-  .tag-green  { background: #d1fae9; color: #065f46; border-color: #a7f3d0; }
-  .tag-purple { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
-
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .hero        { animation: fadeUp 0.5s ease both; }
-  .panel-card  { animation: fadeUp 0.5s ease both; }
+  .panel-card { animation: fadeUp 0.4s ease both; }
   .panel-card:nth-child(2) { animation-delay: 0.06s; }
   .panel-card:nth-child(3) { animation-delay: 0.12s; }
 </style>
@@ -595,100 +478,31 @@
   <span class="header-badge">PROTOTYPE · NOT FOR PRODUCTION</span>
 </header>
 
-<section class="hero">
-  <div class="hero-eyebrow">Telepedaggio + Servizi Ancillari</div>
-  <h1>Sistema di demo<br><strong>multi-pannello</strong></h1>
-  <p class="hero-sub">
-    Tre interfacce che simulano l'ecosistema digitale del progetto: app cliente, tablet operatore e CRM back-office. Aprile in finestre separate e interagisci: le azioni si propagano in tempo reale tramite l'event bus.
-  </p>
-  <div class="howto">
-    <div class="howto-title">Come usare la demo</div>
-    <div class="howto-steps">
-
-      <div class="howto-step">
-        <div class="step-left">
-          <div class="step-num">1</div>
-          <div class="step-line"></div>
-        </div>
-        <div class="step-right">
-          <strong>Apri i tre pannelli in finestre separate</strong>
-          <p>Clicca su <span class="step-badge sb-blue">📱 App Cliente</span> <span class="step-badge sb-purple">🖥️ CRM</span> <span class="step-badge sb-green">📋 Tablet</span> qui sotto e posiziona le finestre affiancate sullo schermo (o su monitor separati). Tutti e tre devono essere aperti nello <strong>stesso browser</strong> per comunicare.</p>
-        </div>
-      </div>
-
-      <div class="howto-step">
-        <div class="step-left">
-          <div class="step-num">2</div>
-          <div class="step-line"></div>
-        </div>
-        <div class="step-right">
-          <strong>Registra un cliente dal Tablet operatore</strong>
-          <p>Sul <span class="step-badge sb-green">📋 Tablet</span> completa il form di onboarding: dati anagrafici, veicolo, piano Telepedaggio e servizi opzionali (RSA, Area C, Memo). Al termine clicca <em>Conferma</em>. Il <span class="step-badge sb-purple">🖥️ CRM</span> riceve l'evento <code style="font-family:monospace;font-size:11px;background:#f0f4f7;padding:1px 5px;border-radius:4px;">cliente:registrato</code> e si aggiorna in tempo reale.</p>
-        </div>
-      </div>
-
-      <div class="howto-step">
-        <div class="step-left">
-          <div class="step-num">3</div>
-          <div class="step-line"></div>
-        </div>
-        <div class="step-right">
-          <strong>Usa l'App per generare eventi</strong>
-          <p>Sull'<span class="step-badge sb-blue">📱 App Cliente</span> simula le azioni del cliente: avvia una sosta Strisce Blu, attiva o disattiva Area C, chiama il soccorso RSA, visualizza le scadenze Memo. Ogni azione genera un movimento visibile nel log del <span class="step-badge sb-purple">🖥️ CRM</span>.</p>
-        </div>
-      </div>
-
-      <div class="howto-step">
-        <div class="step-left">
-          <div class="step-num">4</div>
-          <div class="step-line"></div>
-        </div>
-        <div class="step-right">
-          <strong>Usa il pannello scenari per situazioni specifiche</strong>
-          <p>Nel pannello a destra dell'<span class="step-badge sb-blue">📱 App</span> trovi i bottoni scenario: <em>Notifica scadenza sosta</em>, <em>Errore pagamento</em>, <em>Proroga sosta</em>, <em>Blocca telefono</em>. Usali per mostrare flussi edge-case senza dover navigare manualmente tutta l'app.</p>
-        </div>
-      </div>
-
-      <div class="howto-step">
-        <div class="step-left">
-          <div class="step-num">5</div>
-          <div class="step-line"></div>
-        </div>
-        <div class="step-right">
-          <strong>Osserva il CRM aggiornarsi in tempo reale</strong>
-          <p>Sul <span class="step-badge sb-purple">🖥️ CRM</span> il log eventi a destra mostra ogni azione con timestamp e colore per tipo. I movimenti, i casi di assistenza e lo stato dei servizi si aggiornano automaticamente — questo è il punto che colpisce IT e consulenti.</p>
-        </div>
-      </div>
-
-    </div>
-    <div class="howto-note">
-      <strong>⚠️ Nota tecnica:</strong> la comunicazione tra pannelli funziona solo tra tab dello <strong>stesso browser sullo stesso dispositivo</strong>. Per demo remote, aprire i tre pannelli sulla macchina del presentatore e condividere lo schermo.
-    </div>
-  </div>
-</section>
-
 <main class="main">
 
-  <!-- PANNELLI PRINCIPALI -->
-  <div class="section-label">Pannelli principali — aprire in finestre separate</div>
+  <div class="page-title">
+    <h1>Demo <strong>multi-pannello</strong> — Telepedaggio + Servizi Ancillari</h1>
+    <p>Apri i tre pannelli in finestre separate e interagisci: le azioni si propagano in tempo reale.</p>
+  </div>
+
+  <!-- PANNELLI PRINCIPALI — PRIMA COSA -->
+  <div class="section-label">Pannelli — aprire in finestre separate</div>
   <div class="panels-grid">
 
-    <!-- App cliente -->
     <div class="panel-card">
       <div class="panel-card-top c-blue">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
         <div class="panel-icon">📱</div>
         <h3>App Cliente</h3>
         <div class="filename">protoConEmulatore.html</div>
-        <p>Simula l'app mobile Enilive. Contiene il pannello scenari per attivare situazioni di demo: notifiche, errori pagamento, lock screen, proroga sosta.</p>
+        <p>App mobile Enilive con pannello scenari per attivare situazioni di demo: notifiche, errori pagamento, lock screen, proroga sosta.</p>
         <div class="tag-list">
           <span class="tag tag-blue">Alpine.js</span>
           <span class="tag tag-blue">Emulatore</span>
-          <span class="tag tag-blue">Strisce Blu</span>
           <span class="tag tag-blue">Bus</span>
         </div>
       </div>
       <div class="panel-card-bottom">
-        <div class="status-dot"><div class="dot green"></div> Operativo</div>
         <a href="protoConEmulatore.html" target="_blank" class="open-btn">
           Apri
           <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -696,22 +510,20 @@
       </div>
     </div>
 
-    <!-- CRM -->
     <div class="panel-card">
       <div class="panel-card-top c-purple">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
         <div class="panel-icon">🖥️</div>
         <h3>CRM Simulato</h3>
         <div class="filename">crm.html</div>
-        <p>Pannello back-office. Mostra scheda cliente, stato servizi, movimenti e casi di assistenza. Si aggiorna in tempo reale con le azioni sull'app e sul tablet.</p>
+        <p>Pannello back-office con scheda cliente, stato servizi e log eventi live. Si aggiorna in tempo reale dalle azioni dell'app e del tablet.</p>
         <div class="tag-list">
           <span class="tag tag-purple">Scheda cliente</span>
           <span class="tag tag-purple">Log eventi</span>
-          <span class="tag tag-purple">Casi</span>
           <span class="tag tag-purple">Bus</span>
         </div>
       </div>
       <div class="panel-card-bottom">
-        <div class="status-dot"><div class="dot amber"></div> Da costruire</div>
         <a href="crm.html" target="_blank" class="open-btn">
           Apri
           <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -719,13 +531,13 @@
       </div>
     </div>
 
-    <!-- Tablet -->
     <div class="panel-card">
       <div class="panel-card-top c-green">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
         <div class="panel-icon">📋</div>
         <h3>Tablet Operatore</h3>
         <div class="filename">tablet.html</div>
-        <p>Simula il tablet in dotazione al gestore della Enilive Station. Permette l'onboarding del cliente, firma del contratto Telepedaggio e attivazione dei servizi.</p>
+        <p>Tablet del gestore Enilive Station per l'onboarding del cliente: anagrafica, veicolo, firma contratto Telepedaggio e attivazione servizi.</p>
         <div class="tag-list">
           <span class="tag tag-green">Onboarding</span>
           <span class="tag tag-green">Firma contratto</span>
@@ -733,7 +545,6 @@
         </div>
       </div>
       <div class="panel-card-bottom">
-        <div class="status-dot"><div class="dot amber"></div> Da costruire</div>
         <a href="tablet.html" target="_blank" class="open-btn">
           Apri
           <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -743,60 +554,114 @@
 
   </div>
 
+  <!-- GUIDA IN ROSSO -->
+  <div class="guida">
+    <div class="guida-title">⚠️ Come usare la demo</div>
+    <div class="guida-steps">
+
+      <div class="guida-step">
+        <div class="guida-num">1</div>
+        <strong>Apri i 3 pannelli in finestre separate</strong>
+        <p>Tutti nello <strong>stesso browser</strong> sullo stesso dispositivo — necessario per la comunicazione in tempo reale.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">2</div>
+        <strong>Registra un cliente dal Tablet</strong>
+        <p>Compila il form di onboarding sul 📋 Tablet: anagrafica, veicolo, piano, servizi. Clicca <em>Conferma</em>: il 🖥️ CRM si aggiorna automaticamente.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">3</div>
+        <strong>Usa l'App per generare eventi</strong>
+        <p>Avvia soste, attiva servizi, chiama RSA. Ogni azione appare in tempo reale nel log del 🖥️ CRM.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">4</div>
+        <strong>Usa il pannello scenari</strong>
+        <p>Nel pannello a destra dell'📱 App trovi bottoni scenario preconfigurati per mostrare flussi edge-case in un click.</p>
+      </div>
+
+    </div>
+    <div class="guida-note">
+      ⚠️ La comunicazione funziona solo tra tab dello <strong>stesso browser sullo stesso dispositivo</strong>. Per demo remote: aprire i pannelli sulla macchina del presentatore e condividere lo schermo.
+    </div>
+  </div>
+
+  <!-- FLOWCHART -->
+  <div class="section-label">Documentazione flussi backend</div>
+  <div class="flows-card">
+    <div class="flows-info">
+      <h3>Flowchart processi backend</h3>
+      <p>Swimlane interattive per ogni servizio — attori, passaggi e integrazioni con partner esterni. Documentazione per IT e consulenti.</p>
+      <div class="flows-chips">
+        <span class="chip">Telepedaggio</span>
+        <span class="chip">Strisce Blu</span>
+        <span class="chip">RSA</span>
+        <span class="chip">Area C</span>
+        <span class="chip">Memo</span>
+        <span class="chip">Parcheggi</span>
+      </div>
+    </div>
+    <a href="flows.html" target="_blank" class="open-btn" style="flex-shrink:0; padding: 12px 24px; font-size: 14px;">
+      Apri flowchart
+      <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+
   <!-- SERVIZI -->
-  <div class="services-section">
-    <div class="section-label">Servizi implementati nell'app</div>
-    <div class="services-grid">
-      <div class="service-pill">
-        <div class="s-icon">🛣️</div>
-        <div class="s-name">Telepedaggio</div>
-        <span class="s-status s-wip">In sviluppo</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">🔵</div>
-        <div class="s-name">Strisce Blu</div>
-        <span class="s-status s-done">Completo</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">🅿️</div>
-        <div class="s-name">Parcheggi</div>
-        <span class="s-status s-todo">Da fare</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">🚗</div>
-        <div class="s-name">Area C</div>
-        <span class="s-status s-todo">Da fare</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">🆘</div>
-        <div class="s-name">RSA</div>
-        <span class="s-status s-todo">Da fare</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">🔔</div>
-        <div class="s-name">Memo</div>
-        <span class="s-status s-todo">Da fare</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">📊</div>
-        <div class="s-name">Movimenti</div>
-        <span class="s-status s-todo">Da fare</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">⭐</div>
-        <div class="s-name">Loyalty</div>
-        <span class="s-status s-done">Display only</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">📦</div>
-        <div class="s-name">Bundle</div>
-        <span class="s-status s-done">Display only</span>
-      </div>
-      <div class="service-pill">
-        <div class="s-icon">👤</div>
-        <div class="s-name">Account</div>
-        <span class="s-status s-done">Completo</span>
-      </div>
+  <div class="section-label">Servizi implementati nell'app</div>
+  <div class="services-grid">
+    <div class="service-pill">
+      <div class="s-icon">🛣️</div>
+      <div class="s-name">Telepedaggio</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🔵</div>
+      <div class="s-name">Strisce Blu</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🅿️</div>
+      <div class="s-name">Parcheggi</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🚗</div>
+      <div class="s-name">Area C</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🆘</div>
+      <div class="s-name">RSA</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🔔</div>
+      <div class="s-name">Memo</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">📊</div>
+      <div class="s-name">Movimenti</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">⭐</div>
+      <div class="s-name">Loyalty</div>
+      <span class="s-status s-wip">Display only</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">📦</div>
+      <div class="s-name">Bundle</div>
+      <span class="s-status s-wip">Display only</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">👤</div>
+      <div class="s-name">Account</div>
+      <span class="s-status s-done">Completo</span>
     </div>
   </div>
 
@@ -813,29 +678,6 @@
       <div class="bus-event ev-green"><div class="ev-dot"></div>pagamento:confermato</div>
       <div class="bus-event ev-purple"><div class="ev-dot"></div>sosta:avviata</div>
       <div class="bus-event ev-amber"><div class="ev-dot"></div>rsa:chiamata</div>
-    </div>
-  </div>
-
-  <!-- FLOWCHART -->
-  <div class="flows-section">
-    <div class="section-label">Documentazione flussi backend</div>
-    <div class="flows-card">
-      <div class="flows-info">
-        <h3>Flowchart processi backend</h3>
-        <p>Swimlane interattive per ogni servizio. Mostra gli attori coinvolti (App, Sistema Enilive, Partner esterni) e i passaggi di processo. Documentazione tecnica per IT e consulenti.</p>
-        <div class="flows-chips">
-          <span class="chip">Telepedaggio</span>
-          <span class="chip">Strisce Blu</span>
-          <span class="chip">RSA</span>
-          <span class="chip">Area C</span>
-          <span class="chip">Memo</span>
-          <span class="chip">Parcheggi</span>
-        </div>
-      </div>
-      <a href="flows.html" target="_blank" class="open-btn" style="flex-shrink:0; padding: 12px 24px; font-size: 14px;">
-        Apri flowchart
-        <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
     </div>
   </div>
 
