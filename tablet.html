@@ -275,7 +275,7 @@
             <div class="text-xs text-blue-200" x-text="operatorStation"></div>
           </div>
         </template>
-        <template x-if="operatorLoggedIn && !flowCompleted">
+        <template x-if="operatorLoggedIn && !flowCompleted && tabletMode === 'vendita'">
           <div class="text-right">
             <div class="text-xs text-blue-200 mb-1">Passo <span x-text="currentStep"></span> di <span x-text="totalSteps"></span></div>
             <div class="w-36 h-2 bg-blue-900 rounded-full overflow-hidden">
@@ -283,11 +283,18 @@
             </div>
           </div>
         </template>
+        <template x-if="operatorLoggedIn && tabletMode === 'assistenza'">
+          <div class="text-right">
+            <span class="text-xs text-blue-200 bg-blue-900 px-3 py-1 rounded-full">
+              <i class="fas fa-headset mr-1"></i>Modalità Assistenza
+            </span>
+          </div>
+        </template>
       </div>
     </div>
 
     <!-- Step labels (visible when logged in) -->
-    <template x-if="operatorLoggedIn && !flowCompleted">
+    <template x-if="operatorLoggedIn && !flowCompleted && tabletMode === 'vendita'">
       <div class="px-6 pb-3 flex items-center gap-2 overflow-x-auto">
         <template x-for="(label, idx) in stepLabels" :key="idx">
           <div class="flex items-center gap-1 flex-shrink-0">
@@ -1549,6 +1556,1148 @@
       </div>
     </template>
 
+
+    <!-- ======================================================= -->
+    <!-- SELEZIONE MODALITÀ — dopo login, prima del flusso       -->
+    <!-- ======================================================= -->
+    <template x-if="operatorLoggedIn && !tabletMode">
+      <div class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="card p-10 w-full max-w-lg">
+          <div class="text-center mb-8">
+            <div class="w-14 h-14 bg-teal rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-th-large text-white text-xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900">Seleziona operazione</h2>
+            <p class="text-gray-500 mt-1">Scegli la modalità per questa sessione</p>
+          </div>
+          <div class="grid grid-cols-2 gap-5">
+            <button class="btn-primary justify-center py-10 text-lg flex-col gap-3 rounded-2xl" @click="selectMode('vendita')">
+              <i class="fas fa-file-contract text-3xl"></i>
+              <span class="font-bold text-base">VENDITA</span>
+              <span class="text-xs font-normal opacity-80">Onboarding nuovo cliente</span>
+            </button>
+            <button class="btn-secondary justify-center py-10 text-lg flex-col gap-3 rounded-2xl" @click="selectMode('assistenza')">
+              <i class="fas fa-headset text-3xl"></i>
+              <span class="font-bold text-base">ASSISTENZA</span>
+              <span class="text-xs font-normal opacity-60">Gestione cliente esistente</span>
+            </button>
+          </div>
+          <p class="text-center text-xs text-gray-400 mt-6">
+            Operatore: <span x-text="operatorName"></span> — <span x-text="operatorStation"></span>
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- FLUSSO ASSISTENZA                                        -->
+    <!-- ======================================================= -->
+    <template x-if="tabletMode === 'assistenza'">
+      <div>
+
+        <!-- Breadcrumb assistenza -->
+        <div class="mb-6 flex items-center gap-2 flex-wrap">
+          <button class="btn-ghost text-sm py-1.5 px-3" @click="tabletMode = null; assistStep = 'ricerca'; assistCliente = null; assistAzione = null;">
+            <i class="fas fa-arrow-left mr-1"></i> Selezione modalità
+          </button>
+          <template x-if="assistStep !== 'ricerca'">
+            <i class="fas fa-chevron-right text-gray-400 text-sm"></i>
+          </template>
+          <template x-if="assistStep !== 'ricerca'">
+            <button class="text-sm text-gray-600 hover:text-teal transition-colors py-1.5 px-2 rounded"
+              @click="assistStep = 'ricerca'; assistCliente = null; assistAzione = null; resetAssistOp()">
+              Ricerca cliente
+            </button>
+          </template>
+          <template x-if="assistStep === 'griglia' || assistStep === 'flusso'">
+            <i class="fas fa-chevron-right text-gray-400 text-sm"></i>
+          </template>
+          <template x-if="assistStep === 'griglia' || assistStep === 'flusso'">
+            <button class="text-sm text-gray-600 hover:text-teal transition-colors py-1.5 px-2 rounded"
+              @click="assistStep = 'griglia'; assistAzione = null; resetAssistOp()">
+              <span x-text="assistCliente ? assistCliente.nome + ' ' + assistCliente.cognome : 'Scheda cliente'"></span>
+            </button>
+          </template>
+          <template x-if="assistStep === 'flusso'">
+            <i class="fas fa-chevron-right text-gray-400 text-sm"></i>
+          </template>
+          <template x-if="assistStep === 'flusso'">
+            <span class="text-sm font-semibold text-teal py-1.5 px-2" x-text="assistAzioneLabel()"></span>
+          </template>
+        </div>
+
+        <!-- ===== STEP: RICERCA CLIENTE ===== -->
+        <template x-if="assistStep === 'ricerca'">
+          <div class="card p-8 max-w-xl mx-auto">
+            <h2 class="text-xl font-bold text-gray-900 mb-1">
+              <i class="fas fa-search text-teal mr-2"></i>Ricerca cliente
+            </h2>
+            <p class="text-gray-500 text-sm mb-6">Cerca il cliente per CF, targa o contatto</p>
+
+            <div class="flex gap-2 mb-5">
+              <button class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                :class="assistSearchType === 'cf' ? 'bg-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                @click="assistSearchType = 'cf'; assistSearchQuery = ''">
+                <i class="fas fa-id-card mr-1"></i> Codice Fiscale
+              </button>
+              <button class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                :class="assistSearchType === 'targa' ? 'bg-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                @click="assistSearchType = 'targa'; assistSearchQuery = ''">
+                <i class="fas fa-car mr-1"></i> Targa
+              </button>
+              <button class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                :class="assistSearchType === 'contatto' ? 'bg-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                @click="assistSearchType = 'contatto'; assistSearchQuery = ''">
+                <i class="fas fa-phone mr-1"></i> Email / Cellulare
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="form-label" x-text="assistSearchType === 'cf' ? 'Codice Fiscale' : assistSearchType === 'targa' ? 'Targa veicolo' : 'Email o cellulare'"></label>
+                <input
+                  x-model="assistSearchQuery"
+                  :placeholder="assistSearchType === 'cf' ? 'es. BNCMRC85T10H501Z' : assistSearchType === 'targa' ? 'es. AB123CD' : 'es. marco@email.it'"
+                  class="form-input"
+                  :class="assistSearchType !== 'contatto' ? 'uppercase' : ''"
+                  @keydown.enter="cercaCliente()"
+                  type="text" />
+              </div>
+              <button class="btn-primary w-full justify-center"
+                @click="cercaCliente()"
+                :disabled="assistSearchLoading || !assistSearchQuery.trim()">
+                <span x-show="assistSearchLoading" class="spinner"></span>
+                <i x-show="!assistSearchLoading" class="fas fa-search"></i>
+                <span x-text="assistSearchLoading ? 'Ricerca in corso...' : 'Cerca cliente'"></span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===== STEP: SCHEDA CLIENTE ===== -->
+        <template x-if="assistStep === 'scheda' && assistCliente">
+          <div class="card p-8 max-w-2xl mx-auto">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-xl font-bold text-gray-900">
+                <i class="fas fa-user-circle text-teal mr-2"></i>Scheda cliente
+              </h2>
+              <button class="btn-ghost text-sm" @click="assistStep = 'ricerca'; assistCliente = null">
+                <i class="fas fa-arrow-left mr-1"></i> Nuova ricerca
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="bg-gray-50 rounded-xl p-4">
+                <p class="text-xs text-gray-400 mb-1">Cliente</p>
+                <p class="font-bold text-gray-900 text-lg" x-text="assistCliente.nome + ' ' + assistCliente.cognome"></p>
+                <p class="text-sm text-gray-500 font-mono" x-text="assistCliente.cf"></p>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-4">
+                <p class="text-xs text-gray-400 mb-1">Contatti</p>
+                <p class="text-sm text-gray-700" x-text="assistCliente.email"></p>
+                <p class="text-sm text-gray-700" x-text="assistCliente.cellulare"></p>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Veicoli</p>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="v in assistCliente.veicoli" :key="v.targa">
+                  <span class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-car text-gray-400 mr-1"></i>
+                    <span class="font-mono font-semibold" x-text="v.targa"></span>
+                    <span class="text-xs text-gray-400 ml-1" x-text="'(' + v.marca + ' ' + v.modello + ')'"></span>
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Servizi attivi</p>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="s in assistCliente.serviziAttivi" :key="s">
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold bg-teal text-white capitalize" x-text="s"></span>
+                </template>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-6">
+              <div class="bg-gray-50 rounded-xl p-3">
+                <p class="text-xs text-gray-400 mb-1">OBU</p>
+                <template x-for="o in assistCliente.obu" :key="o.codice">
+                  <p class="text-sm font-mono font-semibold text-gray-800" x-text="o.codice"></p>
+                </template>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-3">
+                <p class="text-xs text-gray-400 mb-1">Pagamento</p>
+                <p class="text-sm font-semibold uppercase" x-text="assistCliente.metodoPagamento.tipo"></p>
+                <p class="text-xs text-gray-500 font-mono" x-text="assistCliente.metodoPagamento.valore"></p>
+              </div>
+              <div class="rounded-xl p-3" :class="assistCliente.ticketAperti > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'">
+                <p class="text-xs text-gray-400 mb-1">Ticket aperti</p>
+                <p class="text-2xl font-bold" :class="assistCliente.ticketAperti > 0 ? 'text-amber-600' : 'text-gray-400'" x-text="assistCliente.ticketAperti"></p>
+              </div>
+            </div>
+
+            <button class="btn-primary w-full justify-center text-lg py-4" @click="assistStep = 'griglia'">
+              <i class="fas fa-tools mr-2"></i> Procedi con assistenza
+            </button>
+          </div>
+        </template>
+
+        <!-- ===== STEP: GRIGLIA AZIONI ===== -->
+        <template x-if="assistStep === 'griglia' && assistCliente">
+          <div>
+            <div class="flex items-center justify-between mb-5">
+              <div>
+                <h2 class="text-xl font-bold text-gray-900">Azioni assistenza</h2>
+                <p class="text-gray-500 text-sm" x-text="assistCliente.nome + ' ' + assistCliente.cognome + ' — ' + assistCliente.cf"></p>
+              </div>
+              <button class="btn-ghost text-sm" @click="assistStep = 'scheda'">
+                <i class="fas fa-arrow-left mr-1"></i> Scheda cliente
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+
+              <!-- CAT 1 — Dati Cliente -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-user mr-2 text-blue-500"></i>Dati Cliente
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-700 transition-all text-sm font-medium" @click="avviaAzione('aggiorna-residenza')">
+                    <i class="fas fa-home mr-2 text-gray-400"></i>Aggiorna residenza / domicilio
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-700 transition-all text-sm font-medium" @click="avviaAzione('aggiorna-contatti')">
+                    <i class="fas fa-phone-alt mr-2 text-gray-400"></i>Aggiorna dati di contatto
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-700 transition-all text-sm font-medium" @click="avviaAzione('aggiorna-veicolo')">
+                    <i class="fas fa-car mr-2 text-gray-400"></i>Aggiorna dati veicolo
+                  </button>
+                </div>
+              </div>
+
+              <!-- CAT 2 — Dispositivo OBU -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-broadcast-tower mr-2 text-teal"></i>Dispositivo OBU
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-teal-light hover:text-teal transition-all text-sm font-medium" @click="avviaAzione('sostituisci-obu')">
+                    <i class="fas fa-exchange-alt mr-2 text-gray-400"></i>Sostituisci OBU (malfunzionamento)
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-blue-50 hover:text-blue-700 transition-all text-sm font-medium" @click="avviaAzione('cambio-targa-obu')">
+                    <i class="fas fa-car-side mr-2 text-gray-400"></i>Cambio targa associata a OBU
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-700 transition-all text-sm font-medium" @click="avviaAzione('furto-obu')">
+                    <i class="fas fa-exclamation-triangle mr-2 text-gray-400"></i>Furto / Smarrimento OBU
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-all text-sm font-medium" @click="avviaAzione('restituzione-obu')">
+                    <i class="fas fa-undo mr-2 text-gray-400"></i>Restituzione OBU
+                  </button>
+                </div>
+              </div>
+
+              <!-- CAT 3 — Contratto & Pagamenti -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-credit-card mr-2 text-green-600"></i>Contratto &amp; Pagamenti
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-green-50 hover:text-green-700 transition-all text-sm font-medium" @click="avviaAzione('modifica-pagamento')">
+                    <i class="fas fa-wallet mr-2 text-gray-400"></i>Modifica metodo di pagamento
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-green-50 hover:text-green-700 transition-all text-sm font-medium" @click="avviaAzione('adesione-rimodulazione')">
+                    <i class="fas fa-percentage mr-2 text-gray-400"></i>Adesione rimodulazione tariffaria
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-amber-50 hover:text-amber-700 transition-all text-sm font-medium" @click="avviaAzione('revoca-rimodulazione')">
+                    <i class="fas fa-times-circle mr-2 text-gray-400"></i>Revoca rimodulazione tariffaria
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-700 transition-all text-sm font-medium" @click="avviaAzione('disattivazione-servizio')">
+                    <i class="fas fa-ban mr-2 text-gray-400"></i>Disattivazione servizio / Recesso
+                  </button>
+                </div>
+              </div>
+
+              <!-- CAT 4 — Documenti -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-file-alt mr-2 text-purple-500"></i>Documenti
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-purple-50 hover:text-purple-700 transition-all text-sm font-medium" @click="avviaAzione('richiesta-fattura')">
+                    <i class="fas fa-file-invoice mr-2 text-gray-400"></i>Richiesta fattura
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-purple-50 hover:text-purple-700 transition-all text-sm font-medium" @click="avviaAzione('nota-spese')">
+                    <i class="fas fa-receipt mr-2 text-gray-400"></i>Richiesta nota spese
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-purple-50 hover:text-purple-700 transition-all text-sm font-medium" @click="avviaAzione('scansione-rmpp')">
+                    <i class="fas fa-barcode mr-2 text-gray-400"></i>Scansione RMPP
+                  </button>
+                </div>
+              </div>
+
+              <!-- CAT 5 — Transiti -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-road mr-2 text-orange-500"></i>Transiti
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-orange-50 hover:text-orange-700 transition-all text-sm font-medium" @click="avviaAzione('mancata-stazione')">
+                    <i class="fas fa-exclamation-circle mr-2 text-gray-400"></i>Mancata stazione d'ingresso
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-orange-50 hover:text-orange-700 transition-all text-sm font-medium" @click="avviaAzione('disconoscimento-transito')">
+                    <i class="fas fa-question-circle mr-2 text-gray-400"></i>Disconoscimento transito
+                  </button>
+                </div>
+              </div>
+
+              <!-- CAT 6 — Ticket & Altro -->
+              <div class="card p-5">
+                <h3 class="font-bold text-gray-700 mb-3 text-base">
+                  <i class="fas fa-ticket-alt mr-2 text-rose-500"></i>Ticket &amp; Altro
+                </h3>
+                <div class="space-y-2">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-rose-50 hover:text-rose-700 transition-all text-sm font-medium" @click="avviaAzione('apri-ticket')">
+                    <i class="fas fa-headset mr-2 text-gray-400"></i>Apri ticket 2° livello
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-rose-50 hover:text-rose-700 transition-all text-sm font-medium" @click="avviaAzione('feedback')">
+                    <i class="fas fa-star mr-2 text-gray-400"></i>Feedback post-assistenza
+                  </button>
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-rose-50 hover:text-rose-700 transition-all text-sm font-medium" @click="avviaAzione('recupero-credenziali')">
+                    <i class="fas fa-key mr-2 text-gray-400"></i>Recupero credenziali cliente
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </template>
+
+        <!-- ===== STEP: FLUSSO SPECIFICO ===== -->
+        <template x-if="assistStep === 'flusso' && assistCliente">
+          <div class="card p-8 max-w-2xl mx-auto">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-xl font-bold text-gray-900" x-text="assistAzioneLabel()"></h2>
+              <button class="btn-ghost text-sm" @click="assistStep = 'griglia'; assistAzione = null; resetAssistOp()">
+                <i class="fas fa-arrow-left mr-1"></i> Torna alle azioni
+              </button>
+            </div>
+
+            <!-- Banner successo operazione -->
+            <template x-if="assistOpSuccess">
+              <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-5 flex items-center gap-3">
+                <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                <div>
+                  <p class="font-semibold text-green-800">Operazione completata</p>
+                  <p class="text-sm text-green-600">Ritorno alla griglia azioni in corso...</p>
+                </div>
+              </div>
+            </template>
+
+            <!-- ========== 4.1 — Aggiorna residenza / domicilio ========== -->
+            <template x-if="assistAzione === 'aggiorna-residenza'">
+              <div class="space-y-5">
+                <div class="grid grid-cols-2 gap-5">
+                  <div class="space-y-3">
+                    <p class="font-semibold text-gray-700 border-b pb-2 text-sm uppercase tracking-wider">Residenza</p>
+                    <div><label class="form-label">Via</label><input x-model="assistForm.resVia" class="form-input" /></div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div><label class="form-label">CAP</label><input x-model="assistForm.resCap" class="form-input" /></div>
+                      <div><label class="form-label">Prov.</label><input x-model="assistForm.resProvincia" class="form-input uppercase" /></div>
+                    </div>
+                    <div><label class="form-label">Città</label><input x-model="assistForm.resCitta" class="form-input" /></div>
+                  </div>
+                  <div class="space-y-3">
+                    <p class="font-semibold text-gray-700 border-b pb-2 text-sm uppercase tracking-wider">Domicilio</p>
+                    <div><label class="form-label">Via</label><input x-model="assistForm.domVia" class="form-input" /></div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div><label class="form-label">CAP</label><input x-model="assistForm.domCap" class="form-input" /></div>
+                      <div><label class="form-label">Prov.</label><input x-model="assistForm.domProvincia" class="form-input uppercase" /></div>
+                    </div>
+                    <div><label class="form-label">Città</label><input x-model="assistForm.domCitta" class="form-input" /></div>
+                  </div>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-3 text-sm text-blue-700">
+                  <i class="fas fa-info-circle mr-1"></i> Autenticazione in store sufficiente — nessun OTP richiesto.
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('aggiorna-residenza')" :disabled="assistOpLoading">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma operazione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.2 — Aggiorna dati di contatto ========== -->
+            <template x-if="assistAzione === 'aggiorna-contatti'">
+              <div class="space-y-4">
+                <div><label class="form-label">Email</label><input x-model="assistForm.email" class="form-input" /></div>
+                <div><label class="form-label">Cellulare</label><input x-model="assistForm.cellulare" class="form-input" /></div>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al nuovo contatto
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800"><i class="fas fa-sms mr-1"></i> OTP inviato al nuovo contatto</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()"><i class="fas fa-check mr-1"></i>Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2 text-green-700 text-sm">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('aggiorna-contatti')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma operazione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.3 — Aggiorna dati veicolo ========== -->
+            <template x-if="assistAzione === 'aggiorna-veicolo'">
+              <div class="space-y-4">
+                <template x-for="(v, idx) in assistForm.veicoli" :key="idx">
+                  <div class="border border-gray-200 rounded-xl p-4 space-y-3">
+                    <p class="font-semibold text-gray-700 text-sm">Veicolo <span x-text="idx+1"></span></p>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div><label class="form-label">Targa</label><input x-model="v.targa" class="form-input uppercase" /></div>
+                      <div>
+                        <label class="form-label">Tipo</label>
+                        <select x-model="v.tipo" class="form-input">
+                          <option>Automobile</option><option>Moto</option><option>Furgone</option>
+                        </select>
+                      </div>
+                      <div><label class="form-label">Marca</label><input x-model="v.marca" class="form-input" /></div>
+                      <div><label class="form-label">Modello</label><input x-model="v.modello" class="form-input" /></div>
+                    </div>
+                  </div>
+                </template>
+                <button class="btn-secondary text-sm py-2" @click="assistForm.veicoli.push({targa:'', tipo:'Automobile', marca:'', modello:''})">
+                  <i class="fas fa-plus mr-1"></i> Aggiungi veicolo
+                </button>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('aggiorna-veicolo')" :disabled="assistOpLoading">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma operazione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.4 — Sostituisci OBU ========== -->
+            <template x-if="assistAzione === 'sostituisci-obu'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona OBU da sostituire</label>
+                  <template x-for="o in assistCliente.obu" :key="o.codice">
+                    <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 mb-2 cursor-pointer hover:border-teal transition-all"
+                      :class="assistForm.obuSelezionato === o.codice ? 'border-teal bg-teal-light' : ''"
+                      @click="assistForm.obuSelezionato = o.codice">
+                      <i class="fas fa-circle text-xs" :class="assistForm.obuSelezionato === o.codice ? 'text-teal' : 'text-gray-300'"></i>
+                      <div>
+                        <p class="font-mono font-semibold text-sm" x-text="o.codice"></p>
+                        <p class="text-xs text-gray-400" x-text="'Targa: ' + o.targa + ' — Stato: ' + o.stato"></p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <div>
+                  <label class="form-label">Nuovo codice OBU</label>
+                  <div class="flex gap-2">
+                    <input x-model="assistForm.nuovoObu" class="form-input" placeholder="Scansiona o inserisci manualmente" />
+                    <button class="btn-secondary px-3 flex-shrink-0" @click="simulaScanObu()" title="Simula scansione">
+                      <i class="fas fa-qrcode" :class="assistForm.obuScanning ? 'scanning-anim' : ''"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
+                  <i class="fas fa-info-circle mr-1"></i> Stock verificato: disponibile. Nessun costo aggiuntivo per sostituzione.
+                </div>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato || !assistForm.nuovoObu">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('sostituisci-obu')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma sostituzione OBU
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.5 — Cambio targa associata a OBU ========== -->
+            <template x-if="assistAzione === 'cambio-targa-obu'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona OBU</label>
+                  <template x-for="o in assistCliente.obu" :key="o.codice">
+                    <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 mb-2 cursor-pointer hover:border-teal transition-all"
+                      :class="assistForm.obuSelezionato === o.codice ? 'border-teal bg-teal-light' : ''"
+                      @click="assistForm.obuSelezionato = o.codice">
+                      <i class="fas fa-circle text-xs" :class="assistForm.obuSelezionato === o.codice ? 'text-teal' : 'text-gray-300'"></i>
+                      <div>
+                        <p class="font-mono font-semibold text-sm" x-text="o.codice"></p>
+                        <p class="text-xs text-gray-400" x-text="'Targa attuale: ' + o.targa"></p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <div>
+                  <label class="form-label">Nuova targa</label>
+                  <input x-model="assistForm.nuovaTarga" class="form-input uppercase" placeholder="es. CD789EF" @input="checkTarga()" />
+                </div>
+                <template x-if="assistForm.targaWarning">
+                  <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Targa già associata a un altro contratto.
+                  </div>
+                </template>
+                <template x-if="!assistOtpSent && !assistForm.targaWarning">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato || !assistForm.nuovaTarga">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('cambio-targa-obu')" :disabled="assistOpLoading || !assistOtpConfirmed || assistForm.targaWarning">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma cambio targa
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.6 — Furto / Smarrimento OBU ========== -->
+            <template x-if="assistAzione === 'furto-obu'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona OBU da bloccare</label>
+                  <template x-for="o in assistCliente.obu" :key="o.codice">
+                    <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 mb-2 cursor-pointer hover:border-teal transition-all"
+                      :class="assistForm.obuSelezionato === o.codice ? 'border-teal bg-teal-light' : ''"
+                      @click="assistForm.obuSelezionato = o.codice">
+                      <i class="fas fa-circle text-xs" :class="assistForm.obuSelezionato === o.codice ? 'text-teal' : 'text-gray-300'"></i>
+                      <div>
+                        <p class="font-mono font-semibold text-sm" x-text="o.codice"></p>
+                        <p class="text-xs text-gray-400" x-text="'Targa: ' + o.targa"></p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  <i class="fas fa-exclamation-triangle mr-1"></i> Nessuna polizza furto/smarrimento attiva. Verrà applicata la penale contrattuale.
+                </div>
+                <div>
+                  <label class="form-label">Il cliente vuole un OBU sostitutivo?</label>
+                  <div class="flex gap-4 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.vuoleSostitutivo" value="si" class="accent-teal" />
+                      <span class="text-sm">Sì — procedi dopo il blocco</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.vuoleSostitutivo" value="no" class="accent-teal" />
+                      <span class="text-sm">No — solo blocco</span>
+                    </label>
+                  </div>
+                </div>
+                <template x-if="assistForm.vuoleSostitutivo === 'si'">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+                    <i class="fas fa-info-circle mr-1"></i> Dopo il blocco, usa "Sostituisci OBU" dalla griglia azioni.
+                  </div>
+                </template>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" style="background-color:#dc2626" @click="confermaOperazione('furto-obu')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-lock"></i>
+                  Blocca dispositivo
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.7 — Restituzione OBU ========== -->
+            <template x-if="assistAzione === 'restituzione-obu'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona OBU da restituire</label>
+                  <template x-for="o in assistCliente.obu" :key="o.codice">
+                    <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 mb-2 cursor-pointer hover:border-teal transition-all"
+                      :class="assistForm.obuSelezionato === o.codice ? 'border-teal bg-teal-light' : ''"
+                      @click="assistForm.obuSelezionato = o.codice">
+                      <i class="fas fa-circle text-xs" :class="assistForm.obuSelezionato === o.codice ? 'text-teal' : 'text-gray-300'"></i>
+                      <div>
+                        <p class="font-mono font-semibold text-sm" x-text="o.codice"></p>
+                        <p class="text-xs text-gray-400" x-text="'Targa: ' + o.targa + ' — Contratto: attivo'"></p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-lg hover:border-teal transition-all">
+                  <input type="checkbox" x-model="assistForm.obuRicevuto" class="accent-teal w-5 h-5" />
+                  <span class="text-sm font-medium">OBU ricevuto fisicamente dal cliente</span>
+                </label>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato || !assistForm.obuRicevuto">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente per conferma
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('restituzione-obu')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma restituzione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.8 — Modifica metodo di pagamento ========== -->
+            <template x-if="assistAzione === 'modifica-pagamento'">
+              <div class="space-y-4">
+                <div class="bg-gray-50 rounded-lg p-3 text-sm">
+                  <span class="text-gray-400">Metodo attuale: </span>
+                  <span class="font-semibold" x-text="assistCliente.metodoPagamento.tipo.toUpperCase() + ' — ' + assistCliente.metodoPagamento.valore"></span>
+                </div>
+                <div>
+                  <label class="form-label">Nuovo metodo</label>
+                  <div class="flex gap-4 mt-1">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.tipoPagamento" value="iban" class="accent-teal" /> <span class="text-sm font-medium">IBAN</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.tipoPagamento" value="carta" class="accent-teal" /> <span class="text-sm font-medium">Carta di credito/debito</span>
+                    </label>
+                  </div>
+                </div>
+                <template x-if="assistForm.tipoPagamento === 'iban'">
+                  <div class="space-y-3">
+                    <div><label class="form-label">IBAN</label><input x-model="assistForm.iban" class="form-input uppercase" placeholder="IT60 XXXX XXXX XXXX XXXX 1234" /></div>
+                    <template x-if="!assistOtpSent">
+                      <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.iban">
+                        <i class="fas fa-sms mr-1"></i> Invia OTP per verifica titolarità
+                      </button>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="assistForm.tipoPagamento === 'carta'">
+                  <div class="space-y-3 border border-gray-200 rounded-xl p-4">
+                    <p class="font-semibold text-sm text-gray-600"><i class="fas fa-credit-card mr-1"></i> POS simulato</p>
+                    <div><label class="form-label">Intestatario</label><input x-model="assistForm.cartaIntestazione" class="form-input" placeholder="MARIO ROSSI" /></div>
+                    <div><label class="form-label">PAN</label><input x-model="assistForm.cartaPan" class="form-input" placeholder="**** **** **** ****" maxlength="19" /></div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div><label class="form-label">Scadenza</label><input x-model="assistForm.cartaScadenza" class="form-input" placeholder="MM/YY" maxlength="5" /></div>
+                      <div><label class="form-label">CVV</label><input x-model="assistForm.cartaCvv" class="form-input" placeholder="***" maxlength="3" type="password" /></div>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center"
+                  @click="confermaOperazione('modifica-pagamento')"
+                  :disabled="assistOpLoading || (assistForm.tipoPagamento === 'iban' && !assistOtpConfirmed) || !assistForm.tipoPagamento">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Conferma metodo di pagamento
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.9 — Adesione rimodulazione tariffaria ========== -->
+            <template x-if="assistAzione === 'adesione-rimodulazione'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Tipo rimodulazione</label>
+                  <select x-model="assistForm.tipoRimodulazione" class="form-input">
+                    <option value="">Seleziona...</option>
+                    <option value="sconto_moto">Sconto Moto (−10%)</option>
+                    <option value="sconto_residenti">Sconto Residenti (−15%)</option>
+                    <option value="convenzione_aziendale">Convenzione Aziendale (−20%)</option>
+                  </select>
+                </div>
+                <template x-if="assistForm.tipoRimodulazione">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm">
+                    <p class="font-semibold text-green-800 mb-1">Requisiti verificati</p>
+                    <p class="text-green-700"><i class="fas fa-check mr-1"></i> Cliente idoneo alla rimodulazione selezionata</p>
+                  </div>
+                </template>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.tipoRimodulazione">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('adesione-rimodulazione')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Attiva rimodulazione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.10 — Revoca rimodulazione ========== -->
+            <template x-if="assistAzione === 'revoca-rimodulazione'">
+              <div class="space-y-4">
+                <!-- Mock: mostra sempre una rimodulazione per demo -->
+                <div>
+                  <label class="form-label">Rimodulazioni attive</label>
+                  <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-teal transition-all mt-2"
+                    :class="assistForm.rimodulazioneSelezionata === 'sconto_moto' ? 'border-teal bg-teal-light' : ''"
+                    @click="assistForm.rimodulazioneSelezionata = 'sconto_moto'">
+                    <i class="fas fa-circle text-xs" :class="assistForm.rimodulazioneSelezionata === 'sconto_moto' ? 'text-teal' : 'text-gray-300'"></i>
+                    <span class="text-sm font-medium">Sconto Moto (−10%) — attiva dal 01/01/2026</span>
+                  </div>
+                </div>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  <i class="fas fa-exclamation-triangle mr-1"></i> La revoca è immediata e irreversibile.
+                </div>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.rimodulazioneSelezionata">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('revoca-rimodulazione')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Revoca rimodulazione
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.11 — Disattivazione servizio / Recesso ========== -->
+            <template x-if="assistAzione === 'disattivazione-servizio'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona servizio da disattivare</label>
+                  <div class="space-y-2 mt-2">
+                    <template x-for="s in assistCliente.serviziAttivi" :key="s">
+                      <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-teal transition-all">
+                        <input type="checkbox" :value="s" x-model="assistForm.serviziDaDisattivare" class="accent-teal w-4 h-4" />
+                        <span class="text-sm font-medium capitalize" x-text="s"></span>
+                      </label>
+                    </template>
+                  </div>
+                </div>
+                <template x-if="assistForm.serviziDaDisattivare.includes('telepedaggio')">
+                  <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Il recesso dal Telepedaggio comporta la disattivazione di tutti i servizi collegati.
+                  </div>
+                </template>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="assistForm.serviziDaDisattivare.length === 0">
+                    <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('disattivazione-servizio')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-ban"></i>
+                  Disattiva servizio
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.12 — Richiesta fattura ========== -->
+            <template x-if="assistAzione === 'richiesta-fattura'">
+              <div class="space-y-4">
+                <label class="form-label">Seleziona fattura</label>
+                <div class="space-y-2">
+                  <template x-for="f in assistCliente.fatture" :key="f.id">
+                    <div class="border border-gray-200 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-teal transition-all"
+                      :class="assistForm.fatturaSelezionata === f.id ? 'border-teal bg-teal-light' : ''"
+                      @click="assistForm.fatturaSelezionata = f.id">
+                      <div class="flex items-center gap-3">
+                        <i class="fas fa-circle text-xs" :class="assistForm.fatturaSelezionata === f.id ? 'text-teal' : 'text-gray-300'"></i>
+                        <div>
+                          <p class="font-semibold text-sm" x-text="f.mese + ' — €' + f.importo.toFixed(2)"></p>
+                          <p class="text-xs text-gray-400" x-text="f.id"></p>
+                        </div>
+                      </div>
+                      <span class="text-xs px-2 py-1 rounded-full font-semibold"
+                        :class="f.stato === 'pagata' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                        x-text="f.stato"></span>
+                    </div>
+                  </template>
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('richiesta-fattura')" :disabled="assistOpLoading || !assistForm.fatturaSelezionata">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-paper-plane"></i>
+                  Invia PDF via email
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.13 — Richiesta nota spese ========== -->
+            <template x-if="assistAzione === 'nota-spese'">
+              <div class="space-y-4">
+                <label class="form-label">Seleziona movimenti (ultimi 30 gg)</label>
+                <div class="space-y-2">
+                  <template x-for="m in assistCliente.movimenti" :key="m.id">
+                    <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-teal transition-all">
+                      <input type="checkbox" :value="m.id" x-model="assistForm.movimentiSelezionati" class="accent-teal w-4 h-4" />
+                      <div class="flex-1">
+                        <p class="text-sm font-medium" x-text="m.descrizione + ' — €' + m.importo.toFixed(2)"></p>
+                        <p class="text-xs text-gray-400" x-text="m.data + ' — ' + m.servizio"></p>
+                      </div>
+                    </label>
+                  </template>
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('nota-spese')" :disabled="assistOpLoading || assistForm.movimentiSelezionati.length === 0">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-file-export"></i>
+                  Genera nota spese
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.14 — Scansione RMPP ========== -->
+            <template x-if="assistAzione === 'scansione-rmpp'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Codice RMPP</label>
+                  <div class="flex gap-2">
+                    <input x-model="assistForm.codiceRmpp" class="form-input" placeholder="Inserimento manuale o scansiona" />
+                    <button class="btn-secondary px-4 flex-shrink-0" @click="simulaScanRmpp()" title="Scansiona barcode">
+                      <i class="fas fa-barcode text-lg" :class="assistForm.rmppScanning ? 'scanning-anim' : ''"></i>
+                    </button>
+                  </div>
+                </div>
+                <template x-if="assistForm.codiceRmpp">
+                  <div class="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                    <div class="flex justify-between"><span class="text-gray-400">Importo</span><span class="font-semibold">€ 18.50</span></div>
+                    <div class="flex justify-between"><span class="text-gray-400">Concessionaria</span><span class="font-semibold">Autostrade per l'Italia</span></div>
+                    <div class="flex justify-between"><span class="text-gray-400">Data</span><span class="font-semibold">08/04/2026</span></div>
+                    <div class="flex justify-between"><span class="text-gray-400">Tipo cliente</span><span class="font-semibold text-teal">Mobility — addebito su prossima fattura</span></div>
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('scansione-rmpp')" :disabled="assistOpLoading || !assistForm.codiceRmpp">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
+                  Registra RMPP
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.15 — Mancata stazione d'ingresso ========== -->
+            <template x-if="assistAzione === 'mancata-stazione'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Transiti irregolari</label>
+                  <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 mt-2 cursor-pointer hover:border-teal transition-all"
+                    :class="assistForm.transitoSelezionato === 'T001' ? 'border-teal bg-teal-light' : ''"
+                    @click="assistForm.transitoSelezionato = 'T001'">
+                    <i class="fas fa-circle text-xs" :class="assistForm.transitoSelezionato === 'T001' ? 'text-teal' : 'text-gray-300'"></i>
+                    <div>
+                      <p class="font-semibold text-sm">T001 — A1 Casello Uscita Milano Nord</p>
+                      <p class="text-xs text-gray-400">07/04/2026 — Ingresso mancante — €4.20</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Stazione d'ingresso corretta</label>
+                  <select x-model="assistForm.stazioneIngresso" class="form-input">
+                    <option value="">Seleziona stazione...</option>
+                    <option value="bologna_nord">A1 Bologna Nord</option>
+                    <option value="firenze_nord">A1 Firenze Nord</option>
+                    <option value="lodi">A1 Lodi</option>
+                    <option value="piacenza_nord">A1 Piacenza Nord</option>
+                  </select>
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('mancata-stazione')" :disabled="assistOpLoading || !assistForm.transitoSelezionato || !assistForm.stazioneIngresso">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-paper-plane"></i>
+                  Invia segnalazione alla concessionaria
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.16 — Disconoscimento transito ========== -->
+            <template x-if="assistAzione === 'disconoscimento-transito'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Seleziona transito</label>
+                  <div class="space-y-2 mt-2">
+                    <template x-for="m in assistCliente.movimenti" :key="m.id">
+                      <div class="border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-teal transition-all"
+                        :class="assistForm.transitoSelezionato === m.id ? 'border-teal bg-teal-light' : ''"
+                        @click="assistForm.transitoSelezionato = m.id">
+                        <i class="fas fa-circle text-xs" :class="assistForm.transitoSelezionato === m.id ? 'text-teal' : 'text-gray-300'"></i>
+                        <div>
+                          <p class="font-semibold text-sm" x-text="m.descrizione + ' — €' + m.importo.toFixed(2)"></p>
+                          <p class="text-xs text-gray-400" x-text="m.data"></p>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Motivazione</label>
+                  <div class="space-y-2 mt-2">
+                    <template x-for="motivo in ['Errata classe veicolo', 'Doppio transito', 'Transito errato', 'Sconto mancante']" :key="motivo">
+                      <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:border-teal transition-all">
+                        <input type="radio" :value="motivo" x-model="assistForm.motivoDisconoscimento" class="accent-teal" />
+                        <span class="text-sm" x-text="motivo"></span>
+                      </label>
+                    </template>
+                  </div>
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('disconoscimento-transito')" :disabled="assistOpLoading || !assistForm.transitoSelezionato || !assistForm.motivoDisconoscimento">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-paper-plane"></i>
+                  Invia pratica alla concessionaria
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.17 — Apri ticket 2° livello ========== -->
+            <template x-if="assistAzione === 'apri-ticket'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Categoria</label>
+                  <select x-model="assistForm.ticketCategoria" class="form-input" @change="assistForm.ticketSottocategoria = ''">
+                    <option value="">Seleziona...</option>
+                    <option value="telepedaggio">Telepedaggio</option>
+                    <option value="parcheggi">Parcheggi</option>
+                    <option value="areac">Area C</option>
+                    <option value="rsa">RSA</option>
+                    <option value="strisceblue">Strisce Blu</option>
+                    <option value="altro">Altro</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Sottocategoria</label>
+                  <select x-model="assistForm.ticketSottocategoria" class="form-input" :disabled="!assistForm.ticketCategoria">
+                    <option value="">Seleziona...</option>
+                    <template x-if="assistForm.ticketCategoria === 'telepedaggio'">
+                      <option value="obu_non_funzionante">OBU non funzionante</option>
+                    </template>
+                    <template x-if="assistForm.ticketCategoria === 'telepedaggio'">
+                      <option value="transito_non_riconosciuto">Transito non riconosciuto</option>
+                    </template>
+                    <template x-if="assistForm.ticketCategoria === 'telepedaggio'">
+                      <option value="addebito_errato">Addebito errato</option>
+                    </template>
+                    <option value="altro">Altro</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Tipologia richiesta</label>
+                  <select x-model="assistForm.ticketTipologia" class="form-input">
+                    <option value="">Seleziona...</option>
+                    <option value="reclamo">Reclamo</option>
+                    <option value="informazione">Informazione</option>
+                    <option value="anomalia">Anomalia tecnica</option>
+                    <option value="altro">Altro</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Note (max 500 caratteri)</label>
+                  <textarea x-model="assistForm.ticketNote" class="form-input" rows="3" maxlength="500" placeholder="Descrivi il problema..."></textarea>
+                  <p class="text-xs text-gray-400 mt-1" x-text="(assistForm.ticketNote || '').length + '/500'"></p>
+                </div>
+                <button class="btn-primary w-full justify-center"
+                  @click="confermaOperazione('apri-ticket')"
+                  :disabled="assistOpLoading || !assistForm.ticketCategoria || !assistForm.ticketTipologia">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-ticket-alt"></i>
+                  Apri ticket
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.18 — Feedback post-assistenza ========== -->
+            <template x-if="assistAzione === 'feedback'">
+              <div class="space-y-5">
+                <div>
+                  <label class="form-label">Valutazione</label>
+                  <div class="flex gap-2 mt-2">
+                    <template x-for="n in [1,2,3,4,5]" :key="n">
+                      <button
+                        class="w-14 h-14 rounded-xl text-3xl transition-all"
+                        :class="assistForm.feedbackRating >= n ? 'bg-amber-400 text-white shadow-md scale-105' : 'bg-gray-100 text-gray-400 hover:bg-amber-100'"
+                        @click="assistForm.feedbackRating = n">
+                        ★
+                      </button>
+                    </template>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Motivazioni</label>
+                  <div class="grid grid-cols-2 gap-2 mt-2">
+                    <template x-for="m in ['Tempi rapidi', 'Personale cortese', 'Problema risolto', 'Altro']" :key="m">
+                      <label class="flex items-center gap-2 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:border-teal transition-all">
+                        <input type="checkbox" :value="m" x-model="assistForm.feedbackMotivazioni" class="accent-teal" />
+                        <span class="text-sm" x-text="m"></span>
+                      </label>
+                    </template>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Note (opzionale)</label>
+                  <textarea x-model="assistForm.feedbackNote" class="form-input" rows="2" placeholder="Commento libero..."></textarea>
+                </div>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('feedback')" :disabled="assistOpLoading || assistForm.feedbackRating === 0">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-paper-plane"></i>
+                  Registra feedback
+                </button>
+              </div>
+            </template>
+
+            <!-- ========== 4.19 — Recupero credenziali ========== -->
+            <template x-if="assistAzione === 'recupero-credenziali'">
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="bg-gray-50 rounded-xl p-4">
+                    <p class="text-xs text-gray-400 mb-1">Email certificata</p>
+                    <p class="text-sm font-semibold">m***@email.it</p>
+                  </div>
+                  <div class="bg-gray-50 rounded-xl p-4">
+                    <p class="text-xs text-gray-400 mb-1">Cellulare certificato</p>
+                    <p class="text-sm font-semibold">+39 3** *** 4567</p>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">Canale di invio</label>
+                  <div class="flex gap-4 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.canaleCredenziali" value="email" class="accent-teal" />
+                      <span class="text-sm font-medium"><i class="fas fa-envelope mr-1"></i>Email</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" x-model="assistForm.canaleCredenziali" value="sms" class="accent-teal" />
+                      <span class="text-sm font-medium"><i class="fas fa-sms mr-1"></i>SMS</span>
+                    </label>
+                  </div>
+                </div>
+                <template x-if="!assistOtpSent">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.canaleCredenziali">
+                    <i class="fas fa-paper-plane mr-1"></i> Invia OTP al cliente
+                  </button>
+                </template>
+                <template x-if="assistOtpSent && !assistOtpConfirmed">
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800">OTP inviato via <span x-text="assistForm.canaleCredenziali"></span></p>
+                    <p class="text-xs text-amber-600">Il cliente comunica l'OTP all'operatore</p>
+                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
+                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
+                  </div>
+                </template>
+                <template x-if="assistOtpConfirmed">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-check-circle"></i> OTP verificato
+                  </div>
+                </template>
+                <button class="btn-primary w-full justify-center" @click="confermaOperazione('recupero-credenziali')" :disabled="assistOpLoading || !assistOtpConfirmed">
+                  <span x-show="assistOpLoading" class="spinner"></span>
+                  <i x-show="!assistOpLoading" class="fas fa-key"></i>
+                  Invia link reset password
+                </button>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+      </div>
+    </template>
+
   </main><!-- /main -->
 
   <!-- ===================== DEMO PANEL ===================== -->
@@ -1573,6 +2722,16 @@
         <button class="demo-btn" @click="demoCompletaOnboarding()">
           <i class="fas fa-rocket mr-1 text-teal" style="color:#1e9fd8"></i> Demo: completa tutto
         </button>
+        <span class="text-slate-600 text-xs self-center mx-1">|</span>
+        <button class="demo-btn" @click="demoAssistenzaObuBloccato()">
+          <i class="fas fa-lock mr-1 text-red-400"></i> Assist: OBU bloccato
+        </button>
+        <button class="demo-btn" @click="demoAssistenzaServizioDisattivato()">
+          <i class="fas fa-ban mr-1 text-amber-400"></i> Assist: servizio disattivato
+        </button>
+        <button class="demo-btn" @click="demoAssistenzaTicketAperto()">
+          <i class="fas fa-ticket-alt mr-1 text-blue-400"></i> Assist: ticket aperto
+        </button>
       </div>
     </div>
   </template>
@@ -1582,10 +2741,55 @@
 <script>
 function tabletApp() {
   return {
+    // === MODALITÀ TABLET ===
+    tabletMode: null, // null | 'vendita' | 'assistenza'
+
     // === WIZARD NAVIGATION ===
     currentStep: 1,
     totalSteps: 6,
     stepLabels: ['Login', 'Registrazione', 'Valutazione', 'Offerta', 'OBU', 'Firma'],
+
+    // === ASSISTENZA — Ricerca ===
+    assistSearchQuery: '',
+    assistSearchType: 'cf',      // 'cf' | 'targa' | 'contatto'
+    assistSearchLoading: false,
+    assistCliente: null,
+    assistStep: 'ricerca',       // 'ricerca' | 'scheda' | 'griglia' | 'flusso'
+    assistAzione: null,
+
+    // === ASSISTENZA — OTP ===
+    assistOtpSent: false,
+    assistOtpValue: '',
+    assistOtpConfirmed: false,
+
+    // === ASSISTENZA — Operazione corrente ===
+    assistOpLoading: false,
+    assistOpSuccess: false,
+
+    // === ASSISTENZA — Form dati ===
+    assistForm: {
+      resVia: '', resCap: '', resCitta: '', resProvincia: '',
+      domVia: '', domCap: '', domCitta: '', domProvincia: '',
+      email: '', cellulare: '',
+      veicoli: [],
+      obuSelezionato: '', nuovoObu: '', obuScanning: false,
+      nuovaTarga: '', targaWarning: false,
+      vuoleSostitutivo: '',
+      obuRicevuto: false,
+      tipoPagamento: '', iban: '',
+      cartaIntestazione: '', cartaPan: '', cartaScadenza: '', cartaCvv: '',
+      tipoRimodulazione: '',
+      rimodulazioneSelezionata: '',
+      serviziDaDisattivare: [],
+      fatturaSelezionata: '',
+      movimentiSelezionati: [],
+      codiceRmpp: '', rmppScanning: false,
+      transitoSelezionato: '', stazioneIngresso: '',
+      motivoDisconoscimento: '',
+      ticketCategoria: '', ticketSottocategoria: '', ticketTipologia: '', ticketNote: '',
+      feedbackRating: 0, feedbackMotivazioni: [], feedbackNote: '',
+      canaleCredenziali: '',
+    },
 
     // === STEP 1 ===
     operatorLoggedIn: false,
@@ -1728,8 +2932,8 @@ function tabletApp() {
         return;
       }
       this.operatorLoggedIn = true;
+      this.tabletMode = null; // mostra selezione modalità
       localStorage.setItem('tabletOperator', JSON.stringify({ nome: this.operatorName, stazione: this.operatorStation }));
-      this.currentStep = 2;
       this.showToastMsg('Accesso effettuato — ' + this.operatorName, 'success');
     },
 
@@ -2090,7 +3294,8 @@ function tabletApp() {
     // ============================================================
     resetForm() {
       Object.assign(this, {
-        currentStep: 2,
+        tabletMode: null,
+        currentStep: 1,
         step2Sub: 'doc',
         scanMode: 'manual',
         scanStatus: null,
@@ -2121,6 +3326,7 @@ function tabletApp() {
     // ============================================================
     demoClienteOk() {
       this.operatorLoggedIn = true;
+      this.tabletMode = 'vendita';
       this.cliente = {
         cf: 'RSSMRA80A01F205X', nome: 'Mario', cognome: 'Rossi',
         dataNascita: '1980-01-01', indirizzo: 'Via Roma', civico: '10',
@@ -2138,6 +3344,7 @@ function tabletApp() {
 
     demoSoloRsa() {
       this.operatorLoggedIn = true;
+      this.tabletMode = 'vendita';
       this.cliente = {
         cf: 'TSTCR0000000KO2', nome: 'Anna', cognome: 'Neri',
         dataNascita: '1990-03-22', indirizzo: 'Via Manzoni', civico: '3',
@@ -2157,6 +3364,7 @@ function tabletApp() {
 
     demoClienteBloccato() {
       this.operatorLoggedIn = true;
+      this.tabletMode = 'vendita';
       this.cliente = {
         cf: 'TSTBL0000000000KO', nome: 'Giuseppe', cognome: 'Verdi',
         dataNascita: '1975-11-08', indirizzo: 'Via Nazionale', civico: '50',
@@ -2171,8 +3379,285 @@ function tabletApp() {
       this.showToastMsg('Demo: cliente bloccato (Stop List KO)', 'error');
     },
 
+    // ============================================================
+    // SELEZIONE MODALITÀ
+    // ============================================================
+    selectMode(mode) {
+      this.tabletMode = mode;
+      if (mode === 'vendita') {
+        this.currentStep = 2;
+        this.step2Sub = 'doc';
+        window.scrollTo(0, 0);
+      } else {
+        this.assistStep = 'ricerca';
+        this.assistCliente = null;
+        this.assistAzione = null;
+        window.scrollTo(0, 0);
+      }
+    },
+
+    // ============================================================
+    // ASSISTENZA — RICERCA CLIENTE
+    // ============================================================
+    cercaCliente() {
+      if (!this.assistSearchQuery.trim()) return;
+      this.assistSearchLoading = true;
+      setTimeout(() => {
+        this.assistSearchLoading = false;
+        // Dati mock cliente (hardcoded)
+        this.assistCliente = {
+          nome: 'Marco',
+          cognome: 'Bianchi',
+          cf: 'BNCMRC85T10H501Z',
+          email: 'marco.bianchi@email.it',
+          cellulare: '+39 347 123 4567',
+          residenza: { via: 'Via Roma 12', cap: '20100', citta: 'Milano', provincia: 'MI' },
+          domicilio: { via: 'Via Torino 5', cap: '20123', citta: 'Milano', provincia: 'MI' },
+          veicoli: [
+            { targa: 'AB123CD', tipo: 'Automobile', marca: 'Fiat', modello: 'Panda' },
+            { targa: 'EF456GH', tipo: 'Moto', marca: 'Honda', modello: 'CB500' },
+          ],
+          obu: [
+            { codice: 'OBU-001-2024', targa: 'AB123CD', stato: 'attivo' },
+          ],
+          serviziAttivi: ['telepedaggio', 'rsa', 'areac'],
+          metodoPagamento: { tipo: 'iban', valore: 'IT60 **** **** **** **** 1234' },
+          rimodulazioni: [],
+          ticketAperti: 1,
+          fatture: [
+            { id: 'F2026-001', mese: 'Marzo 2026', importo: 42.50, stato: 'pagata' },
+            { id: 'F2026-002', mese: 'Aprile 2026', importo: 38.00, stato: 'in attesa' },
+          ],
+          movimenti: [
+            { id: 'M001', data: '2026-04-08', servizio: 'Telepedaggio', descrizione: 'Casello A1 Milano Nord', importo: 4.20 },
+            { id: 'M002', data: '2026-04-05', servizio: 'Parcheggi', descrizione: 'Parcheggio Centrale', importo: 8.00 },
+          ],
+        };
+        // Precompila form con dati cliente
+        const c = this.assistCliente;
+        Object.assign(this.assistForm, {
+          resVia: c.residenza.via,   resCap: c.residenza.cap,
+          resCitta: c.residenza.citta, resProvincia: c.residenza.provincia,
+          domVia: c.domicilio.via,   domCap: c.domicilio.cap,
+          domCitta: c.domicilio.citta, domProvincia: c.domicilio.provincia,
+          email: c.email,
+          cellulare: c.cellulare,
+          veicoli: JSON.parse(JSON.stringify(c.veicoli)),
+        });
+        this.assistStep = 'scheda';
+        this.showToastMsg('Cliente trovato: ' + c.nome + ' ' + c.cognome, 'success');
+      }, 800);
+    },
+
+    // ============================================================
+    // ASSISTENZA — NAVIGAZIONE GRIGLIA
+    // ============================================================
+    avviaAzione(azione) {
+      this.assistAzione = azione;
+      this.assistStep = 'flusso';
+      this.resetAssistOp();
+      window.scrollTo(0, 0);
+    },
+
+    assistAzioneLabel() {
+      const labels = {
+        'aggiorna-residenza':      'Aggiorna residenza / domicilio',
+        'aggiorna-contatti':       'Aggiorna dati di contatto',
+        'aggiorna-veicolo':        'Aggiorna dati veicolo',
+        'sostituisci-obu':         'Sostituisci OBU (malfunzionamento)',
+        'cambio-targa-obu':        'Cambio targa associata a OBU',
+        'furto-obu':               'Furto / Smarrimento OBU',
+        'restituzione-obu':        'Restituzione OBU',
+        'modifica-pagamento':      'Modifica metodo di pagamento',
+        'adesione-rimodulazione':  'Adesione rimodulazione tariffaria',
+        'revoca-rimodulazione':    'Revoca rimodulazione tariffaria',
+        'disattivazione-servizio': 'Disattivazione servizio / Recesso',
+        'richiesta-fattura':       'Richiesta fattura',
+        'nota-spese':              'Richiesta nota spese',
+        'scansione-rmpp':          'Scansione RMPP',
+        'mancata-stazione':        "Mancata stazione d'ingresso",
+        'disconoscimento-transito':'Disconoscimento transito',
+        'apri-ticket':             'Apri ticket 2° livello',
+        'feedback':                'Feedback post-assistenza',
+        'recupero-credenziali':    'Recupero credenziali cliente',
+      };
+      return labels[this.assistAzione] || this.assistAzione;
+    },
+
+    resetAssistOp() {
+      this.assistOtpSent = false;
+      this.assistOtpValue = '';
+      this.assistOtpConfirmed = false;
+      this.assistOpLoading = false;
+      this.assistOpSuccess = false;
+    },
+
+    // ============================================================
+    // ASSISTENZA — OTP SIMULATO
+    // ============================================================
+    inviaOtp() {
+      this.assistOtpSent = true;
+      this.showToastMsg('OTP inviato al cliente', 'info');
+    },
+
+    confermaOtp() {
+      const val = this.assistOtpValue.trim();
+      if (/^\d{6}$/.test(val)) {
+        this.assistOtpConfirmed = true;
+        this.showToastMsg('OTP verificato', 'success');
+      } else {
+        this.showToastMsg('OTP non valido — inserisci 6 cifre', 'error');
+      }
+    },
+
+    // ============================================================
+    // ASSISTENZA — UTILITY FORM
+    // ============================================================
+    simulaScanObu() {
+      this.assistForm.obuScanning = true;
+      setTimeout(() => {
+        this.assistForm.nuovoObu = 'OBU-002-2026';
+        this.assistForm.obuScanning = false;
+        this.showToastMsg('OBU scansionato: OBU-002-2026', 'success');
+      }, 1200);
+    },
+
+    checkTarga() {
+      this.assistForm.targaWarning = this.assistForm.nuovaTarga.toUpperCase().trim() === 'AA000AA';
+    },
+
+    simulaScanRmpp() {
+      this.assistForm.rmppScanning = true;
+      setTimeout(() => {
+        this.assistForm.codiceRmpp = 'RMPP-2026-00789';
+        this.assistForm.rmppScanning = false;
+        this.showToastMsg('RMPP scansionato: RMPP-2026-00789', 'success');
+      }, 1500);
+    },
+
+    // ============================================================
+    // ASSISTENZA — CONFERMA OPERAZIONE + BUS EVENTS
+    // ============================================================
+    confermaOperazione(azione) {
+      this.assistOpLoading = true;
+      setTimeout(() => {
+        this.assistOpLoading = false;
+        this.assistOpSuccess = true;
+        const cf = this.assistCliente.cf;
+
+        switch (azione) {
+          case 'aggiorna-residenza':
+            Bus.emit('assistenza:dati_aggiornati', { cf, campo: 'indirizzo', valore: this.assistForm.resVia, canale: 'store' });
+            this.showToastMsg('Dati aggiornati', 'success');
+            break;
+          case 'aggiorna-contatti':
+            Bus.emit('assistenza:dati_aggiornati', { cf, campo: 'contatti', valore: { email: this.assistForm.email, cellulare: this.assistForm.cellulare }, canale: 'store' });
+            this.showToastMsg('Dati di contatto aggiornati', 'success');
+            break;
+          case 'aggiorna-veicolo':
+            Bus.emit('assistenza:veicolo_aggiornato', { cf, targa: (this.assistForm.veicoli[0] || {}).targa, operazione: 'modifica' });
+            this.showToastMsg('Veicolo aggiornato', 'success');
+            break;
+          case 'sostituisci-obu':
+            Bus.emit('assistenza:obu_sostituito', { cf, obu_vecchio: this.assistForm.obuSelezionato, obu_nuovo: this.assistForm.nuovoObu, targa: (this.assistCliente.obu[0] || {}).targa });
+            this.showToastMsg('OBU sostituito. Aggiornamento whitelist avviato.', 'success', 4000);
+            break;
+          case 'cambio-targa-obu':
+            Bus.emit('assistenza:targa_cambiata', { cf, obu: this.assistForm.obuSelezionato, targa_vecchia: (this.assistCliente.obu[0] || {}).targa, targa_nuova: this.assistForm.nuovaTarga.toUpperCase() });
+            this.showToastMsg('Targa aggiornata. Whitelist in aggiornamento.', 'success');
+            break;
+          case 'furto-obu':
+            Bus.emit('assistenza:obu_bloccato', { cf, obu: this.assistForm.obuSelezionato, targa: (this.assistCliente.obu[0] || {}).targa, motivo: 'furto' });
+            this.showToastMsg('OBU inserito in blacklist entro 12 ore', 'success', 4000);
+            break;
+          case 'restituzione-obu':
+            Bus.emit('assistenza:obu_restituito', { cf, obu: this.assistForm.obuSelezionato, targa: (this.assistCliente.obu[0] || {}).targa });
+            this.showToastMsg('Restituzione registrata. Stock aggiornato.', 'success');
+            break;
+          case 'modifica-pagamento':
+            Bus.emit('assistenza:pagamento_aggiornato', { cf, tipo: this.assistForm.tipoPagamento });
+            this.showToastMsg('Metodo di pagamento aggiornato', 'success');
+            break;
+          case 'adesione-rimodulazione':
+            Bus.emit('assistenza:rimodulazione_attivata', { cf, tipo_rimodulazione: this.assistForm.tipoRimodulazione });
+            this.showToastMsg('Rimodulazione attivata', 'success');
+            break;
+          case 'revoca-rimodulazione':
+            Bus.emit('assistenza:rimodulazione_revocata', { cf, tipo_rimodulazione: this.assistForm.rimodulazioneSelezionata || 'sconto_moto' });
+            this.showToastMsg('Rimodulazione revocata. Flusso Discounted List inviato.', 'success', 4000);
+            break;
+          case 'disattivazione-servizio':
+            this.assistForm.serviziDaDisattivare.forEach(s => {
+              Bus.emit('assistenza:servizio_disattivato', { cf, servizio: s });
+            });
+            this.showToastMsg('Servizio disattivato', 'success');
+            break;
+          case 'richiesta-fattura':
+            Bus.emit('assistenza:documento_inviato', { cf, tipo: 'fattura', email: this.assistCliente.email });
+            this.showToastMsg('Fattura inviata a ' + this.assistCliente.email, 'success');
+            break;
+          case 'nota-spese':
+            Bus.emit('assistenza:documento_inviato', { cf, tipo: 'nota_spese', email: this.assistCliente.email });
+            this.showToastMsg('Nota spese inviata a ' + this.assistCliente.email, 'success');
+            break;
+          case 'scansione-rmpp':
+            Bus.emit('assistenza:rmpp_registrato', { cf, codice_rmpp: this.assistForm.codiceRmpp, importo: 18.50 });
+            this.showToastMsg('RMPP registrato', 'success');
+            break;
+          case 'mancata-stazione':
+            Bus.emit('assistenza:transito_segnalato', { cf, transito_id: this.assistForm.transitoSelezionato, tipo: 'mancata_stazione' });
+            this.showToastMsg('Segnalazione inviata alla concessionaria. Ticket aperto.', 'success', 4000);
+            break;
+          case 'disconoscimento-transito':
+            Bus.emit('assistenza:transito_segnalato', { cf, transito_id: this.assistForm.transitoSelezionato, tipo: 'disconoscimento', motivo: this.assistForm.motivoDisconoscimento });
+            this.showToastMsg('Pratica inviata alla concessionaria. Ticket aperto.', 'success', 4000);
+            break;
+          case 'apri-ticket': {
+            const num = 'TKT-2026-' + String(Math.floor(Math.random() * 90000) + 10000);
+            Bus.emit('assistenza:ticket_aperto', { cf, numero_ticket: num, categoria: this.assistForm.ticketCategoria, tipologia: this.assistForm.ticketTipologia });
+            this.showToastMsg('Ticket aperto: ' + num + '. Email di conferma inviata al cliente.', 'success', 5000);
+            break;
+          }
+          case 'feedback':
+            Bus.emit('assistenza:feedback_registrato', { cf, rating: this.assistForm.feedbackRating, note: this.assistForm.feedbackNote });
+            this.showToastMsg('Feedback registrato', 'success');
+            break;
+          case 'recupero-credenziali':
+            Bus.emit('assistenza:credenziali_recuperate', { cf, canale: this.assistForm.canaleCredenziali });
+            this.showToastMsg('Link di reset password inviato al cliente', 'success');
+            break;
+        }
+
+        // Torna alla griglia dopo 2s
+        setTimeout(() => {
+          this.assistStep = 'griglia';
+          this.assistAzione = null;
+          this.resetAssistOp();
+        }, 2000);
+      }, 800);
+    },
+
+    // ============================================================
+    // DEMO SHORTCUTS — ASSISTENZA
+    // ============================================================
+    demoAssistenzaObuBloccato() {
+      Bus.emit('assistenza:obu_bloccato', { cf: 'BNCMRC85T10H501Z', obu: 'OBU-001-2024', targa: 'AB123CD', motivo: 'furto' });
+      this.showToastMsg('Demo: OBU bloccato in store (evento bus emesso)', 'warning', 4000);
+    },
+
+    demoAssistenzaServizioDisattivato() {
+      Bus.emit('assistenza:servizio_disattivato', { cf: 'BNCMRC85T10H501Z', servizio: 'areac' });
+      this.showToastMsg('Demo: servizio Area C disattivato in store', 'warning', 4000);
+    },
+
+    demoAssistenzaTicketAperto() {
+      Bus.emit('assistenza:ticket_aperto', { cf: 'BNCMRC85T10H501Z', numero_ticket: 'TKT-2026-00123', categoria: 'telepedaggio', tipologia: 'reclamo' });
+      this.showToastMsg('Demo: ticket TKT-2026-00123 aperto in store', 'info', 4000);
+    },
+
     async demoCompletaOnboarding() {
       this.operatorLoggedIn = true;
+      this.tabletMode = 'vendita';
       this.cliente = {
         cf: 'DMOMCK80A01F205Z', nome: 'Chiara', cognome: 'Demo',
         dataNascita: '1988-07-12', indirizzo: 'Corso Buenos Aires', civico: '22',

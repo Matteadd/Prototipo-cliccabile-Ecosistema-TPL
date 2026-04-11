@@ -1,7 +1,7 @@
 // EXTERNAL JS - SHELL
 
 // Listener silenzioso per messaggi Chrome Extension (VS Code)
-if (typeof chrome !== 'undefined' && chrome.runtime) {
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({success: true});
     return true;
