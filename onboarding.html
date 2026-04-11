@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Onboarding - EniLive Mobility+</title>
+  <link rel="stylesheet" href="proto-app.css" />
+</head>
+
+<body>
+  <div class="toast" id="onboardingToast"></div>
+
+  <div class="app-container">
+    <!-- HEADER -->
+    <div class="header">
+      <h1 class="mb-0">Benvenuto</h1>
+      <p class="header-subtitle mb-0">Completa la registrazione</p>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="container-lg" style="flex: 1; display: flex; flex-direction: column;">
+      <form id="onboardingForm">
+        <!-- STEP 1 -->
+        <div class="form-group-lg">
+          <label for="fullName">Nome Completo *</label>
+          <input type="text" id="fullName" placeholder="Es: Mario Rossi" required>
+        </div>
+
+        <div class="form-group-lg">
+          <label for="email">Email *</label>
+          <input type="email" id="email" placeholder="es@example.com" required>
+        </div>
+
+        <div class="form-group-lg">
+          <label for="phone">Numero di Telefono</label>
+          <input type="tel" id="phone" placeholder="+39 000 000 0000">
+        </div>
+
+        <!-- CHECKBOXES -->
+        <div class="section" style="border-top: 1px solid var(--color-border); padding-top: 16px;">
+          <div style="margin-bottom: 12px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chkAgree" required>
+              <span>Accetto i termini e le condizioni</span>
+            </label>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chkPrivacy" required>
+              <span>Accetto la privacy policy</span>
+            </label>
+          </div>
+
+          <div>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chkNewsletter">
+              <span>Desidero ricevere newsletter e offerte</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- BUTTONS -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary btn-block" id="btnBack">Annulla</button>
+          <button type="button" class="btn btn-primary btn-block" id="btnNext">Continua</button>
+        </div>
+      </form>
+
+      <!-- STEP INDICATORS -->
+      <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); transition: all 0.3s;"></div>
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-border); transition: all 0.3s;"></div>
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-border); transition: all 0.3s;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('onboardingForm');
+    const btnNext = document.getElementById('btnNext');
+    const btnBack = document.getElementById('btnBack');
+    const toast = document.getElementById('onboardingToast');
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 2000);
+    }
+
+    btnNext.addEventListener('click', (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById('fullName').value;
+      const email = document.getElementById('email').value;
+      const chkAgree = document.getElementById('chkAgree').checked;
+      const chkPrivacy = document.getElementById('chkPrivacy').checked;
+
+      if (!fullName || !email) {
+        showToast('Compila tutti i campi obbligatori');
+        return;
+      }
+
+      if (!chkAgree || !chkPrivacy) {
+        showToast('Accetta i termini e la privacy');
+        return;
+      }
+
+      showToast(`Registrazione completata! Benvenuto ${fullName}`);
+      
+      // Simula registrazione
+      setTimeout(() => {
+        showToast('Caricamento app...');
+      }, 1500);
+    });
+
+    btnBack.addEventListener('click', () => {
+      showToast('Operazione annullata');
+      setTimeout(() => {
+        form.reset();
+      }, 500);
+    });
+  </script>
+</body>
+</html>

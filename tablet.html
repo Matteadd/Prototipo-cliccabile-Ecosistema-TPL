@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enilive Station — Tablet Operatore</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="bus.js"></script>
+
+  <style>
+    :root {
+      --color-primary: #117299;
+      --color-primary-dark: #0d4f6f;
+      --color-primary-light: #e6f0f6;
+      --color-primary-lighter: #1e9fd8;
+    }
+    body { background: #f3f4f6; font-size: 16px; }
+
+    .tablet-container { max-width: 900px; margin: 0 auto; min-height: 100vh; }
+
+    /* Teal utilities not in Tailwind default */
+    .bg-teal { background-color: var(--color-primary); }
+    .bg-teal-dark { background-color: var(--color-primary-dark); }
+    .bg-teal-light { background-color: var(--color-primary-light); }
+    .text-teal { color: var(--color-primary); }
+    .border-teal { border-color: var(--color-primary); }
+    .ring-teal { --tw-ring-color: var(--color-primary); }
+
+    .btn-primary {
+      background-color: var(--color-primary);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background-color 0.15s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary:hover { background-color: var(--color-primary-dark); }
+    .btn-primary:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+    .btn-secondary {
+      background-color: white;
+      color: var(--color-primary);
+      border: 2px solid var(--color-primary);
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background-color: var(--color-primary-light); }
+
+    .btn-ghost {
+      background-color: transparent;
+      color: #6b7280;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-ghost:hover { background-color: #f3f4f6; color: #374151; }
+    .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06); }
+
+    .form-input {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(17,114,153,0.12); }
+
+    .form-label { font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; display: block; }
+
+    /* Progress bar */
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--color-primary);
+      transition: width 0.4s ease;
+      border-radius: 9999px;
+    }
+
+    /* Step indicator */
+    .step-dot {
+      width: 2rem; height: 2rem;
+      border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .step-dot.active { background-color: var(--color-primary); color: white; }
+    .step-dot.completed { background-color: #10b981; color: white; cursor: pointer; }
+    .step-dot.pending { background-color: #e5e7eb; color: #9ca3af; }
+
+    /* Bundle cards */
+    .bundle-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .bundle-card:hover { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+    .bundle-card.selected { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+    .bundle-card.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      min-width: 280px;
+      max-width: 400px;
+      padding: 1rem 1.25rem;
+      border-radius: 0.625rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      font-size: 0.9375rem;
+      animation: slideIn 0.2s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* OTP input */
+    .otp-input {
+      width: 3.5rem; height: 3.5rem;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      border: 2px solid #e5e7eb;
+      border-radius: 0.5rem;
+      outline: none;
+    }
+    .otp-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(17,114,153,0.12); }
+
+    /* Spinner */
+    .spinner {
+      border: 3px solid #e5e7eb;
+      border-top-color: var(--color-primary);
+      border-radius: 9999px;
+      animation: spin 0.7s linear infinite;
+      width: 1.25rem; height: 1.25rem;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Contract preview */
+    .contract-preview {
+      height: 220px;
+      overflow-y: auto;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: #374151;
+      background: #fafafa;
+    }
+    .contract-preview::-webkit-scrollbar { width: 6px; }
+    .contract-preview::-webkit-scrollbar-track { background: transparent; }
+    .contract-preview::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+
+    /* Toggle switch */
+    .toggle-switch {
+      position: relative;
+      width: 2.75rem; height: 1.5rem;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background-color: #d1d5db;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      height: 1.1rem; width: 1.1rem;
+      left: 3px; bottom: 3px;
+      background-color: white;
+      border-radius: 9999px;
+      transition: 0.2s;
+    }
+    input:checked + .toggle-slider { background-color: var(--color-primary); }
+    input:checked + .toggle-slider:before { transform: translateX(1.25rem); }
+    input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+
+    /* Demo panel */
+    .demo-panel {
+      background: #1e293b;
+      border-top: 3px solid var(--color-primary);
+      padding: 1rem 1.5rem;
+    }
+    .demo-btn {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .demo-btn:hover { background: #475569; border-color: var(--color-primary); color: white; }
+
+    /* Scanning animation */
+    @keyframes pulse-scan {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .scanning-anim { animation: pulse-scan 1s ease-in-out infinite; }
+  </style>
+
+  <script>
+    // Leggi parametri URL prima di Alpine
+    const _urlParams = new URLSearchParams(window.location.search);
+    const _autoLogin = _urlParams.get('autologin') === '1';
+    const _demoMode  = _urlParams.get('demo') === '1';
+  </script>
+</head>
+
+<body class="bg-gray-100">
+
+<div class="tablet-container" x-data="tabletApp()" x-init="init()">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="bg-teal-dark text-white sticky top-0 z-50 shadow-lg">
+    <div class="px-6 py-3 flex items-center justify-between">
+      <!-- Logo + brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center">
+          <span class="text-teal font-black text-sm leading-none">E</span>
+        </div>
+        <div>
+          <div class="font-bold text-base leading-tight">Enilive Station</div>
+          <div class="text-xs text-blue-200 leading-tight">Portale Operatore</div>
+        </div>
+      </div>
+
+      <!-- Step info / operator info -->
+      <div class="flex items-center gap-6">
+        <template x-if="operatorLoggedIn">
+          <div class="text-right">
+            <div class="text-sm font-semibold" x-text="operatorName"></div>
+            <div class="text-xs text-blue-200" x-text="operatorStation"></div>
+          </div>
+        </template>
+        <template x-if="operatorLoggedIn && !flowCompleted">
+          <div class="text-right">
+            <div class="text-xs text-blue-200 mb-1">Passo <span x-text="currentStep"></span> di <span x-text="totalSteps"></span></div>
+            <div class="w-36 h-2 bg-blue-900 rounded-full overflow-hidden">
+              <div class="progress-bar-fill" :style="`width:${(currentStep/totalSteps)*100}%`"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Step labels (visible when logged in) -->
+    <template x-if="operatorLoggedIn && !flowCompleted">
+      <div class="px-6 pb-3 flex items-center gap-2 overflow-x-auto">
+        <template x-for="(label, idx) in stepLabels" :key="idx">
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button
+              class="flex items-center gap-1.5 text-xs py-1 px-2 rounded transition-all"
+              :class="idx+1 < currentStep ? 'text-green-300 hover:text-white cursor-pointer' : idx+1 === currentStep ? 'text-white font-semibold' : 'text-blue-300 cursor-default'"
+              @click="idx+1 < currentStep ? goToStep(idx+1) : null"
+            >
+              <div class="step-dot !w-5 !h-5 !text-xs"
+                :class="idx+1 < currentStep ? 'completed !bg-green-500' : idx+1 === currentStep ? 'active' : 'pending'">
+                <template x-if="idx+1 < currentStep"><i class="fas fa-check text-xs"></i></template>
+                <template x-if="idx+1 >= currentStep"><span x-text="idx+1"></span></template>
+              </div>
+              <span x-text="label"></span>
+            </button>
+            <template x-if="idx < stepLabels.length - 1">
+              <i class="fas fa-chevron-right text-blue-700 text-xs flex-shrink-0"></i>
+            </template>
+          </div>
+        </template>
+      </div>
+    </template>
+  </header>
+
+  <!-- ===================== TOAST ===================== -->
+  <div x-show="showToast" x-transition.opacity class="toast"
+    :class="{
+      'bg-green-600 text-white': toastType === 'success',
+      'bg-red-600 text-white': toastType === 'error',
+      'bg-amber-500 text-white': toastType === 'warning',
+      'bg-teal text-white': toastType === 'info'
+    }">
+    <i :class="{
+      'fas fa-check-circle': toastType === 'success',
+      'fas fa-times-circle': toastType === 'error',
+      'fas fa-exclamation-triangle': toastType === 'warning',
+      'fas fa-info-circle': toastType === 'info'
+    }" class="mt-0.5 flex-shrink-0"></i>
+    <span x-text="toastMessage" class="text-sm leading-snug"></span>
+  </div>
+
+  <!-- ===================== MAIN CONTENT ===================== -->
+  <main class="p-6">
+
+    <!-- ======================================================= -->
+    <!-- STEP 1 — LOGIN                                          -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 1 && !operatorLoggedIn">
+      <div class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="card p-10 w-full max-w-md">
+          <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-teal rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span class="text-white font-black text-2xl">E</span>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900">Portale Operatore</h1>
+            <p class="text-gray-500 mt-1">Accedi con le tue credenziali</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="form-label">Username</label>
+              <input x-model="loginUsername" type="text" class="form-input" placeholder="es. marco.ferretti" />
+            </div>
+            <div>
+              <label class="form-label">Password</label>
+              <input x-model="loginPassword" type="password" class="form-input" placeholder="••••••••" />
+            </div>
+            <button class="btn-primary w-full justify-center" @click="doLogin()">
+              <i class="fas fa-sign-in-alt"></i> Accedi
+            </button>
+          </div>
+
+          <p class="text-center text-xs text-gray-400 mt-6">
+            Demo: qualsiasi credenziale non vuota viene accettata
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- STEP 2 — REGISTRAZIONE CLIENTE                         -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 2">
+      <div>
+        <div class="mb-6 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">Registrazione Cliente</h2>
+            <p class="text-gray-500 text-sm">Acquisizione dati anagrafici e verifica contatti</p>
+          </div>
+          <!-- Sub-step indicator -->
+          <div class="flex gap-2">
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step2Sub === 'doc' ? 'bg-teal text-white' : 'bg-gray-200 text-gray-500'">
+              2a
+            </span>
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step2Sub === 'anagrafica' ? 'bg-teal text-white' : step2Sub === 'otp' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'">
+              2b
+            </span>
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step2Sub === 'otp' ? 'bg-teal text-white' : 'bg-gray-200 text-gray-500'">
+              2c
+            </span>
+          </div>
+        </div>
+
+        <!-- 2a — Acquisizione documento -->
+        <template x-if="step2Sub === 'doc'">
+          <div class="card p-6">
+            <h3 class="font-semibold text-gray-700 mb-4"><i class="fas fa-id-card mr-2 text-teal"></i>Acquisizione documento</h3>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+              <button class="btn-primary justify-center py-6 text-lg flex-col gap-2" @click="simulateScan()">
+                <i class="fas fa-camera text-2xl"></i>
+                <span>Scansiona documento</span>
+                <span class="text-xs font-normal opacity-80">OCR automatico</span>
+              </button>
+              <button class="btn-secondary justify-center py-6 text-lg flex-col gap-2" @click="goToManual()">
+                <i class="fas fa-keyboard text-2xl"></i>
+                <span>Inserimento manuale</span>
+                <span class="text-xs font-normal opacity-60">Digita i dati</span>
+              </button>
+            </div>
+
+            <!-- Scan status -->
+            <template x-if="scanStatus === 'scanning'">
+              <div class="flex flex-col items-center gap-3 py-6">
+                <div class="w-16 h-16 border-4 border-teal border-t-transparent rounded-full scanning-anim"></div>
+                <p class="text-teal font-medium">Acquisizione in corso...</p>
+                <p class="text-sm text-gray-400">Avvicinare il documento alla fotocamera</p>
+              </div>
+            </template>
+
+            <template x-if="scanStatus === 'done'">
+              <div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+                <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                <div>
+                  <p class="font-semibold text-green-800">Documento acquisito con successo</p>
+                  <p class="text-sm text-green-600">Dati precompilati — verifica e procedi</p>
+                </div>
+                <button class="ml-auto btn-primary text-sm py-2" @click="step2Sub = 'anagrafica'">
+                  Verifica dati <i class="fas fa-arrow-right ml-1"></i>
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- 2b — Dati anagrafici -->
+        <template x-if="step2Sub === 'anagrafica'">
+          <div class="space-y-4">
+
+            <!-- Alert cliente esistente -->
+            <template x-if="cfAlreadyExists">
+              <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-3">
+                <i class="fas fa-exclamation-triangle text-amber-500"></i>
+                <div>
+                  <p class="font-semibold text-amber-800">Cliente già presente nel Gruppo Eni</p>
+                  <p class="text-sm text-amber-600">Dati precompilati da anagrafica Cliente Unico</p>
+                </div>
+              </div>
+            </template>
+
+            <div class="card p-6">
+              <h3 class="font-semibold text-gray-700 mb-4"><i class="fas fa-user mr-2 text-teal"></i>Dati anagrafici</h3>
+
+              <!-- CF -->
+              <div class="mb-4">
+                <label class="form-label">Codice Fiscale *</label>
+                <div class="relative">
+                  <input x-model="cliente.cf" @blur="verifyCF()" type="text" class="form-input uppercase pr-10"
+                    placeholder="RSSMRA80A01F205X" maxlength="16" />
+                  <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                    <template x-if="cfVerifyStatus === 'checking'"><div class="spinner"></div></template>
+                    <template x-if="cfVerifyStatus === 'ok'"><i class="fas fa-check-circle text-green-500"></i></template>
+                    <template x-if="cfVerifyStatus === 'ko'"><i class="fas fa-times-circle text-red-500"></i></template>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Nome *</label>
+                  <input x-model="cliente.nome" type="text" class="form-input" placeholder="Mario" />
+                </div>
+                <div>
+                  <label class="form-label">Cognome *</label>
+                  <input x-model="cliente.cognome" type="text" class="form-input" placeholder="Rossi" />
+                </div>
+                <div>
+                  <label class="form-label">Data di nascita *</label>
+                  <input x-model="cliente.dataNascita" type="date" class="form-input" />
+                </div>
+                <div>
+                  <label class="form-label">Stato</label>
+                  <input x-model="cliente.stato" type="text" class="form-input" value="Italia" />
+                </div>
+                <div>
+                  <label class="form-label">Indirizzo *</label>
+                  <input x-model="cliente.indirizzo" type="text" class="form-input" placeholder="Via Roma" />
+                </div>
+                <div>
+                  <label class="form-label">Civico *</label>
+                  <input x-model="cliente.civico" type="text" class="form-input" placeholder="1" />
+                </div>
+                <div>
+                  <label class="form-label">Comune *</label>
+                  <input x-model="cliente.comune" type="text" class="form-input" placeholder="Milano" />
+                </div>
+                <div>
+                  <label class="form-label">Provincia</label>
+                  <input x-model="cliente.provincia" type="text" class="form-input" placeholder="MI" maxlength="2" />
+                </div>
+                <div>
+                  <label class="form-label">CAP</label>
+                  <input x-model="cliente.cap" type="text" class="form-input" placeholder="20100" maxlength="5" />
+                </div>
+              </div>
+
+              <hr class="my-4 border-gray-100" />
+              <h4 class="font-semibold text-gray-600 mb-3 text-sm"><i class="fas fa-address-book mr-1.5 text-teal"></i>Contatti</h4>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Telefono * <span class="text-gray-400 font-normal">(necessario per OTP)</span></label>
+                  <input x-model="cliente.telefono" type="tel" class="form-input" placeholder="+39 333 1234567" />
+                </div>
+                <div>
+                  <label class="form-label">Email <span class="text-gray-400 font-normal">(facoltativa)</span></label>
+                  <input x-model="cliente.email" type="email" class="form-input" placeholder="mario@email.it" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Targhe -->
+            <div class="card p-6">
+              <h3 class="font-semibold text-gray-700 mb-4">
+                <i class="fas fa-car mr-2 text-teal"></i>Targhe veicoli
+                <span class="ml-2 text-xs text-gray-400 font-normal">(min. 1, max. 5)</span>
+              </h3>
+
+              <div class="space-y-3">
+                <template x-for="(targa, i) in targhe" :key="i">
+                  <div class="flex gap-2 items-center">
+                    <span class="text-sm font-medium text-gray-500 w-6 text-right flex-shrink-0" x-text="i+1 + '.'"></span>
+                    <input x-model="targhe[i]" type="text" class="form-input uppercase font-mono tracking-widest"
+                      placeholder="AB123CD" maxlength="7" />
+                    <button x-show="targhe.length > 1" class="btn-ghost !px-3 text-red-400 hover:text-red-600 hover:bg-red-50"
+                      @click="removeTarga(i)" title="Rimuovi">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </template>
+              </div>
+
+              <button x-show="targhe.length < 5" class="btn-secondary text-sm mt-3" @click="addTarga()">
+                <i class="fas fa-plus"></i> Aggiungi targa
+              </button>
+            </div>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="step2Sub = 'doc'">
+                <i class="fas fa-arrow-left"></i> Indietro
+              </button>
+              <button class="btn-primary" @click="goToOtp()">
+                Verifica contatti <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 2c — OTP -->
+        <template x-if="step2Sub === 'otp'">
+          <div class="space-y-4">
+            <div class="card p-6">
+              <h3 class="font-semibold text-gray-700 mb-5"><i class="fas fa-shield-alt mr-2 text-teal"></i>Verifica contatti</h3>
+
+              <!-- OTP SMS -->
+              <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <p class="font-semibold text-gray-800">Numero di telefono</p>
+                    <p class="text-gray-500 text-sm" x-text="cliente.telefono || '—'"></p>
+                  </div>
+                  <template x-if="otpSmsStatus === 'confirmed'">
+                    <span class="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
+                      <i class="fas fa-check mr-1"></i> Certificato
+                    </span>
+                  </template>
+                </div>
+
+                <template x-if="otpSmsStatus === null || otpSmsStatus === 'error'">
+                  <button class="btn-primary text-sm" @click="sendOtpSms()">
+                    <i class="fas fa-sms"></i> Invia OTP via SMS
+                  </button>
+                </template>
+
+                <template x-if="otpSmsStatus === 'sent'">
+                  <div class="space-y-3">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                      <i class="fas fa-info-circle mr-1.5"></i>SMS inviato. Codice di test: <strong>1234</strong>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <input x-model="otpSmsInput" type="text" class="form-input otp-input w-32 text-center text-xl tracking-widest"
+                        placeholder="1234" maxlength="4" />
+                      <button class="btn-primary text-sm" @click="confirmOtpSms()">Conferma</button>
+                      <button class="btn-ghost text-sm" @click="sendOtpSms()">
+                        <i class="fas fa-redo text-xs"></i> Rigenera
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <hr class="border-gray-100 mb-5" />
+
+              <!-- OTP Email -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <p class="font-semibold text-gray-800">Indirizzo email <span class="text-xs text-gray-400 font-normal">(facoltativo)</span></p>
+                    <p class="text-gray-500 text-sm" x-text="cliente.email || 'Non fornita'"></p>
+                  </div>
+                  <template x-if="otpEmailStatus === 'confirmed'">
+                    <span class="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
+                      <i class="fas fa-check mr-1"></i> Verificata
+                    </span>
+                  </template>
+                  <template x-if="otpEmailStatus === 'skipped'">
+                    <span class="bg-gray-100 text-gray-500 text-xs font-semibold px-3 py-1 rounded-full">
+                      <i class="fas fa-minus mr-1"></i> Saltato
+                    </span>
+                  </template>
+                </div>
+
+                <template x-if="otpEmailStatus === null">
+                  <button class="btn-secondary text-sm" @click="sendOtpEmail()">
+                    <i class="fas fa-envelope"></i> Invia OTP via email
+                  </button>
+                </template>
+
+                <template x-if="otpEmailStatus === 'sent'">
+                  <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                      <input x-model="otpEmailInput" type="text" class="form-input otp-input w-32 text-center text-xl tracking-widest"
+                        placeholder="1234" maxlength="4" />
+                      <button class="btn-primary text-sm" @click="confirmOtpEmail()">Conferma</button>
+                      <button class="btn-ghost text-sm" @click="sendOtpEmail()">
+                        <i class="fas fa-redo text-xs"></i> Rigenera
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="step2Sub = 'anagrafica'">
+                <i class="fas fa-arrow-left"></i> Indietro
+              </button>
+              <button class="btn-primary" :disabled="otpSmsStatus !== 'confirmed'" @click="nextStep()">
+                Avanti: Valutazione creditizia <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- STEP 3 — VALUTAZIONE CREDITIZIA                        -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 3">
+      <div>
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Valutazione Creditizia</h2>
+          <p class="text-gray-500 text-sm">Verifica Stop List Enilive + merito creditizio Cerved</p>
+        </div>
+
+        <div class="card p-8 text-center max-w-lg mx-auto">
+          <!-- Initial state -->
+          <template x-if="creditCheckStatus === null">
+            <div>
+              <div class="w-20 h-20 bg-teal-light rounded-full flex items-center justify-center mx-auto mb-5">
+                <i class="fas fa-search-dollar text-3xl text-teal"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800 mb-2">Pronto per la verifica</h3>
+              <p class="text-gray-500 text-sm mb-6">
+                Cliente: <strong x-text="cliente.nome + ' ' + cliente.cognome"></strong><br />
+                CF: <strong x-text="cliente.cf"></strong>
+              </p>
+              <button class="btn-primary text-lg px-10 py-4 mx-auto" @click="runCreditCheck()">
+                <i class="fas fa-play-circle mr-2"></i> Avvia verifica
+              </button>
+            </div>
+          </template>
+
+          <!-- Checking -->
+          <template x-if="creditCheckStatus === 'checking'">
+            <div>
+              <div class="w-20 h-20 border-4 border-teal border-t-transparent rounded-full animate-spin mx-auto mb-5"></div>
+              <p class="text-teal font-semibold text-lg">Verifica in corso...</p>
+              <p class="text-gray-400 text-sm mt-2">Interrogazione Stop List + Cerved</p>
+            </div>
+          </template>
+
+          <!-- OK FULL -->
+          <template x-if="creditCheckStatus === 'ok_full'">
+            <div>
+              <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <i class="fas fa-check-circle text-4xl text-green-500"></i>
+              </div>
+              <span class="bg-green-100 text-green-700 font-semibold px-4 py-2 rounded-full text-sm inline-block mb-4">
+                Cliente idoneo — tutti i bundle disponibili
+              </span>
+              <p class="text-gray-500 text-sm mb-6">Stop List: OK &nbsp;|&nbsp; Merito creditizio: POSITIVO</p>
+              <button class="btn-primary text-lg px-10 py-4 mx-auto" @click="nextStep()">
+                Procedi alla scelta bundle <i class="fas fa-arrow-right ml-2"></i>
+              </button>
+            </div>
+          </template>
+
+          <!-- OK RSA ONLY -->
+          <template x-if="creditCheckStatus === 'ok_rsa_only'">
+            <div>
+              <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <i class="fas fa-exclamation-triangle text-4xl text-amber-500"></i>
+              </div>
+              <span class="bg-amber-100 text-amber-700 font-semibold px-4 py-2 rounded-full text-sm inline-block mb-4">
+                Bundle Mobility non disponibile — proporre RSA Stand-Alone
+              </span>
+              <p class="text-gray-500 text-sm mb-6">Stop List: OK &nbsp;|&nbsp; Merito creditizio: NEGATIVO</p>
+              <button class="btn-primary text-lg px-10 py-4 mx-auto" @click="nextStep()">
+                Procedi con RSA <i class="fas fa-arrow-right ml-2"></i>
+              </button>
+            </div>
+          </template>
+
+          <!-- KO -->
+          <template x-if="creditCheckStatus === 'ko'">
+            <div>
+              <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <i class="fas fa-times-circle text-4xl text-red-500"></i>
+              </div>
+              <span class="bg-red-100 text-red-700 font-semibold px-4 py-2 rounded-full text-sm inline-block mb-4">
+                Cliente non idoneo — impossibile procedere con la vendita
+              </span>
+              <p class="text-gray-500 text-sm mb-6">Stop List: KO — accesso negato</p>
+              <button class="btn-ghost text-red-500 border border-red-200 hover:bg-red-50" @click="resetForm()">
+                <i class="fas fa-door-open mr-2"></i> Chiudi sessione
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <div class="mt-4 flex justify-start">
+          <button class="btn-ghost" @click="prevStep()">
+            <i class="fas fa-arrow-left"></i> Indietro
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- STEP 4 — CONFIGURAZIONE OFFERTA                        -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 4">
+      <div>
+        <div class="mb-6 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">Configurazione Offerta</h2>
+            <p class="text-gray-500 text-sm">Scelta bundle, personalizzazione e metodo di pagamento</p>
+          </div>
+          <div class="flex gap-2">
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step4Sub === 'bundle' ? 'bg-teal text-white' : 'bg-gray-200 text-gray-500'">4a</span>
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step4Sub === 'cart' ? 'bg-teal text-white' : step4Sub === 'payment' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'">4b</span>
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+              :class="step4Sub === 'payment' ? 'bg-teal text-white' : 'bg-gray-200 text-gray-500'">4c</span>
+          </div>
+        </div>
+
+        <!-- 4a — Scelta bundle -->
+        <template x-if="step4Sub === 'bundle'">
+          <div class="space-y-4">
+            <div class="grid grid-cols-3 gap-4">
+              <!-- Bundle Mobility -->
+              <div class="bundle-card" :class="{ selected: selectedBundle === 'mobility', disabled: creditCheckStatus === 'ok_rsa_only' }"
+                @click="creditCheckStatus !== 'ok_rsa_only' && selectBundle('mobility')">
+                <div class="flex items-start justify-between mb-3">
+                  <span class="text-2xl">🏆</span>
+                  <template x-if="selectedBundle === 'mobility'">
+                    <i class="fas fa-check-circle text-teal text-xl"></i>
+                  </template>
+                </div>
+                <h3 class="font-bold text-gray-900 text-lg">Bundle Mobility</h3>
+                <p class="text-sm text-gray-500 mt-1 mb-3">Tutti i servizi inclusi, prezzo scontato</p>
+                <div class="space-y-1 text-sm">
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Telepedaggio</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>RSA + Polizza furto</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Parcheggi, Area C, Memo</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                  <span class="text-teal font-bold text-lg">da €6.00/mese</span>
+                  <span class="ml-2 text-xs text-green-600 font-medium">-€0.50 sconto</span>
+                </div>
+              </div>
+
+              <!-- OBU Stand-Alone -->
+              <div class="bundle-card" :class="{ selected: selectedBundle === 'obu_standalone', disabled: creditCheckStatus === 'ok_rsa_only' }"
+                @click="creditCheckStatus !== 'ok_rsa_only' && selectBundle('obu_standalone')">
+                <div class="flex items-start justify-between mb-3">
+                  <span class="text-2xl">📡</span>
+                  <template x-if="selectedBundle === 'obu_standalone'">
+                    <i class="fas fa-check-circle text-teal text-xl"></i>
+                  </template>
+                </div>
+                <h3 class="font-bold text-gray-900 text-lg">OBU Stand-Alone</h3>
+                <p class="text-sm text-gray-500 mt-1 mb-3">Solo telepedaggio e servizi OBU</p>
+                <div class="space-y-1 text-sm">
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Telepedaggio</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Parcheggi in struttura</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-minus text-gray-300 text-xs"></i>RSA opzionale</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                  <span class="text-teal font-bold text-lg">da €2.50/mese</span>
+                </div>
+              </div>
+
+              <!-- RSA Stand-Alone -->
+              <div class="bundle-card" :class="{ selected: selectedBundle === 'rsa_standalone' }"
+                @click="selectBundle('rsa_standalone')">
+                <div class="flex items-start justify-between mb-3">
+                  <span class="text-2xl">🚗</span>
+                  <template x-if="selectedBundle === 'rsa_standalone'">
+                    <i class="fas fa-check-circle text-teal text-xl"></i>
+                  </template>
+                </div>
+                <h3 class="font-bold text-gray-900 text-lg">RSA Stand-Alone</h3>
+                <p class="text-sm text-gray-500 mt-1 mb-3">Solo assistenza stradale</p>
+                <div class="space-y-1 text-sm">
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Soccorso stradale illimitato</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-check text-green-500 text-xs"></i>Sempre disponibile</span>
+                  <span class="flex items-center gap-1.5 text-gray-600"><i class="fas fa-minus text-gray-300 text-xs"></i>Senza OBU</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                  <span class="text-teal font-bold text-lg">€2.00/mese</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="prevStep()"><i class="fas fa-arrow-left"></i> Indietro</button>
+              <button class="btn-primary" :disabled="!selectedBundle" @click="step4Sub = 'cart'">
+                Personalizza <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 4b — Carrello -->
+        <template x-if="step4Sub === 'cart'">
+          <div class="space-y-4">
+            <div class="card p-6">
+              <h3 class="font-semibold text-gray-700 mb-4"><i class="fas fa-shopping-cart mr-2 text-teal"></i>Servizi nel contratto</h3>
+
+              <div class="space-y-3">
+
+                <!-- Tolling -->
+                <div class="flex items-center justify-between py-2 border-b border-gray-50">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-road text-teal w-5 text-center"></i>
+                    <div>
+                      <p class="font-medium text-gray-800">Telepedaggio</p>
+                      <p class="text-xs text-gray-400">Incluso nel bundle — non rimuovibile</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <span class="font-semibold text-gray-700">€2.50/mese</span>
+                    <label class="toggle-switch opacity-50 cursor-not-allowed">
+                      <input type="checkbox" :checked="cart.tolling" disabled />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- RSA -->
+                <template x-if="selectedBundle !== 'obu_standalone' || true">
+                  <div class="flex items-center justify-between py-2 border-b border-gray-50"
+                    x-show="selectedBundle !== 'obu_standalone' || cart.rsa !== undefined">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-ambulance text-teal w-5 text-center"></i>
+                      <div>
+                        <p class="font-medium text-gray-800">RSA — Assistenza stradale</p>
+                        <p class="text-xs text-gray-400">Illimitata €2/mese</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                      <span class="font-semibold text-gray-700">€2.00/mese</span>
+                      <label class="toggle-switch" :class="selectedBundle === 'rsa_standalone' ? 'opacity-50 cursor-not-allowed' : ''">
+                        <input type="checkbox" x-model="cart.rsa" :disabled="selectedBundle === 'rsa_standalone'" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Polizza furto -->
+                <template x-if="selectedBundle !== 'rsa_standalone'">
+                  <div class="flex items-center justify-between py-2 border-b border-gray-50">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-shield-alt text-teal w-5 text-center"></i>
+                      <div>
+                        <p class="font-medium text-gray-800">Polizza furto veicolo</p>
+                        <p class="text-xs text-gray-400">Copertura base €1.50/mese</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                      <span class="font-semibold text-gray-700">€1.50/mese</span>
+                      <label class="toggle-switch">
+                        <input type="checkbox" x-model="cart.polizzaFurto" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Parcheggi -->
+                <template x-if="selectedBundle !== 'rsa_standalone'">
+                  <div class="flex items-center justify-between py-2 border-b border-gray-50">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-parking text-teal w-5 text-center"></i>
+                      <div>
+                        <p class="font-medium text-gray-800">Parcheggi in struttura</p>
+                        <p class="text-xs text-gray-400">OBU-driven — gratuito</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                      <span class="font-semibold text-gray-700">€0.00/mese</span>
+                      <label class="toggle-switch opacity-50 cursor-not-allowed">
+                        <input type="checkbox" :checked="cart.parcheggi" disabled />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Area C -->
+                <template x-if="selectedBundle !== 'rsa_standalone' && selectedBundle !== 'obu_standalone'">
+                  <div class="flex items-center justify-between py-2 border-b border-gray-50">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-city text-teal w-5 text-center"></i>
+                      <div>
+                        <p class="font-medium text-gray-800">Area C Milano</p>
+                        <p class="text-xs text-gray-400">Addebito su fattura mensile</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                      <span class="font-semibold text-gray-700">€0.00/mese</span>
+                      <label class="toggle-switch">
+                        <input type="checkbox" x-model="cart.areac" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Memo -->
+                <template x-if="selectedBundle !== 'rsa_standalone' && selectedBundle !== 'obu_standalone'">
+                  <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-bell text-teal w-5 text-center"></i>
+                      <div>
+                        <p class="font-medium text-gray-800">Servizio Memo</p>
+                        <p class="text-xs text-gray-400">Scadenze veicolo — gratuito</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                      <span class="font-semibold text-gray-700">€0.00/mese</span>
+                      <label class="toggle-switch">
+                        <input type="checkbox" x-model="cart.memo" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Toggle dispositivo aggiuntivo -->
+              <template x-if="selectedBundle !== 'rsa_standalone'">
+                <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
+                  <label class="flex items-center gap-3 cursor-pointer select-none">
+                    <input type="checkbox" x-model="cart.dispositivoExtra" class="w-5 h-5 rounded accent-teal cursor-pointer" />
+                    <div>
+                      <p class="font-semibold text-gray-800">Aggiungi dispositivo aggiuntivo (OBU #2)</p>
+                      <p class="text-xs text-gray-400">Secondo veicolo con configurazione servizi indipendente</p>
+                    </div>
+                  </label>
+                </div>
+              </template>
+
+              <!-- Blocco OBU #2 -->
+              <template x-if="cart.dispositivoExtra && selectedBundle !== 'rsa_standalone'">
+                <div class="mt-4 border-2 border-dashed border-amber-300 rounded-xl p-4 bg-amber-50">
+                  <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-amber-400 text-white text-xs font-bold px-2.5 py-1 rounded-full">OBU #2</span>
+                    <p class="font-semibold text-gray-700">Secondo dispositivo</p>
+                    <div class="ml-auto flex items-center gap-1.5 bg-amber-100 border border-amber-300 rounded-lg px-3 py-1.5 text-xs text-amber-700">
+                      <i class="fas fa-exclamation-triangle flex-shrink-0"></i>
+                      Il prezzo potrebbe differire dal bundle sottoscritto
+                    </div>
+                  </div>
+
+                  <div class="space-y-3">
+                    <!-- Tolling #2 -->
+                    <div class="flex items-center justify-between py-1.5 border-b border-amber-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-road text-teal w-4 text-center text-sm"></i>
+                        <p class="text-sm font-medium text-gray-800">Telepedaggio</p>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <span class="text-sm font-semibold text-gray-700">€2.50/mese</span>
+                        <label class="toggle-switch opacity-50 cursor-not-allowed">
+                          <input type="checkbox" :checked="cart2.tolling" disabled />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- RSA #2 -->
+                    <template x-if="selectedBundle !== 'obu_standalone'">
+                      <div class="flex items-center justify-between py-1.5 border-b border-amber-200">
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-ambulance text-teal w-4 text-center text-sm"></i>
+                          <p class="text-sm font-medium text-gray-800">RSA — Assistenza stradale</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                          <span class="text-sm font-semibold text-gray-700">€2.00/mese</span>
+                          <label class="toggle-switch">
+                            <input type="checkbox" x-model="cart2.rsa" />
+                            <span class="toggle-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Polizza furto #2 -->
+                    <div class="flex items-center justify-between py-1.5 border-b border-amber-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-shield-alt text-teal w-4 text-center text-sm"></i>
+                        <p class="text-sm font-medium text-gray-800">Polizza furto veicolo</p>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <span class="text-sm font-semibold text-gray-700">€1.50/mese</span>
+                        <label class="toggle-switch">
+                          <input type="checkbox" x-model="cart2.polizzaFurto" />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Parcheggi #2 -->
+                    <div class="flex items-center justify-between py-1.5 border-b border-amber-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-parking text-teal w-4 text-center text-sm"></i>
+                        <p class="text-sm font-medium text-gray-800">Parcheggi in struttura</p>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <span class="text-sm font-semibold text-gray-700">€0.00/mese</span>
+                        <label class="toggle-switch opacity-50 cursor-not-allowed">
+                          <input type="checkbox" :checked="cart2.parcheggi" disabled />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Area C #2 -->
+                    <template x-if="selectedBundle !== 'obu_standalone'">
+                      <div class="flex items-center justify-between py-1.5 border-b border-amber-200">
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-city text-teal w-4 text-center text-sm"></i>
+                          <p class="text-sm font-medium text-gray-800">Area C Milano</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                          <span class="text-sm font-semibold text-gray-700">€0.00/mese</span>
+                          <label class="toggle-switch">
+                            <input type="checkbox" x-model="cart2.areac" />
+                            <span class="toggle-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Memo #2 -->
+                    <template x-if="selectedBundle !== 'obu_standalone'">
+                      <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-bell text-teal w-4 text-center text-sm"></i>
+                          <p class="text-sm font-medium text-gray-800">Servizio Memo</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                          <span class="text-sm font-semibold text-gray-700">€0.00/mese</span>
+                          <label class="toggle-switch">
+                            <input type="checkbox" x-model="cart2.memo" />
+                            <span class="toggle-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Subtotale OBU #2 -->
+                  <div class="mt-3 pt-3 border-t border-amber-200 flex items-center justify-between">
+                    <span class="text-sm font-semibold text-amber-700">Subtotale OBU #2</span>
+                    <span class="font-bold text-amber-700">€<span x-text="calcTotale2().toFixed(2)"></span>/mese</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Totale + sconto -->
+              <div class="mt-5 pt-4 border-t border-gray-100">
+                <div class="flex items-center gap-3 mb-3">
+                  <input x-model="codiceSconto" type="text" class="form-input flex-1" placeholder="Codice sconto / convenzione" />
+                  <button class="btn-secondary text-sm" @click="applySconto()">Applica</button>
+                </div>
+                <template x-if="scontoCodiceApplicato">
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-2 mb-3 text-sm text-green-700 flex items-center gap-2">
+                    <i class="fas fa-tag"></i> Codice sconto ENILIVE2026 applicato
+                  </div>
+                </template>
+                <div class="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+                  <div>
+                    <span class="font-semibold text-gray-700">Totale mensile</span>
+                    <template x-if="cart.dispositivoExtra">
+                      <p class="text-xs text-gray-400 mt-0.5">OBU #1 + OBU #2 (stima)</p>
+                    </template>
+                  </div>
+                  <span class="text-2xl font-bold text-teal">
+                    €<span x-text="(calcTotale() + (cart.dispositivoExtra ? calcTotale2() : 0)).toFixed(2)"></span>
+                    <span class="text-sm font-medium text-gray-500">/mese</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="step4Sub = 'bundle'"><i class="fas fa-arrow-left"></i> Indietro</button>
+              <button class="btn-primary" @click="step4Sub = 'payment'">
+                Metodo di pagamento <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 4c — Pagamento -->
+        <template x-if="step4Sub === 'payment'">
+          <div class="space-y-4">
+            <div class="card p-6 max-w-lg mx-auto">
+              <h3 class="font-semibold text-gray-700 mb-5"><i class="fas fa-university mr-2 text-teal"></i>Metodo di pagamento</h3>
+
+              <div class="mb-6">
+                <label class="form-label">IBAN *</label>
+                <div class="relative">
+                  <input x-model="iban" type="text" class="form-input uppercase pr-10"
+                    placeholder="IT60 X054 2811 1010 0000 0123 456" @input="ibanVerifyStatus = null" />
+                  <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                    <template x-if="ibanVerifyStatus === 'checking'"><div class="spinner"></div></template>
+                    <template x-if="ibanVerifyStatus === 'ok'"><i class="fas fa-check-circle text-green-500"></i></template>
+                    <template x-if="ibanVerifyStatus === 'ko'"><i class="fas fa-times-circle text-red-500"></i></template>
+                  </div>
+                </div>
+                <button class="btn-secondary text-sm mt-2" @click="verifyIban()">
+                  <i class="fas fa-search"></i> Verifica IBAN
+                </button>
+                <p class="text-xs text-gray-400 mt-2">
+                  <i class="fas fa-info-circle mr-1"></i>Esempio IBAN fittizio: <span class="font-mono select-all cursor-text">IT60 X054 2811 1010 0000 0123 456</span>
+                </p>
+              </div>
+
+              <template x-if="ibanVerifyStatus === 'ok'">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-700 flex items-center gap-2">
+                  <i class="fas fa-check-circle"></i>
+                  IBAN verificato — mandato SDD attivato
+                </div>
+              </template>
+
+              <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-500 flex items-start gap-2">
+                <i class="fas fa-credit-card mt-0.5 text-gray-400"></i>
+                <span>Pagamento con carta di credito disponibile in fase post-MVP</span>
+              </div>
+            </div>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="step4Sub = 'cart'"><i class="fas fa-arrow-left"></i> Indietro</button>
+              <button class="btn-primary" :disabled="ibanVerifyStatus !== 'ok'" @click="nextStep()">
+                Associa OBU <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- STEP 5 — ASSOCIAZIONE OBU                              -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 5">
+      <div>
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Associazione OBU</h2>
+          <p class="text-gray-500 text-sm">Scansiona il dispositivo e associalo alla targa del cliente</p>
+        </div>
+
+        <!-- RSA-only: skip step -->
+        <template x-if="selectedBundle === 'rsa_standalone'">
+          <div class="card p-8 text-center max-w-lg mx-auto">
+            <i class="fas fa-info-circle text-4xl text-blue-400 mb-4"></i>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Step non necessario</h3>
+            <p class="text-gray-500 text-sm mb-6">Il bundle RSA Stand-Alone non richiede un dispositivo OBU</p>
+            <button class="btn-primary" @click="nextStep()">Procedi alla firma <i class="fas fa-arrow-right ml-2"></i></button>
+          </div>
+        </template>
+
+        <template x-if="selectedBundle !== 'rsa_standalone'">
+          <div class="space-y-4">
+
+            <!-- OBU #1 -->
+            <div class="card p-6">
+              <div class="flex items-center gap-2 mb-4">
+                <span class="bg-teal text-white text-xs font-bold px-2.5 py-1 rounded-full">OBU #1</span>
+                <h4 class="font-semibold text-gray-700">Primo dispositivo</h4>
+              </div>
+              <div class="grid grid-cols-2 gap-6">
+                <div>
+                  <label class="form-label">Codice OBU</label>
+                  <div class="relative mb-3">
+                    <input x-model="obuCode" type="text" class="form-input font-mono tracking-wider pr-10"
+                      placeholder="OBU-EN-2026-XXXXX" />
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                      <template x-if="obuScanStatus === 'scanning'"><div class="spinner"></div></template>
+                      <template x-if="obuScanStatus === 'ok'"><i class="fas fa-check-circle text-green-500"></i></template>
+                    </div>
+                  </div>
+                  <button class="btn-secondary text-sm w-full justify-center" @click="scanObu()">
+                    <i class="fas fa-camera"></i>
+                    <template x-if="obuScanStatus === 'scanning'"><span>Scansione...</span></template>
+                    <template x-if="obuScanStatus !== 'scanning'"><span>Scansiona codice OBU</span></template>
+                  </button>
+                </div>
+                <div>
+                  <label class="form-label">Targa veicolo</label>
+                  <select x-model="targaSelezionata" class="form-input mb-3">
+                    <option value="">— Seleziona targa —</option>
+                    <template x-for="t in targhe.filter(t => t.trim())" :key="t">
+                      <option :value="t" x-text="t.toUpperCase()"></option>
+                    </template>
+                    <option value="__manual__">Inserisci manualmente...</option>
+                  </select>
+                  <template x-if="targaSelezionata === '__manual__'">
+                    <input type="text" class="form-input font-mono tracking-widest uppercase"
+                      placeholder="AB123CD" maxlength="7"
+                      @input="targaSelezionata = $event.target.value" />
+                  </template>
+                </div>
+              </div>
+              <div class="mt-5 text-center">
+                <button class="btn-primary px-10"
+                  :disabled="!obuCode || !targaSelezionata || targaSelezionata === '__manual__' || obuAssociazioneConfermata"
+                  @click="associaObu()">
+                  <i class="fas fa-link mr-2"></i> Associa OBU #1
+                </button>
+              </div>
+              <template x-if="obuAssociazioneConfermata">
+                <div class="mt-4 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-4">
+                  <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-check text-green-600"></i>
+                  </div>
+                  <div>
+                    <p class="font-semibold text-green-800">Associazione confermata</p>
+                    <p class="text-sm text-green-600">OBU <strong x-text="obuCode"></strong> → Targa <strong x-text="targaSelezionata.toUpperCase()"></strong></p>
+                  </div>
+                  <span class="ml-auto bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">Attivo</span>
+                </div>
+              </template>
+            </div>
+
+            <!-- OBU #2 (condizionale) -->
+            <template x-if="cart.dispositivoExtra">
+              <div class="card p-6 border-2 border-amber-200">
+                <div class="flex items-center gap-2 mb-4">
+                  <span class="bg-amber-400 text-white text-xs font-bold px-2.5 py-1 rounded-full">OBU #2</span>
+                  <h4 class="font-semibold text-gray-700">Secondo dispositivo</h4>
+                </div>
+                <div class="grid grid-cols-2 gap-6">
+                  <div>
+                    <label class="form-label">Codice OBU</label>
+                    <div class="relative mb-3">
+                      <input x-model="obuCode2" type="text" class="form-input font-mono tracking-wider pr-10"
+                        placeholder="OBU-EN-2026-XXXXX" />
+                      <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                        <template x-if="obuScanStatus2 === 'scanning'"><div class="spinner"></div></template>
+                        <template x-if="obuScanStatus2 === 'ok'"><i class="fas fa-check-circle text-green-500"></i></template>
+                      </div>
+                    </div>
+                    <button class="btn-secondary text-sm w-full justify-center" @click="scanObu2()">
+                      <i class="fas fa-camera"></i>
+                      <template x-if="obuScanStatus2 === 'scanning'"><span>Scansione...</span></template>
+                      <template x-if="obuScanStatus2 !== 'scanning'"><span>Scansiona codice OBU</span></template>
+                    </button>
+                  </div>
+                  <div>
+                    <label class="form-label">Targa veicolo</label>
+                    <select x-model="targaSelezionata2" class="form-input mb-3">
+                      <option value="">— Seleziona targa —</option>
+                      <template x-for="t in targhe.filter(t => t.trim())" :key="t">
+                        <option :value="t" x-text="t.toUpperCase()"></option>
+                      </template>
+                      <option value="__manual2__">Inserisci manualmente...</option>
+                    </select>
+                    <template x-if="targaSelezionata2 === '__manual2__'">
+                      <input type="text" class="form-input font-mono tracking-widest uppercase"
+                        placeholder="AB123CD" maxlength="7"
+                        @input="targaSelezionata2 = $event.target.value" />
+                    </template>
+                  </div>
+                </div>
+                <div class="mt-5 text-center">
+                  <button class="btn-primary px-10"
+                    :disabled="!obuCode2 || !targaSelezionata2 || targaSelezionata2 === '__manual2__' || obuAssociazioneConfermata2"
+                    @click="associaObu2()">
+                    <i class="fas fa-link mr-2"></i> Associa OBU #2
+                  </button>
+                </div>
+                <template x-if="obuAssociazioneConfermata2">
+                  <div class="mt-4 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-4">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <i class="fas fa-check text-green-600"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-green-800">Associazione confermata</p>
+                      <p class="text-sm text-green-600">OBU <strong x-text="obuCode2"></strong> → Targa <strong x-text="targaSelezionata2.toUpperCase()"></strong></p>
+                    </div>
+                    <span class="ml-auto bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">Attivo</span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <div class="flex justify-between">
+              <button class="btn-ghost" @click="prevStep()"><i class="fas fa-arrow-left"></i> Indietro</button>
+              <button class="btn-primary"
+                :disabled="!obuAssociazioneConfermata || (cart.dispositivoExtra && !obuAssociazioneConfermata2)"
+                @click="nextStep()">
+                Firma contratto <i class="fas fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- STEP 6 — FIRMA CONTRATTO                               -->
+    <!-- ======================================================= -->
+    <template x-if="currentStep === 6 && !flowCompleted">
+      <div>
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Firma Contratto</h2>
+          <p class="text-gray-500 text-sm">Invia il link di firma al cliente e conferma tramite OTP</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6">
+          <!-- Anteprima contratto -->
+          <div class="card p-6">
+            <h3 class="font-semibold text-gray-700 mb-3"><i class="fas fa-file-contract mr-2 text-teal"></i>Anteprima contratto</h3>
+            <div class="contract-preview">
+              <p class="font-bold text-gray-900 mb-3">CONTRATTO DI SERVIZIO ENILIVE MOBILITY+</p>
+              <p class="text-gray-600 mb-2">
+                Il/La sottoscritto/a <strong x-text="(cliente.nome + ' ' + cliente.cognome).trim() || '[nome cliente]'"></strong>,
+                nato/a il <strong x-text="cliente.dataNascita || '[data nascita]'"></strong>,
+                codice fiscale <strong x-text="cliente.cf || '[CF]'"></strong>,
+                residente in <strong x-text="(cliente.indirizzo + ' ' + cliente.civico + ', ' + cliente.comune).trim() || '[indirizzo]'"></strong>,
+              </p>
+              <p class="text-gray-600 mb-2">
+                sottoscrive il bundle <strong x-text="selectedBundle === 'mobility' ? 'Bundle Mobility' : selectedBundle === 'obu_standalone' ? 'OBU Stand-Alone' : 'RSA Stand-Alone'"></strong>
+                con metodo di addebito SEPA Direct Debit su IBAN <strong x-text="iban || '[IBAN]'"></strong>.
+              </p>
+              <p class="text-gray-600 mb-4">Il contratto ha durata indeterminata con rinnovo mensile. Disdetta con preavviso di 30 giorni.</p>
+              <p class="font-semibold text-gray-700 mb-2">Servizi inclusi:</p>
+              <ul class="list-disc list-inside space-y-1 text-gray-600">
+                <template x-if="cart.tolling && selectedBundle !== 'rsa_standalone'">
+                  <li>Telepedaggio Enilive (OBU: <span x-text="obuCode || 'da assegnare'"></span>)</li>
+                </template>
+                <template x-if="cart.rsa"><li>RSA — Assistenza Stradale Illimitata</li></template>
+                <template x-if="cart.polizzaFurto && selectedBundle !== 'rsa_standalone'"><li>Polizza Furto Veicolo</li></template>
+                <template x-if="cart.parcheggi && selectedBundle !== 'rsa_standalone'"><li>Parcheggi in Struttura Convenzionati</li></template>
+                <template x-if="cart.areac && selectedBundle !== 'rsa_standalone'"><li>Area C Milano</li></template>
+                <template x-if="cart.memo && selectedBundle !== 'rsa_standalone'"><li>Servizio Memo Scadenze</li></template>
+              </ul>
+              <p class="mt-4 text-gray-500">
+                Corrispettivo mensile: €<strong x-text="calcTotale().toFixed(2)"></strong> IVA inclusa.
+                Addebito automatico il giorno 15 di ogni mese.
+              </p>
+              <p class="mt-4 text-xs text-gray-400">
+                Firmando questo contratto il Cliente accetta i Termini e Condizioni di Servizio Enilive S.p.A.,
+                l'Informativa Privacy ai sensi del GDPR 679/2016 e il mandato SDD Sepa. Copia del contratto sarà
+                inviata all'indirizzo email registrato.
+              </p>
+              <p class="mt-3 text-xs text-gray-400">Data: <span x-text="new Date().toLocaleDateString('it-IT')"></span></p>
+            </div>
+          </div>
+
+          <!-- Firma OTP -->
+          <div class="card p-6 flex flex-col">
+            <h3 class="font-semibold text-gray-700 mb-5"><i class="fas fa-pen-nib mr-2 text-teal"></i>Firma elettronica</h3>
+
+            <!-- Invia SMS -->
+            <div class="mb-6">
+              <p class="text-sm text-gray-600 mb-3">
+                1. Invia il link di firma tramite SMS al cliente (<strong x-text="cliente.telefono"></strong>)
+              </p>
+              <button
+                class="w-full justify-center"
+                :class="contrattoSmsInviato ? 'btn-ghost !border !border-gray-200 !text-gray-400 cursor-not-allowed' : 'btn-primary'"
+                :disabled="contrattoSmsInviato"
+                @click="sendContrattoSms()">
+                <template x-if="!contrattoSmsInviato">
+                  <span><i class="fas fa-paper-plane mr-2"></i>Invia link contratto via SMS</span>
+                </template>
+                <template x-if="contrattoSmsInviato">
+                  <span><i class="fas fa-check mr-2"></i>SMS inviato ✓</span>
+                </template>
+              </button>
+            </div>
+
+            <!-- OTP firma -->
+            <div class="flex-1">
+              <p class="text-sm text-gray-600 mb-3">
+                2. Il cliente firma sul proprio dispositivo e riceve un OTP di conferma
+              </p>
+              <p class="text-sm text-gray-600 mb-3">3. Inserisci il codice OTP comunicato dal cliente:</p>
+              <div class="flex items-center gap-3 mb-3">
+                <input x-model="firmaOtpInput" type="text" class="form-input otp-input w-32 text-center text-xl tracking-widest"
+                  placeholder="----" maxlength="4" :disabled="firmaStatus === 'pending'" />
+                <button class="btn-primary" :disabled="!contrattoSmsInviato || firmaStatus === 'pending' || firmaStatus === 'signed'"
+                  @click="confirmFirma()">
+                  <template x-if="firmaStatus === 'pending'"><span><div class="spinner !border-white !border-t-transparent mr-1"></div>Elaborazione...</span></template>
+                  <template x-if="firmaStatus !== 'pending'"><span><i class="fas fa-pen-nib mr-1"></i>Conferma firma</span></template>
+                </button>
+              </div>
+
+              <p class="text-xs text-gray-400 mt-2">
+                <i class="fas fa-lock mr-1"></i>
+                Codice di test: qualsiasi 4 cifre — es. 1234
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-start">
+          <button class="btn-ghost" @click="prevStep()"><i class="fas fa-arrow-left"></i> Indietro</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ======================================================= -->
+    <!-- SCHERMATA FINALE                                        -->
+    <!-- ======================================================= -->
+    <template x-if="flowCompleted">
+      <div class="flex flex-col items-center py-10">
+        <div class="card p-10 w-full max-w-xl text-center">
+          <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="fas fa-check text-5xl text-green-500"></i>
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-2">Onboarding completato!</h2>
+          <p class="text-gray-500 mb-6">Il cliente è stato registrato con successo</p>
+
+          <!-- Riepilogo -->
+          <div class="bg-gray-50 rounded-xl p-5 text-left space-y-3 mb-6">
+            <div class="flex items-center gap-3">
+              <i class="fas fa-user w-5 text-center text-teal"></i>
+              <div>
+                <p class="text-xs text-gray-400">Cliente</p>
+                <p class="font-semibold text-gray-800" x-text="cliente.nome + ' ' + cliente.cognome"></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <i class="fas fa-box w-5 text-center text-teal"></i>
+              <div>
+                <p class="text-xs text-gray-400">Bundle</p>
+                <p class="font-semibold text-gray-800" x-text="selectedBundle === 'mobility' ? 'Bundle Mobility' : selectedBundle === 'obu_standalone' ? 'OBU Stand-Alone' : 'RSA Stand-Alone'"></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <i class="fas fa-car w-5 text-center text-teal"></i>
+              <div>
+                <p class="text-xs text-gray-400">Targhe</p>
+                <p class="font-semibold text-gray-800" x-text="targhe.filter(t => t.trim()).map(t => t.toUpperCase()).join(', ')"></p>
+              </div>
+            </div>
+            <template x-if="obuCode">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-broadcast-tower w-5 text-center text-teal"></i>
+                <div>
+                  <p class="text-xs text-gray-400" x-text="cart.dispositivoExtra ? 'Dispositivo OBU #1' : 'Dispositivo OBU'"></p>
+                  <p class="font-semibold text-gray-800 font-mono">
+                    <span x-text="obuCode"></span>
+                    <template x-if="targaSelezionata">
+                      <span class="text-sm font-normal text-gray-500"> → <span x-text="targaSelezionata.toUpperCase()"></span></span>
+                    </template>
+                  </p>
+                </div>
+              </div>
+            </template>
+            <template x-if="cart.dispositivoExtra && obuCode2">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-broadcast-tower w-5 text-center" style="color:#f59e0b"></i>
+                <div>
+                  <p class="text-xs text-gray-400">Dispositivo OBU #2</p>
+                  <p class="font-semibold text-gray-800 font-mono">
+                    <span x-text="obuCode2"></span>
+                    <template x-if="targaSelezionata2">
+                      <span class="text-sm font-normal text-gray-500"> → <span x-text="targaSelezionata2.toUpperCase()"></span></span>
+                    </template>
+                  </p>
+                  <p class="text-xs text-amber-600 mt-0.5">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>Il prezzo potrebbe differire dal bundle sottoscritto
+                  </p>
+                </div>
+              </div>
+            </template>
+            <div class="flex items-center gap-3">
+              <i class="fas fa-euro-sign w-5 text-center text-teal"></i>
+              <div>
+                <p class="text-xs text-gray-400">Canone mensile</p>
+                <p class="font-semibold text-gray-800">€<span x-text="calcTotale().toFixed(2)"></span>/mese</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Email conferma -->
+          <template x-if="emailConfermaVisible">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5 flex items-center gap-2 text-sm text-blue-700">
+              <i class="fas fa-envelope"></i>
+              <span>Email di conferma inviata a <strong x-text="cliente.email || 'indirizzo non registrato'"></strong></span>
+            </div>
+          </template>
+
+          <div class="flex gap-3 justify-center">
+            <button class="btn-primary" @click="resetForm()">
+              <i class="fas fa-user-plus"></i> Nuovo cliente
+            </button>
+            <a href="crm.html" target="_blank" class="btn-secondary">
+              <i class="fas fa-external-link-alt"></i> Apri CRM
+            </a>
+          </div>
+        </div>
+      </div>
+    </template>
+
+  </main><!-- /main -->
+
+  <!-- ===================== DEMO PANEL ===================== -->
+  <template x-if="isDemoMode">
+    <div class="demo-panel">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">
+          <i class="fas fa-flask mr-1"></i>Pannello Demo
+        </span>
+        <span class="text-xs text-slate-400">Shortcuts per presentazione — visibile solo con ?demo=1</span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button class="demo-btn" @click="demoClienteOk()">
+          <i class="fas fa-user-check mr-1 text-green-400"></i> Demo: cliente nuovo OK
+        </button>
+        <button class="demo-btn" @click="demoSoloRsa()">
+          <i class="fas fa-exclamation-circle mr-1 text-amber-400"></i> Demo: solo RSA (Cerved KO)
+        </button>
+        <button class="demo-btn" @click="demoClienteBloccato()">
+          <i class="fas fa-ban mr-1 text-red-400"></i> Demo: cliente bloccato
+        </button>
+        <button class="demo-btn" @click="demoCompletaOnboarding()">
+          <i class="fas fa-rocket mr-1 text-teal" style="color:#1e9fd8"></i> Demo: completa tutto
+        </button>
+      </div>
+    </div>
+  </template>
+
+</div><!-- /tablet-container -->
+
+<script>
+function tabletApp() {
+  return {
+    // === WIZARD NAVIGATION ===
+    currentStep: 1,
+    totalSteps: 6,
+    stepLabels: ['Login', 'Registrazione', 'Valutazione', 'Offerta', 'OBU', 'Firma'],
+
+    // === STEP 1 ===
+    operatorLoggedIn: false,
+    operatorName: 'Marco Ferretti',
+    operatorStation: 'Enilive Station Milano Lorenteggio',
+    loginUsername: '',
+    loginPassword: '',
+
+    // === STEP 2 ===
+    step2Sub: 'doc',
+    scanMode: 'manual',
+    scanStatus: null,
+    cliente: {
+      cf: '', nome: '', cognome: '',
+      dataNascita: '', indirizzo: '', civico: '',
+      comune: '', provincia: '', cap: '',
+      stato: 'Italia', telefono: '', email: '',
+    },
+    cfVerifyStatus: null,
+    cfAlreadyExists: false,
+    targhe: [''],
+    otpSmsValue: '', otpSmsStatus: null,
+    otpEmailValue: '', otpEmailStatus: null,
+    otpSmsInput: '', otpEmailInput: '',
+
+    // === STEP 3 ===
+    creditCheckStatus: null,
+
+    // === STEP 4 ===
+    step4Sub: 'bundle',
+    selectedBundle: null,
+    cart: {
+      tolling: true, rsa: true, polizzaFurto: true,
+      parcheggi: true, areac: true, memo: true,
+      dispositivoExtra: false,
+    },
+    cart2: {
+      tolling: true, rsa: true, polizzaFurto: true,
+      parcheggi: true, areac: true, memo: true,
+    },
+    codiceSconto: '',
+    scontoCodiceApplicato: false,
+    prezziNativi: {
+      tolling: 2.50, rsa: 2.00, polizzaFurto: 1.50,
+      parcheggi: 0.00, areac: 0.00, memo: 0.00,
+    },
+    scontoBundle: 0.50,
+    iban: '',
+    ibanVerifyStatus: null,
+
+    // === STEP 5 ===
+    obuCode: '',
+    obuScanStatus: null,
+    obuAssociazioneConfermata: false,
+    targaSelezionata: '',
+    // OBU #2
+    obuCode2: '',
+    obuScanStatus2: null,
+    obuAssociazioneConfermata2: false,
+    targaSelezionata2: '',
+
+    // === STEP 6 ===
+    contrattoSmsInviato: false,
+    firmaOtpInput: '',
+    firmaStatus: null,
+    flowCompleted: false,
+    emailConfermaVisible: false,
+
+    // === TOAST ===
+    toastMessage: '',
+    toastType: 'info',
+    showToast: false,
+    _toastTimer: null,
+
+    // === DEMO ===
+    isDemoMode: false,
+
+    // ============================================================
+    init() {
+      // Auto-login da URL
+      if (_autoLogin) {
+        this.loginUsername = 'auto';
+        this.loginPassword = 'auto';
+        this.doLogin();
+      }
+
+      // Demo mode
+      this.isDemoMode = _demoMode;
+
+      // Operatore da localStorage
+      const saved = localStorage.getItem('tabletOperator');
+      if (saved) {
+        try {
+          const op = JSON.parse(saved);
+          this.operatorName = op.nome || this.operatorName;
+          this.operatorStation = op.stazione || this.operatorStation;
+        } catch(_) {}
+      }
+
+      // Ascolta crm:aggiornato per feedback visivo
+      Bus.on('crm:aggiornato', (payload) => {
+        this.showToastMsg('CRM aggiornato: ' + (payload.campo || ''), 'info');
+      });
+    },
+
+    // ============================================================
+    // NAVIGAZIONE
+    // ============================================================
+    goToStep(n) {
+      this.currentStep = n;
+      // Reset sub-steps
+      if (n === 2) this.step2Sub = 'doc';
+      if (n === 4) this.step4Sub = 'bundle';
+    },
+
+    nextStep() {
+      if (this.currentStep < this.totalSteps) {
+        this.currentStep++;
+        if (this.currentStep === 2) this.step2Sub = 'doc';
+        if (this.currentStep === 4) this.step4Sub = 'bundle';
+        window.scrollTo(0, 0);
+      }
+    },
+
+    prevStep() {
+      if (this.currentStep > 1) {
+        if (this.currentStep === 4 && this.step4Sub === 'cart') { this.step4Sub = 'bundle'; return; }
+        if (this.currentStep === 4 && this.step4Sub === 'payment') { this.step4Sub = 'cart'; return; }
+        this.currentStep--;
+        window.scrollTo(0, 0);
+      }
+    },
+
+    // ============================================================
+    // STEP 1 — LOGIN
+    // ============================================================
+    doLogin() {
+      if (!this.loginUsername.trim() || !this.loginPassword.trim()) {
+        this.showToastMsg('Inserisci username e password', 'error');
+        return;
+      }
+      this.operatorLoggedIn = true;
+      localStorage.setItem('tabletOperator', JSON.stringify({ nome: this.operatorName, stazione: this.operatorStation }));
+      this.currentStep = 2;
+      this.showToastMsg('Accesso effettuato — ' + this.operatorName, 'success');
+    },
+
+    // ============================================================
+    // STEP 2 — REGISTRAZIONE
+    // ============================================================
+    simulateScan() {
+      this.scanStatus = 'scanning';
+      setTimeout(() => {
+        this.scanStatus = 'done';
+        this.cliente = {
+          cf: 'RSSMRA80A01F205X', nome: 'Mario', cognome: 'Rossi',
+          dataNascita: '1980-01-01', indirizzo: 'Via Roma', civico: '10',
+          comune: 'Milano', provincia: 'MI', cap: '20100',
+          stato: 'Italia', telefono: '+39 333 1234567', email: 'mario.rossi@email.it',
+        };
+        this.targhe = ['AB123CD'];
+        this.cfVerifyStatus = 'ok';
+        this.showToastMsg('Documento acquisito con successo', 'success');
+      }, 1500);
+    },
+
+    goToManual() {
+      this.scanMode = 'manual';
+      this.step2Sub = 'anagrafica';
+    },
+
+    verifyCF() {
+      const cf = this.cliente.cf.trim().toUpperCase();
+      if (!cf) return;
+      if (cf.length !== 16) {
+        this.cfVerifyStatus = 'ko';
+        return;
+      }
+      this.cfVerifyStatus = 'checking';
+      setTimeout(() => {
+        if (cf === 'TSTKO0000000000A') {
+          this.cfVerifyStatus = 'ko';
+          this.showToastMsg('CF non valido — impossibile procedere', 'error');
+        } else if (cf.startsWith('TSTENI')) {
+          this.cfVerifyStatus = 'ok';
+          this.cfAlreadyExists = true;
+          this.cliente.nome = 'Laura';
+          this.cliente.cognome = 'Bianchi';
+          this.cliente.dataNascita = '1985-06-15';
+          this.cliente.indirizzo = 'Via Verdi';
+          this.cliente.civico = '5';
+          this.cliente.comune = 'Roma';
+          this.cliente.provincia = 'RM';
+          this.cliente.cap = '00100';
+          this.cliente.telefono = '+39 347 9876543';
+          this.cliente.email = 'laura.bianchi@email.it';
+          this.showToastMsg('Cliente già registrato su app Gruppo Eni — dati precompilati', 'warning');
+        } else {
+          this.cfVerifyStatus = 'ok';
+        }
+      }, 800);
+    },
+
+    goToOtp() {
+      const c = this.cliente;
+      if (!c.cf || !c.nome || !c.cognome || !c.dataNascita || !c.indirizzo || !c.comune || !c.telefono) {
+        this.showToastMsg('Compila tutti i campi obbligatori (*)', 'error');
+        return;
+      }
+      if (this.cfVerifyStatus !== 'ok') {
+        this.showToastMsg('Verifica il codice fiscale prima di procedere', 'error');
+        return;
+      }
+      if (!this.targhe.some(t => t.trim())) {
+        this.showToastMsg('Inserisci almeno una targa', 'error');
+        return;
+      }
+      this.step2Sub = 'otp';
+    },
+
+    sendOtpSms() {
+      this.otpSmsStatus = 'sent';
+      Bus.emit('sms:outbound', {
+        to: this.cliente.telefono,
+        template: 'OTP_REGISTRAZIONE',
+        preview: 'Il tuo codice OTP è: 1234',
+      });
+      this.showToastMsg('SMS con OTP inviato al ' + this.cliente.telefono, 'info');
+    },
+
+    confirmOtpSms() {
+      const input = this.otpSmsInput.trim();
+      if (/^\d{4}$/.test(input)) {
+        this.otpSmsStatus = 'confirmed';
+        this.showToastMsg('Numero certificato', 'success');
+      } else {
+        this.showToastMsg('OTP non valido — riprova', 'error');
+      }
+    },
+
+    sendOtpEmail() {
+      if (!this.cliente.email.trim()) {
+        this.otpEmailStatus = 'skipped';
+        this.showToastMsg('Email non fornita — step saltato (facoltativo)', 'info');
+        return;
+      }
+      this.otpEmailStatus = 'sent';
+      Bus.emit('email:outbound', {
+        to: this.cliente.email,
+        subject: 'Verifica indirizzo email',
+        preview: 'Clicca qui per verificare il tuo indirizzo email...',
+      });
+      this.showToastMsg('Email di verifica inviata a ' + this.cliente.email, 'info');
+    },
+
+    confirmOtpEmail() {
+      const input = this.otpEmailInput.trim();
+      if (/^\d{4}$/.test(input)) {
+        this.otpEmailStatus = 'confirmed';
+        this.showToastMsg('Email verificata', 'success');
+      } else {
+        this.showToastMsg('OTP non valido — riprova', 'error');
+      }
+    },
+
+    addTarga() {
+      if (this.targhe.length < 5) this.targhe.push('');
+    },
+
+    removeTarga(i) {
+      if (this.targhe.length > 1) this.targhe.splice(i, 1);
+    },
+
+    // ============================================================
+    // STEP 3 — VALUTAZIONE CREDITIZIA
+    // ============================================================
+    runCreditCheck() {
+      this.creditCheckStatus = 'checking';
+      setTimeout(() => {
+        const cf = this.cliente.cf.toUpperCase();
+        if (cf.endsWith('KO2') || cf.endsWith('KO 2')) {
+          this.creditCheckStatus = 'ok_rsa_only';
+        } else if (cf.endsWith('KO')) {
+          this.creditCheckStatus = 'ko';
+        } else {
+          this.creditCheckStatus = 'ok_full';
+        }
+      }, 2000);
+    },
+
+    // ============================================================
+    // STEP 4 — CARRELLO
+    // ============================================================
+    selectBundle(type) {
+      this.selectedBundle = type;
+      if (type === 'mobility') {
+        this.cart  = { tolling: true, rsa: true, polizzaFurto: true, parcheggi: true, areac: true, memo: true, dispositivoExtra: false };
+        this.cart2 = { tolling: true, rsa: true, polizzaFurto: true, parcheggi: true, areac: true, memo: true };
+      } else if (type === 'obu_standalone') {
+        this.cart  = { tolling: true, rsa: false, polizzaFurto: false, parcheggi: true, areac: false, memo: false, dispositivoExtra: false };
+        this.cart2 = { tolling: true, rsa: false, polizzaFurto: false, parcheggi: true, areac: false, memo: false };
+      } else if (type === 'rsa_standalone') {
+        this.cart  = { tolling: false, rsa: true, polizzaFurto: false, parcheggi: false, areac: false, memo: false, dispositivoExtra: false };
+        this.cart2 = { tolling: false, rsa: true, polizzaFurto: false, parcheggi: false, areac: false, memo: false };
+      }
+    },
+
+    toggleCartItem(item) {
+      if (item === 'tolling' || item === 'parcheggi') return;
+      if (this.selectedBundle === 'rsa_standalone') return;
+      this.cart[item] = !this.cart[item];
+    },
+
+    applySconto() {
+      if (this.codiceSconto.trim().toUpperCase() === 'ENILIVE2026') {
+        this.scontoCodiceApplicato = true;
+        this.showToastMsg('Codice sconto applicato!', 'success');
+      } else {
+        this.showToastMsg('Codice non valido', 'error');
+      }
+    },
+
+    calcTotale() {
+      let total = 0;
+      for (const [k, v] of Object.entries(this.cart)) {
+        if (v && this.prezziNativi[k] !== undefined) {
+          total += this.prezziNativi[k];
+        }
+      }
+      const allServices = ['tolling','rsa','polizzaFurto','parcheggi','areac','memo'];
+      const allActive = allServices.every(s => this.cart[s]);
+      if (allActive && this.selectedBundle === 'mobility') total -= this.scontoBundle;
+      if (this.scontoCodiceApplicato) total = Math.max(0, total - 0.50);
+      return total;
+    },
+
+    calcTotale2() {
+      let total = 0;
+      for (const [k, v] of Object.entries(this.cart2)) {
+        if (v && this.prezziNativi[k] !== undefined) {
+          total += this.prezziNativi[k];
+        }
+      }
+      return total;
+    },
+
+    verifyIban() {
+      if (!this.iban.trim()) { this.showToastMsg('Inserisci un IBAN', 'error'); return; }
+      this.ibanVerifyStatus = 'checking';
+      setTimeout(() => {
+        const clean = this.iban.replace(/\s/g, '').toUpperCase();
+        if (clean.startsWith('IT') && clean.length >= 15) {
+          this.ibanVerifyStatus = 'ok';
+          this.showToastMsg('IBAN verificato — mandato SDD attivato', 'success');
+        } else {
+          this.ibanVerifyStatus = 'ko';
+          this.showToastMsg('IBAN non valido o titolarità non verificata', 'error');
+        }
+      }, 1000);
+    },
+
+    // ============================================================
+    // STEP 5 — OBU
+    // ============================================================
+    scanObu() {
+      this.obuScanStatus = 'scanning';
+      setTimeout(() => {
+        this.obuCode = 'OBU-EN-2026-00421';
+        this.obuScanStatus = 'ok';
+        this.showToastMsg('Dispositivo rilevato nel magazzino stazione', 'success');
+      }, 1000);
+    },
+
+    associaObu() {
+      if (!this.obuCode || !this.targaSelezionata || this.targaSelezionata === '__manual__') {
+        this.showToastMsg('Compila codice OBU e targa prima di associare', 'error');
+        return;
+      }
+      this.obuAssociazioneConfermata = true;
+      Bus.emit('obu:associato', { targa: this.targaSelezionata, obu: this.obuCode });
+      this.showToastMsg('Targa ' + this.targaSelezionata.toUpperCase() + ' associata a dispositivo ' + this.obuCode, 'success');
+    },
+
+    scanObu2() {
+      this.obuScanStatus2 = 'scanning';
+      setTimeout(() => {
+        this.obuCode2 = 'OBU-EN-2026-00422';
+        this.obuScanStatus2 = 'ok';
+        this.showToastMsg('Secondo dispositivo rilevato nel magazzino stazione', 'success');
+      }, 1000);
+    },
+
+    associaObu2() {
+      if (!this.obuCode2 || !this.targaSelezionata2 || this.targaSelezionata2 === '__manual2__') {
+        this.showToastMsg('Compila codice OBU e targa per il secondo dispositivo', 'error');
+        return;
+      }
+      if (this.obuCode2 === this.obuCode) {
+        this.showToastMsg('Codice OBU già utilizzato per il primo dispositivo', 'error');
+        return;
+      }
+      this.obuAssociazioneConfermata2 = true;
+      Bus.emit('obu:associato', { targa: this.targaSelezionata2, obu: this.obuCode2 });
+      this.showToastMsg('Targa ' + this.targaSelezionata2.toUpperCase() + ' associata a dispositivo ' + this.obuCode2, 'success');
+    },
+
+    // ============================================================
+    // STEP 6 — FIRMA
+    // ============================================================
+    sendContrattoSms() {
+      this.contrattoSmsInviato = true;
+      Bus.emit('sms:outbound', {
+        to: this.cliente.telefono,
+        template: 'LINK_CONTRATTO',
+        preview: 'Firma il tuo contratto Enilive: [link mock]',
+      });
+      Bus.emit('contratto:inviato', {
+        cliente: this.cliente.nome + ' ' + this.cliente.cognome,
+        bundle: this.selectedBundle,
+      });
+      this.showToastMsg('Link contratto inviato via SMS al cliente', 'info');
+    },
+
+    confirmFirma() {
+      const input = this.firmaOtpInput.trim();
+      if (!/^\d{4}$/.test(input)) {
+        this.showToastMsg('Codice OTP non valido — chiedi al cliente di riprovare', 'error');
+        return;
+      }
+      this.firmaStatus = 'pending';
+      setTimeout(() => {
+        this.firmaStatus = 'signed';
+        this.completaOnboarding();
+      }, 1200);
+    },
+
+    async completaOnboarding() {
+      this.flowCompleted = true;
+
+      const payload = {
+        nome: this.cliente.nome + ' ' + this.cliente.cognome,
+        cf: this.cliente.cf,
+        email: this.cliente.email,
+        telefono: this.cliente.telefono,
+        targhe: this.targhe.filter(t => t.trim()),
+        bundle: this.selectedBundle,
+        servizi: Object.keys(this.cart).filter(k => this.cart[k]),
+        obu: this.obuCode,
+        ...(this.cart.dispositivoExtra && this.obuCode2 ? {
+          obu2: this.obuCode2,
+          targa2: this.targaSelezionata2,
+          servizi2: Object.keys(this.cart2).filter(k => this.cart2[k]),
+        } : {}),
+        dataRegistrazione: new Date().toISOString(),
+      };
+
+      Bus.emit('cliente:registrato', payload);
+
+      // Attivazioni servizi con delay 200ms
+      const attivazioni = [];
+      if (this.cart.rsa)      attivazioni.push('rsa');
+      if (this.cart.memo)     attivazioni.push('memo');
+      if (this.cart.areac)    attivazioni.push('areac');
+      if (this.cart.parcheggi) attivazioni.push('parcheggi');
+
+      for (let i = 0; i < attivazioni.length; i++) {
+        await new Promise(r => setTimeout(r, 200 * (i + 1)));
+        Bus.emit('servizio:attivato', {
+          servizio: attivazioni[i],
+          targa: this.targaSelezionata || (this.targhe[0] || ''),
+          data: new Date().toISOString(),
+        });
+      }
+
+      // Email conferma dopo 1.5s
+      setTimeout(() => {
+        this.emailConfermaVisible = true;
+        Bus.emit('email:outbound', {
+          to: this.cliente.email,
+          subject: 'Copia contratto Enilive',
+          preview: 'In allegato la tua copia del contratto Enilive...',
+        });
+        this.showToastMsg('Email di conferma inviata a ' + (this.cliente.email || 'cliente'), 'success');
+      }, 1500);
+
+      window.scrollTo(0, 0);
+    },
+
+    // ============================================================
+    // TOAST
+    // ============================================================
+    showToastMsg(message, type = 'info', duration = 3000) {
+      if (this._toastTimer) clearTimeout(this._toastTimer);
+      this.toastMessage = message;
+      this.toastType = type;
+      this.showToast = true;
+      this._toastTimer = setTimeout(() => { this.showToast = false; }, duration);
+    },
+
+    // ============================================================
+    // RESET
+    // ============================================================
+    resetForm() {
+      Object.assign(this, {
+        currentStep: 2,
+        step2Sub: 'doc',
+        scanMode: 'manual',
+        scanStatus: null,
+        cliente: { cf:'', nome:'', cognome:'', dataNascita:'', indirizzo:'', civico:'', comune:'', provincia:'', cap:'', stato:'Italia', telefono:'', email:'' },
+        cfVerifyStatus: null,
+        cfAlreadyExists: false,
+        targhe: [''],
+        otpSmsValue: '', otpSmsStatus: null,
+        otpEmailValue: '', otpEmailStatus: null,
+        otpSmsInput: '', otpEmailInput: '',
+        creditCheckStatus: null,
+        step4Sub: 'bundle',
+        selectedBundle: null,
+        cart: { tolling:true, rsa:true, polizzaFurto:true, parcheggi:true, areac:true, memo:true, dispositivoExtra:false },
+        cart2: { tolling:true, rsa:true, polizzaFurto:true, parcheggi:true, areac:true, memo:true },
+        codiceSconto: '', scontoCodiceApplicato: false,
+        iban: '', ibanVerifyStatus: null,
+        obuCode: '', obuScanStatus: null, obuAssociazioneConfermata: false, targaSelezionata: '',
+        obuCode2: '', obuScanStatus2: null, obuAssociazioneConfermata2: false, targaSelezionata2: '',
+        contrattoSmsInviato: false, firmaOtpInput: '', firmaStatus: null,
+        flowCompleted: false, emailConfermaVisible: false,
+      });
+      window.scrollTo(0, 0);
+    },
+
+    // ============================================================
+    // DEMO SHORTCUTS
+    // ============================================================
+    demoClienteOk() {
+      this.operatorLoggedIn = true;
+      this.cliente = {
+        cf: 'RSSMRA80A01F205X', nome: 'Mario', cognome: 'Rossi',
+        dataNascita: '1980-01-01', indirizzo: 'Via Roma', civico: '10',
+        comune: 'Milano', provincia: 'MI', cap: '20100',
+        stato: 'Italia', telefono: '+39 333 1234567', email: 'mario.rossi@email.it',
+      };
+      this.targhe = ['AB123CD'];
+      this.cfVerifyStatus = 'ok';
+      this.otpSmsStatus = 'confirmed';
+      this.creditCheckStatus = 'ok_full';
+      this.currentStep = 4;
+      this.step4Sub = 'bundle';
+      this.showToastMsg('Demo: cliente nuovo OK — step 4', 'success');
+    },
+
+    demoSoloRsa() {
+      this.operatorLoggedIn = true;
+      this.cliente = {
+        cf: 'TSTCR0000000KO2', nome: 'Anna', cognome: 'Neri',
+        dataNascita: '1990-03-22', indirizzo: 'Via Manzoni', civico: '3',
+        comune: 'Torino', provincia: 'TO', cap: '10100',
+        stato: 'Italia', telefono: '+39 340 9876543', email: 'anna.neri@email.it',
+      };
+      this.targhe = ['CD456EF'];
+      this.cfVerifyStatus = 'ok';
+      this.otpSmsStatus = 'confirmed';
+      this.creditCheckStatus = 'ok_rsa_only';
+      this.selectedBundle = 'rsa_standalone';
+      this.selectBundle('rsa_standalone');
+      this.currentStep = 4;
+      this.step4Sub = 'bundle';
+      this.showToastMsg('Demo: solo RSA — Cerved KO', 'warning');
+    },
+
+    demoClienteBloccato() {
+      this.operatorLoggedIn = true;
+      this.cliente = {
+        cf: 'TSTBL0000000000KO', nome: 'Giuseppe', cognome: 'Verdi',
+        dataNascita: '1975-11-08', indirizzo: 'Via Nazionale', civico: '50',
+        comune: 'Napoli', provincia: 'NA', cap: '80100',
+        stato: 'Italia', telefono: '+39 081 1234567', email: '',
+      };
+      this.targhe = ['NA789GH'];
+      this.cfVerifyStatus = 'ok';
+      this.otpSmsStatus = 'confirmed';
+      this.creditCheckStatus = 'ko';
+      this.currentStep = 3;
+      this.showToastMsg('Demo: cliente bloccato (Stop List KO)', 'error');
+    },
+
+    async demoCompletaOnboarding() {
+      this.operatorLoggedIn = true;
+      this.cliente = {
+        cf: 'DMOMCK80A01F205Z', nome: 'Chiara', cognome: 'Demo',
+        dataNascita: '1988-07-12', indirizzo: 'Corso Buenos Aires', civico: '22',
+        comune: 'Milano', provincia: 'MI', cap: '20124',
+        stato: 'Italia', telefono: '+39 345 6789012', email: 'chiara.demo@enilive.it',
+      };
+      this.targhe = ['DM000EN'];
+      this.cfVerifyStatus = 'ok';
+      this.otpSmsStatus = 'confirmed';
+      this.creditCheckStatus = 'ok_full';
+      this.selectBundle('mobility');
+      this.iban = 'IT60X054281110100000123456';
+      this.ibanVerifyStatus = 'ok';
+      this.obuCode = 'OBU-EN-2026-00999';
+      this.obuScanStatus = 'ok';
+      this.targaSelezionata = 'DM000EN';
+      this.obuAssociazioneConfermata = true;
+      this.contrattoSmsInviato = true;
+      this.firmaOtpInput = '1234';
+      this.firmaStatus = 'signed';
+      this.showToastMsg('Demo: esecuzione onboarding completo...', 'info');
+      await this.completaOnboarding();
+    },
+  };
+}
+</script>
+
+</body>
+</html>

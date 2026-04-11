@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emulatore + Strisce Blu</title>
+  <link rel="stylesheet" href="protoConEmulatore.css" />
+</head>
+
+<body>
+  <div id="shellToast"></div>
+
+  <!-- LEFT: SCENARI E IMPOSTAZIONI -->
+  <aside class="controls">
+    <!-- SCENARI -->
+    <section class="control-section">
+      <h2>Scenari</h2>
+      <button id="btnNotify">Notifica scadenza strisce blu</button>
+      <div class="muted">
+        Mostra: "Mancano 15 minuti alla scadenza"<br/>
+        + apre il timer Strisce Blu (15:00).
+      </div>
+      
+      <button id="btnLockScreen">Blocca telefono</button>
+      <div class="muted">
+        Mostra la schermata di blocco con timer delle strisce blu.
+      </div>
+    </section>
+
+    <!-- STRISCE BLU — NUOVI SCENARI BUR v6 -->
+    <section class="control-section">
+      <h2>Strisce Blu</h2>
+      <button id="btnSbPaymentError">Errore Pagamento</button>
+      <div class="muted">Simula carta scaduta nel modal di conferma pagamento</div>
+
+      <button id="btnSbOpenExtend">Proroga Sosta</button>
+      <div class="muted">Apre il modal di modifica durata (richiede sosta attiva)</div>
+    </section>
+
+    <!-- TELEPEDAGGIO -->
+    <section class="control-section">
+      <h2>Telepedaggio</h2>
+      <button id="btnTpTransito">Simula transito casello</button>
+      <div class="muted">Aggiunge transito A8 Milano Nord (€1,80) — visibile in app e CRM</div>
+
+      <button id="btnTpTransitoA9">Simula transito A9</button>
+      <div class="muted">Aggiunge transito A9 Como Sud (€2,40) — visibile in app e CRM</div>
+    </section>
+
+    <!-- AREA C -->
+    <section class="control-section">
+      <h2>Area C</h2>
+      <button id="btnAcTransito">Simula transito Area C</button>
+      <div class="muted">Aggiunge transito ZTL Milano (€7,50 da addebitare) — visibile in app e CRM</div>
+    </section>
+
+    <!-- PARCHEGGI -->
+    <section class="control-section">
+      <h2>Parcheggi</h2>
+      <button id="btnPgAccesso">Simula ingresso parcheggio</button>
+      <div class="muted">Aggiunge accesso "in corso" a Parking Centro Milano</div>
+
+      <button id="btnPgUscita">Simula uscita parcheggio</button>
+      <div class="muted">Chiude l'accesso in corso con durata e importo</div>
+    </section>
+
+    <!-- RSA -->
+    <section class="control-section">
+      <h2>RSA</h2>
+      <button id="btnRsaChiamata">Simula chiamata soccorso</button>
+      <div class="muted">Pubblica evento rsa:chiamata — visibile nel log CRM</div>
+    </section>
+
+    <!-- MEMO -->
+    <section class="control-section">
+      <h2>Memo</h2>
+      <button id="btnMemoScadenza">Simula scadenza imminente</button>
+      <div class="muted">Pubblica memo:scadenza per bollo AB123CD — visibile nel log CRM</div>
+    </section>
+
+    <!-- ACCOUNT -->
+    <section class="control-section">
+      <h2>Account</h2>
+      <button id="btnOpenGarage">Vai a Garage</button>
+      <div class="muted">Apre direttamente la sezione Garage</div>
+
+      <button id="btnOpenPayments">Vai a Pagamenti</button>
+      <div class="muted">Apre direttamente la sezione Metodi di Pagamento</div>
+    </section>
+
+    <!-- IMPOSTAZIONI SCENARI -->
+    <section class="control-section">
+      <h2>Impostazioni Scenari</h2>
+      
+      <label for="iframeSelect">Carica iframe:</label>
+      <select id="iframeSelect">
+        <option value="proto-app.html">App Principale (proto-app)</option>
+        <option value="onboarding.html">Onboarding Cliente</option>
+      </select>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkTerminiServizio">
+        Accetta Termini e Condizioni Servizio Memo
+      </label>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkTerminiStricheBlu">
+        Accetta Termini e Condizioni Strisce Blu
+      </label>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkWizardStricheBlu">
+        Wizard Strisce Blu già visualizzato
+      </label>
+
+      <button id="btnLoadSettings">Carica Impostazioni</button>
+    </section>
+  </aside>
+
+  <!-- RIGHT: EMULATORE -->
+  <main class="emulator-wrapper">
+    <div class="phone">
+      <div class="status"><span>09:41</span><span>▮▮▮ 5G 🔋</span></div>
+      <div class="screen">
+        <iframe id="appFrame" title="App Emulator"></iframe>
+      </div>
+    </div>
+  </main>
+
+  <script src="bus.js"></script>
+  <script src="protoConEmulatore.js"></script>
+</body>
+</html>

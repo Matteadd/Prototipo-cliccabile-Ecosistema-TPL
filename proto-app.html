@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>EniLive Mobility+</title>
+
+  <!-- External Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Leaflet (mappa zone Strisce Blu) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="proto-app.css" />
+</head>
+
+<body class="bg-gray-100">
+  <div id="demoToast"></div>
+
+  <div class="app-container bg-white shadow-lg"
+    x-data="{
+      currentPage: localStorage.getItem('currentPage') || 'home',
+      showServiceDetail: false,
+      selectedService: null,
+      showRefuelModal: false,
+      showBundleDetail: false,
+      selectedBundle: null,
+      selectedStation: null,
+      selectedFuel: 'benzina',
+      selectedAmount: 50,
+      messages: [
+        { type: 'bot', text: 'Ciao! Sono Eni Assistant. Come posso aiutarti oggi?' }
+      ],
+      messageInput: '',
+      
+      // Lock Screen
+      showLockScreen: false,
+      lockScreenCurrentTime: '00:00',
+      lockScreenInterval: null,
+      
+      init() {
+        this.$watch('currentPage', (val) => {
+          localStorage.setItem('currentPage', val);
+          if (val !== 'account') this.accountSection = 'main';
+        });
+        // Carica il flag di accettazione termini Strisce Blu
+        this.sbTermsAccepted = localStorage.getItem('sbTermsAccepted') === 'true';
+        // Carica flag wizard Strisce Blu
+        this.sbWizardSeen = localStorage.getItem('sbWizardSeen') === 'true';
+        window.APP = this;
+        // Callback: tap su poligono → aggiorna card nel pannello (non conferma ancora)
+        window._sbHighlightZone = (zone) => {
+          this.sbMapSelectedZone = zone;
+        };
+        // Callback: conferma zona selezionata
+        window._sbSelectZone = (name, rate, hours) => {
+          this.sbZoneName = name;
+          this.sbZoneRate = rate;
+          this.sbZoneHours = hours;
+          this.closeSbZoneModal();
+        };
+        this.$nextTick(() => this.busInit());
+      },
+
+      updateLockScreenTime(){
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2,'0');
+        const mm = String(now.getMinutes()).padStart(2,'0');
+        this.lockScreenCurrentTime = `${hh}:${mm}`;
+      },
+
+      toggleLockScreen(){
+        this.showLockScreen = !this.showLockScreen;
+        if(this.showLockScreen){
+          this.updateLockScreenTime();
+          if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+          this.lockScreenInterval = setInterval(() => this.updateLockScreenTime(), 1000);
+        } else {
+          if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+          this.lockScreenInterval = null;
+        }
+      },
+
+      /* =========================
+         STRISCE BLU 
+         ========================= */
+      showBlueModal: false,
+      showTermsModal: false,
+      sbTermsAccepted: false,
+      sbPage: 'map',
+      sbPlate: '',
+      sbMode: 'wheel',
+      sbMinutes: 60,
+      sbActive: false,
+      sbEndTs: null,
+      sbStartTs: null,
+      sbTimerText: '00:00:00',
+      sbMetaText: '',
+      sbCalculatedEndTime: '00:00',
+      sbSostaEndTime: '00:00',
+      sbInterval: null,
+      sbPrice: 0.00,
+      showPaymentModal: false,
+      selectedPaymentMethod: null,
+      sbPricePerHour: 1.50,
+
+      // Strisce Blu — Estensioni BUR v6
+      sbWizardSeen: false,
+      sbShowWizard: false,
+      sbZoneSelected: false,
+      sbZoneName: 'Zona A — Centro',
+      sbZoneRate: 1.50,
+      sbZoneHours: '08:00–20:00',
+      sbSelectedVehicle: null,
+      sbShowVehicleSelector: false,
+      sbShowPaymentSelector: false,
+      sbShowExtendModal: false,
+      sbExtendMinutes: 30,
+      sbPaymentError: false,
+      sbPaymentErrorMsg: '',
+      sbShowZoneModal: false,
+      sbMapSelectedZone: null,
+
+      /* ========================
+         ACCOUNT
+         ======================== */
+      accountSection: 'main',
+      userProfile: {
+        nome: 'Mario Rossi',
+        email: 'mario.rossi@email.it',
+        telefono: '+39 333 1234567'
+      },
+      garageVehicles: [
+        { id: 1, targa: 'AB123CD', tipo: 'Auto', marca: 'Fiat', modello: 'Panda', nickname: 'La Panda' },
+        { id: 2, targa: 'EF456GH', tipo: 'Auto', marca: 'Volkswagen', modello: 'Golf', nickname: 'Golf Nera' }
+      ],
+      showGarageAddModal: false,
+      showGarageDeleteConfirm: false,
+      garageDeleteTarget: null,
+      garageNewVehicle: { targa: '', tipo: 'Auto', marca: '', modello: '', nickname: '' },
+      cronologiaItems: [
+        { id: 1, servizio: 'Strisce Blu', data: '2026-03-28', importo: 2.50, targa: 'AB123CD', stato: 'completato' },
+        { id: 2, servizio: 'Strisce Blu', data: '2026-03-15', importo: 1.50, targa: 'EF456GH', stato: 'completato' },
+        { id: 3, servizio: 'Rifornimento', data: '2026-03-10', importo: 45.00, targa: 'AB123CD', stato: 'completato' },
+        { id: 4, servizio: 'Memo', data: '2026-03-01', importo: 0.00, targa: 'AB123CD', stato: 'attivo' }
+      ],
+      paymentMethods: [
+        { id: 1, tipo: 'Carta di credito', label: 'Visa \u2022\u2022\u2022\u2022 4242', icona: 'fa-credit-card', predefinito: true },
+        { id: 2, tipo: 'PayPal', label: 'mario.rossi@email.it', icona: 'fa-paypal', predefinito: false }
+      ],
+      showPaymentAddModal: false,
+      showPaymentDeleteConfirm: false,
+      paymentDeleteTarget: null,
+      paymentNewType: 'Carta di credito',
+      paymentNewLabel: '',
+      paymentIconMap: {
+        'Carta di credito': 'fa-credit-card',
+        'PayPal': 'fa-paypal',
+        'Apple Pay': 'fa-mobile-alt',
+        'Google Pay': 'fa-wallet'
+      },
+
+      showToast(msg) {
+        const t = document.getElementById('demoToast');
+        if (t) {
+          t.textContent = msg;
+          t.style.display = 'block';
+          clearTimeout(window.__inAppToastT);
+          window.__inAppToastT = setTimeout(() => t.style.display = 'none', 2000);
+        }
+      },
+
+      goAccountSection(section) {
+        this.accountSection = section;
+      },
+
+      backToAccountMain() {
+        this.accountSection = 'main';
+      },
+
+      openGarageAdd() {
+        this.garageNewVehicle = { targa: '', tipo: 'Auto', marca: '', modello: '', nickname: '' };
+        this.showGarageAddModal = true;
+      },
+
+      confirmGarageAdd() {
+        if (!this.garageNewVehicle.targa || this.garageNewVehicle.targa.trim().length < 5) {
+          this.showToast('Inserisci una targa valida');
+          return;
+        }
+        const newId = Date.now();
+        this.garageVehicles.push({ id: newId, ...this.garageNewVehicle });
+        this.showGarageAddModal = false;
+        this.showToast('Veicolo aggiunto al garage');
+      },
+
+      confirmGarageDelete() {
+        this.garageVehicles = this.garageVehicles.filter(v => v.id !== this.garageDeleteTarget.id);
+        this.showGarageDeleteConfirm = false;
+        this.garageDeleteTarget = null;
+        this.showToast('Veicolo rimosso dal garage');
+      },
+
+      setDefaultPayment(id) {
+        this.paymentMethods = this.paymentMethods.map(p => ({ ...p, predefinito: p.id === id }));
+        this.showToast('Metodo predefinito aggiornato');
+      },
+
+      confirmPaymentDelete() {
+        if (this.paymentMethods.length <= 1) {
+          this.showToast('Devi avere almeno un metodo di pagamento');
+          return;
+        }
+        this.paymentMethods = this.paymentMethods.filter(p => p.id !== this.paymentDeleteTarget.id);
+        this.showPaymentDeleteConfirm = false;
+        this.paymentDeleteTarget = null;
+        this.showToast('Metodo rimosso');
+      },
+
+      confirmPaymentAdd() {
+        const icona = this.paymentIconMap[this.paymentNewType] || 'fa-credit-card';
+        this.paymentMethods.push({
+          id: Date.now(),
+          tipo: this.paymentNewType,
+          label: this.paymentNewLabel || this.paymentNewType,
+          icona: icona,
+          predefinito: false
+        });
+        this.showPaymentAddModal = false;
+        this.paymentNewType = 'Carta di credito';
+        this.paymentNewLabel = '';
+        this.showToast('Metodo aggiunto');
+      },
+
+      _openMapPage(){
+        this.sbPage = 'map';
+        this.sbMapSelectedZone = null;
+        this.$nextTick(() => { setTimeout(() => window._sbInitMap(), 150); });
+      },
+
+      dismissSbWizard(){
+        // Spunta il checkbox wizard nel pannello scenari del parent
+        try {
+          const chkW = window.parent.document.getElementById('chkWizardStricheBlu');
+          if (chkW) chkW.checked = true;
+        } catch(e) {
+          console.warn('Impossibile aggiornare il checkbox wizard del parent');
+        }
+        this.sbShowWizard = false;
+        this.showBlueModal = true;
+        this.sbMode = 'wheel';
+        this.sbMinutes = 60;
+        this.sbMetaText = '';
+        if (!this.sbSelectedVehicle && this.garageVehicles.length > 0) {
+          this.sbSelectedVehicle = this.garageVehicles[0];
+          this.sbPlate = this.garageVehicles[0].targa;
+        }
+        const defM = this.paymentMethods.find(p => p.predefinito) || this.paymentMethods[0] || null;
+        this.selectedPaymentMethod = defM ? defM.id : null;
+        this._openMapPage();
+      },
+
+      sbSelectVehicle(vehicle){
+        this.sbSelectedVehicle = vehicle;
+        this.sbPlate = vehicle.targa;
+        this.sbShowVehicleSelector = false;
+      },
+
+      openSbExtend(){
+        if (!this.sbActive) return;
+        this.sbExtendMinutes = 30;
+        this.sbShowExtendModal = true;
+      },
+
+      confirmSbExtend(){
+        const addMs = this.sbExtendMinutes * 60 * 1000;
+        this.sbEndTs = this.sbEndTs + addMs;
+        // Ricalcola prezzo totale basato sulla durata totale
+        const totalMs = this.sbEndTs - this.sbStartTs;
+        const totalMins = totalMs / 60000;
+        this.sbPrice = parseFloat(((totalMins / 60) * this.sbZoneRate).toFixed(2));
+        this.showToast(`Sosta prorogata di ${this.sbExtendMinutes} min — Nuovo importo: €${this.sbPrice.toFixed(2)}`);
+        this.sbShowExtendModal = false;
+      },
+
+      sbSimulatePaymentError(msg){
+        this.sbPaymentError = true;
+        this.sbPaymentErrorMsg = msg || 'Errore nel pagamento. Riprova.';
+      },
+
+      openBlue(){
+        // Controlla SEMPRE il checkbox nel pannello scenari (source of truth)
+        let checkboxIsChecked = false;
+        try {
+          const chk = window.parent.document.getElementById('chkTerminiStricheBlu');
+          if (chk && chk.checked) {
+            checkboxIsChecked = true;
+          }
+        } catch(e) {
+          console.warn('Impossibile accedere al checkbox del parent');
+        }
+        
+        // Se il checkbox NON è spuntato, mostra la modal dei termini
+        if (!checkboxIsChecked) {
+          this.showTermsModal = true;
+          return; // Non apre la modal Strices Blu finché non accetta i termini
+        }
+        
+        // Controlla il checkbox wizard nel pannello scenari (source of truth)
+        let wizardIsChecked = false;
+        try {
+          const chkW = window.parent.document.getElementById('chkWizardStricheBlu');
+          if (chkW && chkW.checked) {
+            wizardIsChecked = true;
+          }
+        } catch(e) {}
+
+        // Se il checkbox wizard NON è spuntato, mostra il wizard
+        if (!wizardIsChecked) {
+          this.sbShowWizard = true;
+          return;
+        }
+
+        // Apri direttamente Strisce Blu
+        this.showBlueModal = true;
+        if(this.sbActive){
+          this.sbPage = 'timer';
+        } else {
+          this.sbMode = 'wheel';
+          this.sbMinutes = 60;
+          this.sbPlate = this.sbPlate || '';
+          this.sbMetaText = '';
+          if (!this.sbSelectedVehicle && this.garageVehicles.length > 0) {
+            this.sbSelectedVehicle = this.garageVehicles[0];
+            this.sbPlate = this.garageVehicles[0].targa;
+          }
+          const defMethod = this.paymentMethods.find(p => p.predefinito) || this.paymentMethods[0] || null;
+          this.selectedPaymentMethod = defMethod ? defMethod.id : null;
+          this._openMapPage();
+        }
+      },
+
+      sbSetMode(mode){
+        this.sbMode = mode;
+        if(mode === 'standard'){
+          this.sbMinutes = 120;
+        }
+      },
+
+      acceptSbTerms(){
+        // Spunta il checkbox nel pannello scenari del parent
+        try {
+          const chk = window.parent.document.getElementById('chkTerminiStricheBlu');
+          if (chk) chk.checked = true;
+        } catch(e) {
+          console.warn('Impossibile aggiornare il checkbox del parent');
+        }
+        this.sbTermsAccepted = true;
+        localStorage.setItem('sbTermsAccepted', 'true');
+        this.showTermsModal = false;
+        // Riprende il flusso: controllo wizard → apertura sosta
+        this.openBlue();
+      },
+
+      rejectSbTerms(){
+        // Chiudi modal termini senza salvare nulla
+        this.showTermsModal = false;
+      },
+
+      calculateSbPrice(){
+        const mins = parseInt(this.sbMinutes || 0, 10);
+        if(this.sbMode === 'open'){
+          return 0.00;
+        }
+        return parseFloat(((mins / 60) * this.sbZoneRate).toFixed(2));
+      },
+
+      sbStart(){
+        // Pre-check veicolo garage
+        if (this.garageVehicles.length === 0 && !this.sbSelectedVehicle) {
+          this.showToast('Aggiungi prima un veicolo dal Garage');
+          return;
+        }
+        if (!this.sbSelectedVehicle && !this.sbPlate && this.garageVehicles.length > 0) {
+          this.sbSelectedVehicle = this.garageVehicles[0];
+          this.sbPlate = this.garageVehicles[0].targa;
+        }
+        if(!this.sbPlate || this.sbPlate.trim().length < 5){
+          this.sbMetaText = 'Inserisci una targa valida (min 5 caratteri).';
+          return;
+        }
+        if (!this.selectedPaymentMethod && this.paymentMethods.length === 0) {
+          this.showToast('Aggiungi prima un metodo di pagamento in Account');
+          return;
+        }
+        this.sbMetaText = '';
+        this.sbPrice = this.calculateSbPrice();
+        this.confirmSbPayment();
+      },
+      
+      confirmSbPayment(){
+        // Check errore pagamento (impostato da scenario emulatore)
+        if (this.sbPaymentError) {
+          return; // Il messaggio è già visibile nel modal
+        }
+        const now = Date.now();
+        if(this.sbMode === 'open'){
+          this.sbStartTs = now;
+          this.sbEndTs = null;
+        } else {
+          const mins = parseInt(this.sbMinutes || 0, 10);
+          this.sbEndTs = now + (mins * 60 * 1000);
+          this.sbStartTs = now;
+        }
+        this.sbActive = true;
+        this.sbPage = 'timer';
+        this.showPaymentModal = false;
+        this.sbTick();
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = setInterval(() => this.sbTick(), 1000);
+      },
+
+      sbStop(){
+        // Registra sosta in cronologia
+        this.cronologiaItems.unshift({
+          id: Date.now(),
+          servizio: 'Strisce Blu',
+          data: new Date().toLocaleDateString('it-IT'),
+          importo: this.sbPrice,
+          targa: this.sbPlate,
+          stato: 'completato',
+          zona: this.sbZoneName
+        });
+        this.sbActive = false;
+        this.showLockScreen = false;
+        this.showBlueModal = false;
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = null;
+        if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+        this.lockScreenInterval = null;
+        this.sbMetaText = '';
+      },
+
+      sbTick(){
+        if(!this.sbActive) return;
+        const now = Date.now();
+
+        if(this.sbMode === 'open'){
+          const elapsed = Math.max(0, now - this.sbStartTs);
+          this.sbTimerText = this.formatMs(elapsed);
+        } else {
+          const remaining = Math.max(0, this.sbEndTs - now);
+          this.sbTimerText = this.formatMs(remaining);
+          
+          // Calcola orario di fine sosta (HH:MM)
+          const endDate = new Date(this.sbEndTs);
+          const hh = String(endDate.getHours()).padStart(2,'0');
+          const mm = String(endDate.getMinutes()).padStart(2,'0');
+          this.sbSostaEndTime = `${hh}:${mm}`;
+
+          if(remaining <= 0){
+            this.sbActive = false;
+            this.showLockScreen = false;
+            if(this.sbInterval) clearInterval(this.sbInterval);
+            this.sbInterval = null;
+            this.sbMetaText = 'Sosta terminata (demo).';
+          }
+        }
+      },
+
+      formatMs(ms){
+        const total = Math.floor(ms/1000);
+        const hh = String(Math.floor(total/3600)).padStart(2,'0');
+        const mm = String(Math.floor((total%3600)/60)).padStart(2,'0');
+        const ss = String(total%60).padStart(2,'0');
+        return `${hh}:${mm}:${ss}`;
+      },
+
+      calculateSbEndTime(){
+        // Calcola l'orario di fine sosta basato su ora attuale + minuti
+        const now = new Date();
+        const mins = parseInt(this.sbMinutes || 0, 10);
+        const endDate = new Date(now.getTime() + mins * 60 * 1000);
+        const hh = String(endDate.getHours()).padStart(2,'0');
+        const mm = String(endDate.getMinutes()).padStart(2,'0');
+        this.sbCalculatedEndTime = `${hh}:${mm}`;
+      },
+
+      sbNotifyExpiry(minutes=15){
+        this.showBlueModal = true;
+        this.sbPage = 'timer';
+        this.sbMode = 'wheel';
+        this.sbPlate = (this.sbPlate && this.sbPlate.trim().length >= 5) ? this.sbPlate : 'EZ123AB';
+        this.sbMinutes = minutes;
+        this.sbActive = true;
+
+        const now = Date.now();
+        this.sbStartTs = now;
+        this.sbEndTs = now + minutes*60*1000;
+
+        this.sbTick();
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = setInterval(() => this.sbTick(), 1000);
+
+        const t = document.getElementById('demoToast');
+        if(t){
+          t.textContent = `Mancano ${minutes} minuti alla scadenza`;
+          t.style.display = 'block';
+          clearTimeout(window.__inAppToastT);
+          window.__inAppToastT = setTimeout(() => t.style.display='none', 1800);
+        }
+      },
+
+      sbShowLockScreen(){
+        // Mostra il lock screen solo se c'è una sosta attiva
+        if(!this.sbActive){
+          return; // Non fare niente se non c'è sosta attiva
+        }
+        
+        // Mostra il lock screen con il timer reale della sosta
+        this.showLockScreen = true;
+        this.updateLockScreenTime();
+        if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+        this.lockScreenInterval = setInterval(() => this.updateLockScreenTime(), 1000);
+        
+        // Aggiorna il timer display con il valore reale
+        this.sbTick();
+      },
+
+      /* ========================
+         TELEPEDAGGIO
+         ======================== */
+      tpActive: true,
+      tpObu: 'OBU-IT-00123456',
+      tpSaldo: 45.30,
+      tpSospeso: false,
+      showTpSospendModal: false,
+      tpMovimenti: [
+        { id: 'tp001', data: '2026-04-09T08:22:00', casello: 'Milano Nord', autostrada: 'A8',  importo: 1.80, targa: 'AB123CD' },
+        { id: 'tp002', data: '2026-04-08T19:05:00', casello: 'Rho',         autostrada: 'A8',  importo: 1.20, targa: 'AB123CD' },
+        { id: 'tp003', data: '2026-04-06T07:45:00', casello: 'Lainate',     autostrada: 'A8',  importo: 0.90, targa: 'AB123CD' },
+        { id: 'tp004', data: '2026-04-03T16:30:00', casello: 'Como Sud',    autostrada: 'A9',  importo: 2.40, targa: 'AB123CD' },
+        { id: 'tp005', data: '2026-03-28T09:10:00', casello: 'Milano Est',  autostrada: 'A51', importo: 1.10, targa: 'AB123CD' }
+      ],
+
+      tpSospendi() {
+        this.tpSospeso = true;
+        this.showTpSospendModal = false;
+        if (typeof Bus !== 'undefined') Bus.emit('servizio:disattivato', { servizio: 'telepedaggio', targa: this.garageVehicles[0]?.targa || 'AB123CD', data: new Date().toISOString() });
+        this.showToast('Contratto sospeso');
+      },
+
+      tpRiattiva() {
+        this.tpSospeso = false;
+        if (typeof Bus !== 'undefined') Bus.emit('servizio:attivato', { servizio: 'telepedaggio', targa: this.garageVehicles[0]?.targa || 'AB123CD', data: new Date().toISOString() });
+        this.showToast('Contratto riattivato');
+      },
+
+      /* ========================
+         RSA
+         ======================== */
+      rsaAttiva: true,
+      rsaCodiceTessera: 'RSA-2024-98765',
+      rsaCallActive: false,
+      rsaIframeUrl: 'about:blank',
+      showRsaModal: false,
+      rsaInterventi: [
+        { id: 'rsa001', data: '2026-04-05T08:00:00', tipo: 'foratura', descrizione: 'Foratura pneumatico — A8 km 14', stato: 'chiuso', dataChiusura: '2026-04-05T09:45:00', targa: 'AB123CD' }
+      ],
+
+      rsaOpenCall() {
+        this.rsaCallActive = true;
+        this.showRsaModal = true;
+        if (typeof Bus !== 'undefined') Bus.emit('rsa:chiamata', { targa: this.garageVehicles[0]?.targa || 'AB123CD', posizione: 'mock', tipo: 'generico' });
+      },
+
+      rsaCloseCall() {
+        this.rsaCallActive = false;
+        this.showRsaModal = false;
+      },
+
+      /* ========================
+         AREA C
+         ======================== */
+      acAttiva: true,
+      acTargaAbilitata: 'AB123CD',
+      acMovimenti: [
+        { id: 'ac001', data: '2026-04-08T08:15:00', targa: 'AB123CD', importo: 7.50, stato: 'da_addebitare', note: 'Ingresso ore 08:15' },
+        { id: 'ac002', data: '2026-04-07T09:02:00', targa: 'AB123CD', importo: 7.50, stato: 'da_addebitare', note: 'Ingresso ore 09:02' },
+        { id: 'ac003', data: '2026-03-31T07:55:00', targa: 'AB123CD', importo: 7.50, stato: 'pagato',        note: 'Ingresso ore 07:55 — fattura marzo' }
+      ],
+      showAcDisattiva: false,
+
+      acAttivaServizio() {
+        this.acAttiva = true;
+        this.acTargaAbilitata = this.garageVehicles[0]?.targa || 'AB123CD';
+        if (typeof Bus !== 'undefined') Bus.emit('servizio:attivato', { servizio: 'areac', targa: this.acTargaAbilitata, data: new Date().toISOString() });
+        this.showToast('Area C attivata');
+      },
+
+      acDisattivaServizio() {
+        this.acAttiva = false;
+        this.showAcDisattiva = false;
+        if (typeof Bus !== 'undefined') Bus.emit('servizio:disattivato', { servizio: 'areac', targa: this.acTargaAbilitata, data: new Date().toISOString() });
+        this.showToast('Area C disattivata');
+      },
+
+      /* ========================
+         MEMO
+         ======================== */
+      memoVeicoli: [
+        {
+          targa: 'AB123CD', tipo: 'auto', marca: 'Fiat', modello: 'Panda',
+          bollo:     { scadenza: '2026-05-31', importo: 187.50, pagato: false, reminderAttivo: true },
+          revisione: { scadenza: '2026-09-15', reminderAttivo: false },
+          rca:       { scadenza: '2026-07-22', compagnia: 'Generali', reminderAttivo: false }
+        },
+        {
+          targa: 'EF456GH', tipo: 'auto', marca: 'Volkswagen', modello: 'Golf',
+          bollo:     { scadenza: '2026-03-31', importo: 120.00, pagato: false, reminderAttivo: false },
+          revisione: { scadenza: '2026-11-30', reminderAttivo: false },
+          rca:       { scadenza: '2026-04-30', compagnia: 'UnipolSai', reminderAttivo: true }
+        }
+      ],
+      showMemoModal: false,
+      memoSelectedVeicolo: null,
+      showMemoPayModal: false,
+      memoPayTargetVeicolo: null,
+
+      memoScadenzaStato(dataStr) {
+        const oggi = new Date();
+        const scad = new Date(dataStr);
+        const diff = (scad - oggi) / (1000 * 60 * 60 * 24);
+        if (diff < 0) return 'scaduto';
+        if (diff <= 30) return 'in_scadenza';
+        return 'ok';
+      },
+
+      memoStatoClass(dataStr) {
+        const s = this.memoScadenzaStato(dataStr);
+        return { ok: 'bg-green-100 text-green-700', in_scadenza: 'bg-orange-100 text-orange-700', scaduto: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600';
+      },
+
+      memoStatoLabel(dataStr) {
+        return { ok: 'OK', in_scadenza: 'In scadenza', scaduto: 'Scaduto' }[this.memoScadenzaStato(dataStr)] || '';
+      },
+
+      memoFormatDate(dateStr) {
+        return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
+
+      memoOpenVeicolo(v) {
+        this.memoSelectedVeicolo = v;
+        this.showMemoModal = true;
+      },
+
+      memoOpenPay(v) {
+        this.memoPayTargetVeicolo = v;
+        this.showMemoPayModal = true;
+      },
+
+      memoConfirmPay() {
+        if (!this.memoPayTargetVeicolo) return;
+        this.memoPayTargetVeicolo.bollo.pagato = true;
+        const importo = this.memoPayTargetVeicolo.bollo.importo;
+        const targa   = this.memoPayTargetVeicolo.targa;
+        if (typeof Bus !== 'undefined') {
+          Bus.emit('pagamento:confermato', { servizio: 'memo', importo, metodo: 'carta', data: new Date().toISOString(), tipo: 'bollo', targa });
+          Bus.emit('memo:scadenza', { tipo: 'bollo', targa, data: this.memoPayTargetVeicolo.bollo.scadenza });
+        }
+        this.movimenti.unshift({ id: 'mv_' + Date.now(), data: new Date().toISOString(), servizio: 'memo', descrizione: 'Bollo auto ' + targa + ' — 2026', targa, importo, stato: 'pagato' });
+        this.showMemoPayModal = false;
+        this.showMemoModal = false;
+        this.showToast('Bollo pagato con successo');
+      },
+
+      /* ========================
+         PARCHEGGI
+         ======================== */
+      pgList: [
+        { id: 'p001', nome: 'Parking Centro Milano', indirizzo: 'Via M. Gioia 55, Milano',   lat: 45.4847, lng: 9.1990, orari: '24h',                  tariffa: '€2,00/h — max €18,00/g', posti: 320 },
+        { id: 'p002', nome: 'Parking Garibaldi',      indirizzo: 'Piazza Freud 1, Milano',    lat: 45.4830, lng: 9.1877, orari: 'Lun-Dom 06:00–01:00', tariffa: '€2,50/h — max €22,00/g', posti: 180 },
+        { id: 'p003', nome: 'Parking Fiera Milano',   indirizzo: 'Viale Scarampo 1, Milano',  lat: 45.4819, lng: 9.1482, orari: '24h',                  tariffa: '€1,50/h — max €12,00/g', posti: 1200 },
+        { id: 'p004', nome: 'Parking Lambrate',       indirizzo: 'Via Conte Rosso 18, Milano',lat: 45.4840, lng: 9.2398, orari: 'Lun-Sab 07:00–22:00', tariffa: '€1,00/h — max €8,00/g',  posti: 95 }
+      ],
+      pgMovimenti: [
+        { id: 'pg001', parcheggio: 'Parking Centro Milano', ingresso: '2026-04-09T09:00:00', uscita: '2026-04-09T11:30:00', durata: '2h 30m', importo: 5.00, targa: 'AB123CD', stato: 'pagato' },
+        { id: 'pg002', parcheggio: 'Parking Garibaldi',     ingresso: '2026-04-07T14:15:00', uscita: '2026-04-07T16:00:00', durata: '1h 45m', importo: 4.38, targa: 'AB123CD', stato: 'pagato' },
+        { id: 'pg003', parcheggio: 'Parking Centro Milano', ingresso: '2026-04-03T10:30:00', uscita: '2026-04-03T12:30:00', durata: '2h 00m', importo: 4.00, targa: 'AB123CD', stato: 'pagato' }
+      ],
+      pgActiveTab: 'lista',
+
+      pgOpenMaps(p) {
+        window.open('https://www.google.com/maps?q=' + p.lat + ',' + p.lng, '_blank');
+      },
+
+      /* ========================
+         MOVIMENTI
+         ======================== */
+      movimenti: [
+        { id: 'm001', data: '2026-04-09T09:15:00', servizio: 'strisce_blu',  descrizione: 'Sosta Zona A — 1h 30m',            targa: 'AB123CD', importo: 2.25,   stato: 'pagato' },
+        { id: 'm002', data: '2026-04-09T09:00:00', servizio: 'parcheggi',    descrizione: 'Parking Centro Milano — 2h 30m',   targa: 'AB123CD', importo: 5.00,   stato: 'pagato' },
+        { id: 'm003', data: '2026-04-09T08:22:00', servizio: 'telepedaggio', descrizione: 'Transito A8 — Milano Nord',         targa: 'AB123CD', importo: 1.80,   stato: 'pagato' },
+        { id: 'm004', data: '2026-04-08T19:05:00', servizio: 'telepedaggio', descrizione: 'Transito A8 — Rho',                 targa: 'AB123CD', importo: 1.20,   stato: 'pagato' },
+        { id: 'm005', data: '2026-04-08T14:00:00', servizio: 'strisce_blu',  descrizione: 'Sosta Zona B — 45 min',            targa: 'AB123CD', importo: 1.13,   stato: 'pagato' },
+        { id: 'm006', data: '2026-04-08T08:15:00', servizio: 'areac',        descrizione: 'Transito Area C Milano',            targa: 'AB123CD', importo: 7.50,   stato: 'da_addebitare' },
+        { id: 'm007', data: '2026-04-07T14:15:00', servizio: 'parcheggi',    descrizione: 'Parking Garibaldi — 1h 45m',       targa: 'AB123CD', importo: 4.38,   stato: 'pagato' },
+        { id: 'm008', data: '2026-04-07T09:02:00', servizio: 'areac',        descrizione: 'Transito Area C Milano',            targa: 'AB123CD', importo: 7.50,   stato: 'da_addebitare' },
+        { id: 'm009', data: '2026-04-06T07:45:00', servizio: 'telepedaggio', descrizione: 'Transito A8 — Lainate',             targa: 'AB123CD', importo: 0.90,   stato: 'pagato' },
+        { id: 'm010', data: '2026-04-01T00:00:00', servizio: 'rsa',          descrizione: 'Canone mensile RSA — Aprile 2026',  targa: 'AB123CD', importo: 2.00,   stato: 'pagato' },
+        { id: 'm011', data: '2026-03-15T10:30:00', servizio: 'memo',         descrizione: 'Bollo auto AB123CD — 2026',         targa: 'AB123CD', importo: 187.50, stato: 'pagato' }
+      ],
+      movimentiFilter: { servizio: null, stato: null, dateFrom: null, dateTo: null },
+      movimentiSelectedId: null,
+
+      movimentiFiltrati() {
+        return this.movimenti.filter(m => {
+          if (this.movimentiFilter.servizio && m.servizio !== this.movimentiFilter.servizio) return false;
+          if (this.movimentiFilter.stato    && m.stato    !== this.movimentiFilter.stato)    return false;
+          if (this.movimentiFilter.dateFrom && m.data < this.movimentiFilter.dateFrom) return false;
+          if (this.movimentiFilter.dateTo   && m.data > this.movimentiFilter.dateTo + 'T23:59:59') return false;
+          return true;
+        });
+      },
+
+      movimentiTotaleMese() {
+        const meseCorrente = '2026-04';
+        return this.movimenti
+          .filter(m => m.data.startsWith(meseCorrente) && (m.stato === 'pagato' || m.stato === 'da_addebitare'))
+          .reduce((sum, m) => sum + m.importo, 0).toFixed(2);
+      },
+
+      movServiceLabel(s) {
+        return { strisce_blu: 'Strisce Blu', telepedaggio: 'Telepedaggio', areac: 'Area C', rsa: 'RSA', parcheggi: 'Parcheggi', memo: 'Memo' }[s] || s;
+      },
+
+      movServiceClass(s) {
+        return { strisce_blu: 'bg-purple-100 text-purple-700', telepedaggio: 'bg-blue-100 text-blue-700', areac: 'bg-indigo-100 text-indigo-700', rsa: 'bg-orange-100 text-orange-700', parcheggi: 'bg-teal-100 text-teal-700', memo: 'bg-amber-100 text-amber-700' }[s] || 'bg-gray-100 text-gray-600';
+      },
+
+      movStatoClass(s) {
+        return { pagato: 'bg-green-100 text-green-700', in_corso: 'bg-blue-100 text-blue-700', da_addebitare: 'bg-yellow-100 text-yellow-700', errore: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600';
+      },
+
+      movStatoLabel(s) {
+        return { pagato: 'Pagato', in_corso: 'In corso', da_addebitare: 'Da addebitare', errore: 'Errore' }[s] || s;
+      },
+
+      movFormatData(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      },
+
+      resetMovimentiFilter() {
+        this.movimentiFilter = { servizio: null, stato: null, dateFrom: null, dateTo: null };
+      },
+
+      /* ========================
+         BUS INTEGRATION
+         ======================== */
+      busInit() {
+        if (typeof Bus === 'undefined') return;
+        Bus.on('cliente:registrato', (p) => {
+          if (p.servizi && p.servizi.includes('telepedaggio')) this.tpActive = true;
+          if (p.servizi && p.servizi.includes('rsa'))          this.rsaAttiva = true;
+          if (p.servizi && p.servizi.includes('areac'))        { this.acAttiva = true; this.acTargaAbilitata = p.targa || 'AB123CD'; }
+        });
+        Bus.on('scenario:trigger', (p) => {
+          if (p.nome === 'tp:transito') {
+            const targa = this.garageVehicles[0]?.targa || 'AB123CD';
+            const m = { id: 'tp_' + Date.now(), data: new Date().toISOString(), casello: p.casello || 'Milano Nord', autostrada: p.autostrada || 'A8', importo: p.importo || 1.80, targa };
+            this.tpMovimenti.unshift(m);
+            this.tpSaldo = parseFloat((this.tpSaldo - m.importo).toFixed(2));
+            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.data, servizio: 'telepedaggio', descrizione: 'Transito ' + m.autostrada + ' — ' + m.casello, targa: m.targa, importo: m.importo, stato: 'pagato' });
+            Bus.emit('pagamento:confermato', { servizio: 'telepedaggio', importo: m.importo, metodo: 'conto_enilive', data: m.data });
+          }
+          if (p.nome === 'ac:transito') {
+            const ora = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+            const m = { id: 'ac_' + Date.now(), data: new Date().toISOString(), targa: this.acTargaAbilitata, importo: 7.50, stato: 'da_addebitare', note: 'Ingresso ore ' + ora };
+            this.acMovimenti.unshift(m);
+            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.data, servizio: 'areac', descrizione: 'Transito Area C Milano', targa: m.targa, importo: m.importo, stato: 'da_addebitare' });
+            Bus.emit('pagamento:confermato', { servizio: 'areac', importo: 7.50, metodo: 'fattura', data: m.data });
+          }
+          if (p.nome === 'pg:accesso') {
+            const park  = p.parcheggio || 'Parking Centro Milano';
+            const targa = this.garageVehicles[0]?.targa || 'AB123CD';
+            const m = { id: 'pg_' + Date.now(), parcheggio: park, ingresso: new Date().toISOString(), uscita: null, durata: 'In corso', importo: 0, targa, stato: 'in_corso' };
+            this.pgMovimenti.unshift(m);
+            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.ingresso, servizio: 'parcheggi', descrizione: park + ' — in corso', targa, importo: 0, stato: 'in_corso' });
+          }
+          if (p.nome === 'pg:uscita') {
+            const inCorso = this.pgMovimenti.find(m => m.stato === 'in_corso');
+            if (inCorso) {
+              inCorso.uscita = new Date().toISOString();
+              inCorso.durata = p.durata || '1h 00m';
+              inCorso.importo = p.importo || 2.00;
+              inCorso.stato = 'pagato';
+              const mvIdx = this.movimenti.findIndex(m => m.servizio === 'parcheggi' && m.stato === 'in_corso');
+              if (mvIdx >= 0) {
+                this.movimenti[mvIdx].importo = inCorso.importo;
+                this.movimenti[mvIdx].stato = 'pagato';
+                this.movimenti[mvIdx].descrizione = inCorso.parcheggio + ' — ' + inCorso.durata;
+              }
+              Bus.emit('pagamento:confermato', { servizio: 'parcheggi', importo: inCorso.importo, metodo: 'fattura', data: inCorso.uscita, parcheggio: inCorso.parcheggio });
+            }
+          }
+        });
+        Bus.on('crm:movimento_aggiornato', (p) => {
+          const idx = this.movimenti.findIndex(m => m.id === p.id);
+          if (idx >= 0) this.movimenti[idx] = { ...this.movimenti[idx], ...p };
+        });
+      }
+    }">
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow overflow-y-auto pb-20">
+
+      <!-- HOME -->
+      <div x-show="currentPage === 'home'" x-transition.opacity>
+        <h1 class="text-2xl font-bold mb-6 text-eni-teal text-center mt-8">EniLive</h1>
+
+        <div class="px-4 py-4">
+          <div class="h-64 relative overflow-hidden rounded-xl shadow-md" style="background: linear-gradient(135deg, #f0e5d8 0%, #e8dcc8 50%, #d4e8d4 100%);">
+            <div class="absolute top-1/4 left-1/4 w-24 h-24 bg-green-300 opacity-60 rounded-full blur-md"></div>
+            <div class="absolute bottom-1/3 right-1/3 w-20 h-20 bg-green-400 opacity-50 rounded-full blur-sm"></div>
+
+            <div class="absolute top-0 left-1/4 w-1.5 h-full bg-gray-300"></div>
+            <div class="absolute top-1/2 left-0 w-full h-1.5 bg-gray-300"></div>
+
+            <div class="absolute top-0 right-1/3 w-1 h-full bg-gray-200 opacity-60"></div>
+            <div class="absolute top-1/3 left-0 w-full h-1 bg-gray-200 opacity-60"></div>
+            <div class="absolute bottom-1/4 left-0 w-full h-0.5 bg-gray-200 opacity-40"></div>
+
+            <div class="absolute top-1/4 left-1/3 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Centro
+              </div>
+            </div>
+
+            <div class="absolute top-1/3 right-1/4 transform translate-x-1/2 -translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Nord
+              </div>
+            </div>
+
+            <div class="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Sud
+              </div>
+            </div>
+
+            <button class="absolute bottom-4 right-4 bg-eni-teal text-white p-3 rounded-full shadow-lg hover:bg-eni-teal-darker transition z-20">
+              <i class="fa fa-location-arrow"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4">
+          <div class="text-center my-4">
+            <button @click="showRefuelModal = true" class="w-full bg-eni-teal text-white font-bold py-4 rounded-xl shadow-lg hover:bg-eni-teal-darker transition text-lg">
+              <i class="fa fa-gas-pump mr-3"></i> Inizia Rifornimento
+            </button>
+          </div>
+
+          <h2 class="font-semibold mb-4 mt-6 text-gray-800">Ecosistema Servizi Mobilità</h2>
+
+          <div class="grid grid-cols-3 gap-3">
+            <template x-for="service in [
+              { id: 'telepedaggio', name: 'Telepedaggio', icon: 'fa-road' },
+              { id: 'strisce',      name: 'Strisce Blu',  icon: 'fa-square' },
+              { id: 'rsa',          name: 'RSA',           icon: 'fa-truck-medical' },
+              { id: 'areac',        name: 'Area C',        icon: 'fa-city' },
+              { id: 'parcheggi',    name: 'Parcheggi',     icon: 'fa-square-parking' },
+              { id: 'memo',         name: 'Memo',          icon: 'fa-bell' }
+            ]" :key="service.id">
+
+              <button
+                @click="
+                  if (service.id === 'strisce') {
+                    openBlue();
+                  } else {
+                    currentPage = service.id;
+                  }
+                "
+                class="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg shadow-sm hover:bg-eni-teal hover:text-white transition cursor-pointer duration-200">
+                <i :class="'fa ' + service.icon" class="text-2xl mb-2"></i>
+                <span class="text-xs text-center font-medium" x-text="service.name"></span>
+              </button>
+
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOYALTY -->
+      <div x-show="currentPage === 'loyalty'" x-transition.opacity class="p-6">
+        <h1 class="text-2xl font-bold mb-6 text-eni-teal">EniLive Loyalty Program</h1>
+
+        <div class="p-6 rounded-xl shadow-lg text-white mb-6 border-2 border-white/20" style="background: linear-gradient(135deg, #117299 0%, #0d4f6f 50%, #1e9fd8 100%);">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <p class="text-sm font-semibold mb-2">🎯 PROSSIMO OBIETTIVO</p>
+              <h2 class="text-3xl font-bold">Telepedaggio</h2>
+              <p class="text-sm font-semibold mt-2">Completamente Gratuito</p>
+            </div>
+            <i class="fa fa-road text-4xl opacity-30"></i>
+          </div>
+
+          <div class="mt-3 pt-3 border-t border-white/30">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold">700 / 1000 L</span>
+              <span class="text-lg font-bold">70%</span>
+            </div>
+            <div class="w-full bg-white/20 rounded-full h-5 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500" style="width: 70%; background: linear-gradient(90deg, #1e9fd8, #4db8e8, #7ed3f0);"></div>
+            </div>
+            <p class="text-xs mt-3 font-semibold">📍 Solo 300 litri mancanti!</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs text-gray-600 font-semibold mb-1">PUNTI LOYALTY</p>
+              <p class="text-4xl font-bold text-eni-teal">4,520</p>
+              <p class="text-xs text-gray-600 mt-2"><i class="fa fa-star text-yellow-400 mr-1"></i>Gold Member</p>
+            </div>
+            <div class="bg-eni-teal-light rounded-lg p-4">
+              <i class="fa fa-trophy text-2xl text-eni-teal"></i>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="font-semibold mb-3 text-gray-800 text-sm">✅ VANTAGGI ATTIVI</h2>
+        <ul class="space-y-2 mb-6">
+          <li class="flex items-center bg-green-50 p-3 rounded-lg shadow-sm border-l-4 border-green-500">
+            <i class="fa fa-check-circle text-green-500 mr-3"></i>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">10% Cashback</p>
+              <p class="text-xs text-gray-600">Su rifornimenti</p>
+            </div>
+          </li>
+          <li class="flex items-center bg-green-50 p-3 rounded-lg shadow-sm border-l-4 border-green-500">
+            <i class="fa fa-check-circle text-green-500 mr-3"></i>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">Parcheggio Gratuito</p>
+              <p class="text-xs text-gray-600">2 ore/mese</p>
+            </div>
+          </li>
+        </ul>
+
+        <h2 class="font-semibold mb-3 text-gray-800 text-sm">🔒 PROSSIMI PREMI</h2>
+        <div class="space-y-2">
+          <div class="bg-blue-50 p-3 rounded-lg shadow-sm border-l-4 border-blue-400">
+            <div class="flex items-start">
+              <i class="fa fa-unlock text-blue-500 mr-2 mt-0.5 text-sm"></i>
+              <div class="flex-1 text-sm">
+                <p class="font-semibold text-blue-900">Assistenza Stradale 24/7</p>
+                <p class="text-xs text-blue-700 mt-1">Mancano 500 L</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHATBOT RIMOSSO -->
+      <!--
+      <div x-show="currentPage === 'chatbot'" x-transition.opacity class="flex flex-col h-[calc(100vh-120px)]">
+        <h1 class="text-xl font-bold p-4 shadow-sm text-eni-teal border-b">Enil<span style="color: #0d4f6f; font-weight: 700;">AI</span>ve concierge</h1>
+
+        <div class="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <template x-for="msg in messages" :key="msg">
+            <div :class="msg.type === 'bot' ? 'flex justify-start' : 'flex justify-end'">
+              <div :class="msg.type === 'bot' ? 'bg-blue-100 text-gray-800' : 'bg-eni-teal text-white'" class="p-3 rounded-lg max-w-xs text-sm">
+                <p x-text="msg.text"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="p-4 border-t bg-white">
+          <div class="flex items-center gap-2">
+            <input type="text"
+              x-model="messageInput"
+              @keyup.enter="messages.push({type: 'user', text: messageInput}); messageInput = ''; setTimeout(() => messages.push({type: 'bot', text: 'Grazie per il tuo messaggio!'}), 500)"
+              placeholder="Scrivi un messaggio..."
+              class="flex-grow border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-eni-teal">
+            <button
+              @click="messages.push({type: 'user', text: messageInput}); messageInput = ''; setTimeout(() => messages.push({type: 'bot', text: 'Grazie per il tuo messaggio!'}), 500)"
+              class="bg-eni-teal text-white p-3 rounded-full hover:bg-eni-teal-darker transition">
+              <i class="fa fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      -->
+
+      <!-- ACCOUNT -->
+      <div x-show="currentPage === 'account'" x-transition.opacity>
+
+        <!-- MAIN -->
+        <div x-show="accountSection === 'main'">
+          <div class="px-4 pt-6 pb-2">
+            <div class="rounded-xl p-4 flex items-center gap-3 text-white mb-5" style="background: linear-gradient(135deg, #117299 0%, #0d4f6f 100%);">
+              <i class="fa fa-leaf text-2xl"></i>
+              <div>
+                <p class="text-xs font-semibold opacity-80">APP</p>
+                <p class="text-lg font-bold">Enilive Mobility+</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-4 pb-24">
+            <!-- Il tuo account -->
+            <p class="account-section-title">Il tuo account</p>
+            <div class="account-section-card">
+              <div class="account-row" @click="showToast('Funzione in arrivo')">
+                <div class="account-row-icon"><i class="fa fa-user-circle"></i></div>
+                <div class="flex-1">
+                  <p class="account-row-label" x-text="userProfile.nome"></p>
+                  <p class="text-sm text-muted">Dati personali e pagamento</p>
+                </div>
+                <i class="fa fa-chevron-right account-row-chevron"></i>
+              </div>
+            </div>
+
+            <!-- Griglia 3 voci -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+              <button @click="showToast('Funzione in arrivo')" class="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-eni-teal hover:text-white transition">
+                <div class="account-row-icon mb-2"><i class="fa fa-ticket"></i></div>
+                <span class="text-xs font-medium text-center">Voucher</span>
+              </button>
+              <button @click="goAccountSection('cronologia')" class="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-eni-teal hover:text-white transition">
+                <div class="account-row-icon mb-2"><i class="fa fa-history"></i></div>
+                <span class="text-xs font-medium text-center">Cronologia</span>
+              </button>
+              <button @click="showToast('Funzione in arrivo')" class="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-eni-teal hover:text-white transition">
+                <div class="account-row-icon mb-2"><i class="fa fa-headset"></i></div>
+                <span class="text-xs font-medium text-center">Assistenza</span>
+              </button>
+            </div>
+
+            <!-- La tua mobilità -->
+            <p class="account-section-title">La tua mobilità</p>
+            <div class="account-section-card">
+              <div class="account-row" @click="goAccountSection('garage')">
+                <div class="account-row-icon"><i class="fa fa-car"></i></div>
+                <span class="account-row-label">Garage</span>
+                <i class="fa fa-chevron-right account-row-chevron"></i>
+              </div>
+              <div class="account-row" @click="goAccountSection('pagamenti')">
+                <div class="account-row-icon"><i class="fa fa-credit-card"></i></div>
+                <span class="account-row-label">Metodi di pagamento</span>
+                <i class="fa fa-chevron-right account-row-chevron"></i>
+              </div>
+            </div>
+
+            <!-- Impostazioni -->
+            <p class="account-section-title">Impostazioni</p>
+            <div class="account-section-card">
+              <div class="account-row" @click="showToast('Funzione in arrivo')">
+                <div class="account-row-icon"><i class="fa fa-shield-alt"></i></div>
+                <span class="account-row-label">Documenti e privacy</span>
+                <i class="fa fa-chevron-right account-row-chevron"></i>
+              </div>
+              <div class="account-row" @click="showToast('Disconnessione simulata')">
+                <div class="account-row-icon" style="background: #fee2e2; color: #dc2626;"><i class="fa fa-sign-out-alt"></i></div>
+                <span class="account-row-label" style="color: #dc2626;">Disconnetti</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GARAGE -->
+        <div x-show="accountSection === 'garage'">
+          <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+            <button @click="backToAccountMain()" class="text-gray-500 hover:text-eni-teal transition">
+              <i class="fa fa-chevron-left text-xl"></i>
+            </button>
+            <h2 class="text-xl font-bold text-gray-800">Il tuo Garage</h2>
+          </div>
+
+          <div class="px-4 py-4 pb-28">
+            <div x-show="garageVehicles.length === 0" class="text-center py-16">
+              <i class="fa fa-car text-6xl text-gray-200 mb-4 block"></i>
+              <p class="text-gray-500">Nessun veicolo nel garage</p>
+            </div>
+
+            <template x-for="v in garageVehicles" :key="v.id">
+              <div class="garage-card">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="targa-badge" x-text="v.targa"></span>
+                    <span class="font-semibold text-gray-800" x-text="v.nickname"></span>
+                  </div>
+                  <p class="text-sm text-muted" x-text="v.marca + ' ' + v.modello + ' \u00b7 ' + v.tipo"></p>
+                </div>
+                <button
+                  @click="garageDeleteTarget = v; showGarageDeleteConfirm = true"
+                  class="text-red-400 hover:text-red-600 transition p-2">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            </template>
+          </div>
+
+          <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 pb-2">
+            <button @click="openGarageAdd()" class="btn-primary btn-block py-4 rounded-xl text-lg">
+              <i class="fa fa-plus mr-2"></i>Aggiungi veicolo
+            </button>
+          </div>
+        </div>
+
+        <!-- CRONOLOGIA -->
+        <div x-show="accountSection === 'cronologia'">
+          <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+            <button @click="backToAccountMain()" class="text-gray-500 hover:text-eni-teal transition">
+              <i class="fa fa-chevron-left text-xl"></i>
+            </button>
+            <h2 class="text-xl font-bold text-gray-800">Cronologia</h2>
+          </div>
+
+          <div class="px-4 py-4">
+            <div x-show="cronologiaItems.length === 0" class="text-center py-16">
+              <i class="fa fa-history text-6xl text-gray-200 mb-4 block"></i>
+              <p class="text-gray-500">Nessuna transazione</p>
+            </div>
+
+            <div class="card">
+              <template x-for="item in cronologiaItems" :key="item.id">
+                <div class="cronologia-item">
+                  <div class="account-row-icon flex-shrink-0"
+                    :style="item.servizio === 'Strisce Blu' ? '' : item.servizio === 'Rifornimento' ? 'background:#fef3c7;color:#d97706;' : 'background:#f0fdf4;color:#16a34a;'">
+                    <i :class="'fa ' + (item.servizio === 'Strisce Blu' ? 'fa-square' : item.servizio === 'Rifornimento' ? 'fa-gas-pump' : 'fa-bell')"></i>
+                  </div>
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-800 text-sm" x-text="item.servizio"></p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <p class="text-xs text-muted" x-text="item.data.split('-').reverse().join('/')"></p>
+                      <span class="targa-badge" style="font-size:10px;padding:2px 6px;" x-text="item.targa"></span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <p class="font-bold text-sm" :class="item.importo === 0 ? 'text-green-600' : 'text-eni-teal'" x-text="item.importo === 0 ? 'Gratuito' : '\u20ac ' + item.importo.toFixed(2)"></p>
+                    <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="item.stato === 'attivo' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'" x-text="item.stato"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGAMENTI -->
+        <div x-show="accountSection === 'pagamenti'">
+          <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+            <button @click="backToAccountMain()" class="text-gray-500 hover:text-eni-teal transition">
+              <i class="fa fa-chevron-left text-xl"></i>
+            </button>
+            <h2 class="text-xl font-bold text-gray-800">Metodi di Pagamento</h2>
+          </div>
+
+          <div class="px-4 py-4 pb-28">
+            <template x-for="p in paymentMethods" :key="p.id">
+              <div class="payment-card">
+                <div class="account-row-icon flex-shrink-0">
+                  <i :class="'fa ' + p.icona"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="font-semibold text-gray-800 text-sm" x-text="p.label"></p>
+                  <p class="text-xs text-muted" x-text="p.tipo"></p>
+                  <span x-show="p.predefinito" class="badge-predefinito mt-1 inline-block">Predefinito</span>
+                </div>
+                <div class="flex gap-1">
+                  <button x-show="!p.predefinito" @click="setDefaultPayment(p.id)" class="text-yellow-400 hover:text-yellow-600 transition p-2" title="Imposta come predefinito">
+                    <i class="fa fa-star"></i>
+                  </button>
+                  <button @click="paymentDeleteTarget = p; showPaymentDeleteConfirm = true" class="text-red-400 hover:text-red-600 transition p-2">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 pb-2">
+            <button @click="showPaymentAddModal = true" class="btn-primary btn-block py-4 rounded-xl text-lg">
+              <i class="fa fa-plus mr-2"></i>Aggiungi metodo
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BUNDLE -->
+      <div x-show="currentPage === 'bundle'" x-transition.opacity class="p-6">
+        <h1 class="text-2xl font-bold mb-2 text-eni-teal">Piani e Abbonamenti</h1>
+        <p class="text-gray-600 text-sm mb-6">Scegli il piano più adatto alle tue esigenze</p>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4 cursor-pointer hover:shadow-md transition" @click="selectedBundle = 'standard'; showBundleDetail = true">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-gray-800 text-lg">STANDARD</h3>
+              <span class="inline-block bg-eni-teal text-white text-xs font-bold px-2 py-1 rounded mt-1">NO FEE</span>
+            </div>
+            <p class="text-2xl font-bold text-gray-800">€0<span class="text-sm text-gray-600">/mese</span></p>
+          </div>
+          <ul class="text-sm text-gray-700 space-y-2 mb-4">
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Early Access ai servizi</li>
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Accesso a tutte le feature</li>
+            <li><i class="fa fa-times text-gray-400 mr-2"></i>Servizi premium limitati</li>
+          </ul>
+          <button class="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-300 transition">Attiva ora</button>
+        </div>
+
+        <div class="p-4 rounded-lg shadow-md mb-4 cursor-pointer hover:shadow-lg transition text-white relative overflow-hidden" style="background: linear-gradient(135deg, #117299 0%, #1e9fd8 100%); border: 2px solid #117299;" @click="selectedBundle = 'premium'; showBundleDetail = true">
+          <div class="absolute top-0 right-0 w-0 h-0" style="border-left: 40px solid transparent; border-top: 40px solid #FFD700;"></div>
+          <div class="absolute text-gray-800 font-bold" style="top: 5px; right: 6px; font-size: 9px; line-height: 1; letter-spacing: 0.5px;">TOP</div>
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-lg">PREMIUM</h3>
+              <p class="text-sm font-semibold">All Inclusive</p>
+            </div>
+            <p class="text-2xl font-bold">€1,99<span class="text-sm font-semibold">/mese</span></p>
+          </div>
+          <ul class="text-sm space-y-2 mb-4">
+            <li><i class="fa fa-check mr-2"></i>Telepedaggio Gratuito</li>
+            <li><i class="fa fa-check mr-2"></i>Strisce Blu Scontate</li>
+            <li><i class="fa fa-check mr-2"></i>Assistenza Stradale 24/7</li>
+          </ul>
+          <button class="w-full bg-white text-eni-teal font-semibold py-2 rounded-lg hover:bg-gray-100 transition">Attiva ora</button>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition" @click="selectedBundle = 'telepedaggio'; showBundleDetail = true">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-gray-800 text-lg">TELEPEDAGGIO</h3>
+              <span class="inline-block bg-eni-teal text-white text-xs font-bold px-2 py-1 rounded mt-1">ONLY TOOLLING</span>
+            </div>
+            <p class="text-2xl font-bold text-gray-800">€2,50<span class="text-sm text-gray-600">/mese</span></p>
+          </div>
+          <ul class="text-sm text-gray-700 space-y-2 mb-4">
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Premium</li>
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Area C/B ilimitata</li>
+            <li><i class="fa fa-plus text-blue-500 mr-2"></i>Add-on: Strisce Blu (+€0,99)</li>
+          </ul>
+          <button class="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-300 transition">Attiva ora</button>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           TELEPEDAGGIO
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'telepedaggio'" x-transition.opacity>
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+            <i class="fa fa-chevron-left text-xl"></i>
+          </button>
+          <h2 class="text-xl font-bold text-gray-800">Telepedaggio</h2>
+          <div class="ml-auto">
+            <span x-show="tpActive && !tpSospeso" class="text-xs bg-green-100 text-green-700 font-semibold px-2 py-1 rounded-full">Attivo</span>
+            <span x-show="tpSospeso" class="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-1 rounded-full">Sospeso</span>
+            <span x-show="!tpActive" class="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-1 rounded-full">Non attivo</span>
+          </div>
+        </div>
+
+        <div class="px-4 py-4 pb-24 space-y-4">
+          <!-- Card OBU + saldo -->
+          <div x-show="tpActive" class="rounded-xl p-5 text-white" style="background: linear-gradient(135deg, #117299 0%, #0d4f6f 100%);">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <p class="text-xs font-semibold opacity-80 mb-1">DISPOSITIVO OBU</p>
+                <p class="text-lg font-bold font-mono" x-text="tpObu"></p>
+              </div>
+              <i class="fa fa-road text-3xl opacity-30"></i>
+            </div>
+            <div class="border-t border-white/30 pt-3">
+              <p class="text-xs opacity-80">Saldo credito</p>
+              <p class="text-3xl font-bold mt-1" x-text="'€ ' + tpSaldo.toFixed(2)"></p>
+              <p class="text-xs opacity-60 mt-1">Ricarica tramite il tuo istituto bancario</p>
+            </div>
+          </div>
+
+          <!-- Non attivo -->
+          <div x-show="!tpActive" class="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+            <i class="fa fa-road text-4xl text-gray-300 mb-3 block"></i>
+            <p class="text-gray-700 font-semibold mb-1">Telepedaggio non attivo</p>
+            <p class="text-sm text-gray-500">Attiva il servizio in stazione Enilive con il tablet operatore</p>
+          </div>
+
+          <!-- Azioni sospensione / riattivazione -->
+          <div x-show="tpActive" class="flex gap-3">
+            <button x-show="!tpSospeso" @click="showTpSospendModal = true"
+              class="flex-1 border-2 border-orange-200 text-orange-600 font-semibold py-3 rounded-xl hover:bg-orange-50 transition text-sm">
+              <i class="fa fa-pause-circle mr-2"></i>Sospendi contratto
+            </button>
+            <button x-show="tpSospeso" @click="tpRiattiva()"
+              class="flex-1 bg-eni-teal text-white font-semibold py-3 rounded-xl hover:bg-eni-teal-darker transition text-sm">
+              <i class="fa fa-play-circle mr-2"></i>Riattiva contratto
+            </button>
+          </div>
+
+          <!-- Transiti recenti -->
+          <div x-show="tpActive">
+            <h3 class="font-semibold text-gray-800 mb-3">Transiti recenti</h3>
+            <div x-show="tpMovimenti.length === 0" class="text-center py-8 text-gray-400">
+              <i class="fa fa-receipt text-3xl mb-2 block"></i>Nessun transito
+            </div>
+            <div class="space-y-2">
+              <template x-for="t in tpMovimenti" :key="t.id">
+                <div class="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                  <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa fa-road text-blue-600 text-sm"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm" x-text="t.casello"></p>
+                    <p class="text-xs text-gray-500" x-text="t.autostrada + ' · ' + new Date(t.data).toLocaleDateString('it-IT')"></p>
+                  </div>
+                  <p class="font-bold text-eni-teal text-sm flex-shrink-0" x-text="'€ ' + t.importo.toFixed(2)"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal sospensione -->
+        <div x-show="showTpSospendModal" class="modal-overlay" @click.self="showTpSospendModal = false">
+          <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl p-6 z-50">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Sospendere il contratto?</h2>
+            <p class="text-sm text-gray-600 mb-6">Sospendendo il contratto, l'OBU verrà disabilitato. Potrai riattivarlo in qualsiasi momento.</p>
+            <div class="flex gap-3">
+              <button @click="showTpSospendModal = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+              <button @click="tpSospendi()" class="flex-1 bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition">Sospendi</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           RSA
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'rsa'" x-transition.opacity>
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+            <i class="fa fa-chevron-left text-xl"></i>
+          </button>
+          <h2 class="text-xl font-bold text-gray-800">Assistenza Stradale</h2>
+          <div class="ml-auto">
+            <span x-show="rsaAttiva" class="text-xs bg-green-100 text-green-700 font-semibold px-2 py-1 rounded-full">Attivo</span>
+            <span x-show="!rsaAttiva" class="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-1 rounded-full">Non attivo</span>
+          </div>
+        </div>
+
+        <div class="px-4 py-4 pb-24 space-y-4">
+          <!-- Info canone -->
+          <div class="bg-eni-teal-light rounded-xl p-4 text-sm text-eni-teal font-medium">
+            <i class="fa fa-info-circle mr-2"></i>
+            €2,00/mese — Illimitato — Attivo su <strong x-text="garageVehicles[0]?.targa || 'AB123CD'"></strong>
+          </div>
+
+          <!-- CTA Chiama Soccorso -->
+          <button x-show="rsaAttiva" @click="rsaOpenCall()"
+            :class="rsaCallActive ? 'bg-red-600 animate-pulse' : 'bg-red-500 hover:bg-red-600'"
+            class="w-full text-white font-bold py-5 rounded-2xl transition text-lg shadow-lg">
+            <i class="fa fa-phone-alt mr-3 text-xl"></i>
+            <span x-text="rsaCallActive ? 'Chiamata in corso...' : 'Chiama Soccorso'"></span>
+          </button>
+
+          <!-- Tessera digitale -->
+          <div class="rounded-2xl p-5 text-white" style="background: linear-gradient(135deg, #374151 0%, #1f2937 100%);">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold opacity-70 uppercase tracking-wide">Tessera Assistenza</p>
+              <i class="fa fa-id-card opacity-50 text-lg"></i>
+            </div>
+            <p class="text-2xl font-mono font-bold tracking-widest" x-text="rsaCodiceTessera"></p>
+            <p class="text-xs opacity-60 mt-2">Comunica questo codice all'operatore sul campo</p>
+            <button @click="navigator.clipboard?.writeText(rsaCodiceTessera); showToast('Codice copiato')"
+              class="mt-3 text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition">
+              <i class="fa fa-copy mr-1"></i>Copia codice
+            </button>
+          </div>
+
+          <!-- Storico interventi -->
+          <div>
+            <h3 class="font-semibold text-gray-800 mb-3">Storico interventi</h3>
+            <div x-show="rsaInterventi.length === 0" class="text-center py-8 text-gray-400">
+              <i class="fa fa-truck-medical text-3xl mb-2 block"></i>Nessun intervento
+            </div>
+            <div class="space-y-2">
+              <template x-for="r in rsaInterventi" :key="r.id">
+                <div class="bg-gray-50 rounded-xl p-3">
+                  <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <i class="fa fa-truck-medical text-orange-500 text-sm"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-semibold text-gray-800 text-sm" x-text="r.descrizione"></p>
+                      <p class="text-xs text-gray-500 mt-0.5" x-text="new Date(r.data).toLocaleDateString('it-IT') + ' · ' + r.targa"></p>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded-full font-semibold flex-shrink-0"
+                      :class="r.stato === 'chiuso' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'"
+                      x-text="r.stato === 'chiuso' ? 'Chiuso' : 'In lavorazione'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal chiamata RSA -->
+        <div x-show="showRsaModal"
+          style="position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;max-width:420px;margin:0 auto;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#dc2626;color:white;">
+            <div>
+              <p style="font-size:14px;font-weight:700;">Chiamata soccorso</p>
+              <p style="font-size:12px;opacity:0.8;">Connessione in corso...</p>
+            </div>
+            <button @click="rsaCloseCall()"
+              style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+              <i class="fa fa-times" style="color:white;font-size:16px;"></i>
+            </button>
+          </div>
+          <div style="flex:1;background:#1a1a1a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:white;padding:40px 24px;text-align:center;">
+            <div style="width:80px;height:80px;border-radius:50%;background:#dc2626;display:flex;align-items:center;justify-content:center;">
+              <i class="fa fa-phone-alt" style="font-size:32px;color:white;"></i>
+            </div>
+            <p style="font-size:18px;font-weight:700;">Centrale Assistenza</p>
+            <p style="font-size:14px;opacity:0.7;line-height:1.5;">Operatore disponibile 24/7<br>Tempo medio attesa: &lt;2 min</p>
+            <p style="font-size:13px;background:rgba(255,255,255,0.1);padding:10px 20px;border-radius:12px;">
+              Codice: <strong x-text="rsaCodiceTessera"></strong>
+            </p>
+          </div>
+          <div style="padding:16px 20px;background:#1a1a1a;border-top:1px solid rgba(255,255,255,0.1);">
+            <button @click="rsaCloseCall()"
+              style="width:100%;background:#dc2626;color:white;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;">
+              <i class="fa fa-phone-slash" style="margin-right:8px;"></i>Termina chiamata
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           AREA C
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'areac'" x-transition.opacity>
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+            <i class="fa fa-chevron-left text-xl"></i>
+          </button>
+          <h2 class="text-xl font-bold text-gray-800">Area C Milano</h2>
+          <div class="ml-auto">
+            <span x-show="acAttiva" class="text-xs bg-green-100 text-green-700 font-semibold px-2 py-1 rounded-full">Attivo</span>
+            <span x-show="!acAttiva" class="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-1 rounded-full">Non attivo</span>
+          </div>
+        </div>
+
+        <div class="px-4 py-4 pb-24 space-y-4">
+          <!-- Banner info -->
+          <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800">
+            <i class="fa fa-info-circle mr-2"></i>
+            I transiti vengono rilevati automaticamente tramite targa. Gli importi sono addebitati sulla <strong>fattura mensile Enilive</strong>.
+          </div>
+
+          <!-- Stato attivo -->
+          <div x-show="acAttiva">
+            <div class="rounded-xl p-5 text-white mb-4" style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-xs font-semibold opacity-80 mb-1">TARGA ABILITATA</p>
+                  <p class="text-2xl font-bold font-mono" x-text="acTargaAbilitata"></p>
+                </div>
+                <i class="fa fa-city text-3xl opacity-30"></i>
+              </div>
+              <div class="border-t border-white/30 pt-3 mt-3 flex items-center justify-between">
+                <div>
+                  <p class="text-xs opacity-80">Transiti aprile</p>
+                  <p class="text-2xl font-bold" x-text="acMovimenti.filter(m => m.data >= '2026-04-01').length"></p>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs opacity-80">Da addebitare</p>
+                  <p class="text-2xl font-bold" x-text="'€ ' + acMovimenti.filter(m => m.stato === \'da_addebitare\').reduce((s,m) => s + m.importo, 0).toFixed(2)"></p>
+                </div>
+              </div>
+            </div>
+            <button @click="showAcDisattiva = true"
+              class="w-full border-2 border-red-200 text-red-600 font-semibold py-3 rounded-xl hover:bg-red-50 transition text-sm">
+              <i class="fa fa-toggle-off mr-2"></i>Disattiva servizio
+            </button>
+          </div>
+
+          <!-- Stato non attivo -->
+          <div x-show="!acAttiva" class="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+            <i class="fa fa-city text-4xl text-gray-300 mb-3 block"></i>
+            <p class="text-gray-700 font-semibold mb-1">Area C non attiva</p>
+            <p class="text-sm text-gray-500 mb-4">Abilita la tua targa per accedere alla ZTL centrale di Milano con addebito automatico su fattura.</p>
+            <button @click="acAttivaServizio()"
+              class="bg-eni-teal text-white font-bold px-6 py-3 rounded-xl hover:bg-eni-teal-darker transition">
+              Attiva per <span x-text="garageVehicles[0]?.targa || 'AB123CD'"></span>
+            </button>
+          </div>
+
+          <!-- Transiti -->
+          <div x-show="acAttiva">
+            <h3 class="font-semibold text-gray-800 mb-3">Transiti recenti</h3>
+            <div x-show="acMovimenti.length === 0" class="text-center py-8 text-gray-400">
+              <i class="fa fa-city text-3xl mb-2 block"></i>Nessun transito
+            </div>
+            <div class="space-y-2">
+              <template x-for="t in acMovimenti" :key="t.id">
+                <div class="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                  <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa fa-city text-indigo-600 text-sm"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm" x-text="t.note"></p>
+                    <p class="text-xs text-gray-500" x-text="new Date(t.data).toLocaleDateString('it-IT') + ' · ' + t.targa"></p>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <p class="font-bold text-sm" :class="t.stato === 'da_addebitare' ? 'text-amber-600' : 'text-eni-teal'"
+                      x-text="'€ ' + t.importo.toFixed(2)"></p>
+                    <span class="text-xs" :class="t.stato === 'da_addebitare' ? 'text-amber-500' : 'text-green-600'"
+                      x-text="t.stato === 'da_addebitare' ? 'In fattura' : 'Pagato'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal conferma disattivazione -->
+        <div x-show="showAcDisattiva" class="modal-overlay" @click.self="showAcDisattiva = false">
+          <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl p-6 z-50">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Disattivare Area C?</h2>
+            <p class="text-sm text-gray-600 mb-6">Disattivando il servizio, i transiti in Area C non verranno più addebitati su Enilive. Dovrai pagare tramite gli altri canali del Comune.</p>
+            <div class="flex gap-3">
+              <button @click="showAcDisattiva = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+              <button @click="acDisattivaServizio()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-lg hover:bg-red-600 transition">Disattiva</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           MEMO
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'memo'" x-transition.opacity>
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+            <i class="fa fa-chevron-left text-xl"></i>
+          </button>
+          <h2 class="text-xl font-bold text-gray-800">Memo Scadenze</h2>
+        </div>
+
+        <div class="px-4 py-4 pb-24 space-y-3">
+          <!-- Banner scadenze imminenti -->
+          <div x-show="memoVeicoli.some(v => memoScadenzaStato(v.bollo.scadenza) !== 'ok' || memoScadenzaStato(v.rca.scadenza) !== 'ok')"
+            class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-800">
+            <i class="fa fa-exclamation-triangle mr-2"></i>Hai scadenze imminenti o già scadute. Controlla i dettagli.
+          </div>
+
+          <template x-for="v in memoVeicoli" :key="v.targa">
+            <div @click="memoOpenVeicolo(v)"
+              class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm cursor-pointer hover:shadow-md transition">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-eni-teal-light rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i class="fa fa-car text-eni-teal text-sm"></i>
+                </div>
+                <div class="flex-1">
+                  <span class="targa-badge" x-text="v.targa"></span>
+                  <p class="text-xs text-gray-500 mt-0.5" x-text="v.marca + ' ' + v.modello"></p>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                    :class="v.bollo.pagato ? 'bg-blue-100 text-blue-700' : memoStatoClass(v.bollo.scadenza)"
+                    x-text="v.bollo.pagato ? 'Pagato' : memoStatoLabel(v.bollo.scadenza)"></span>
+                  <p class="text-xs text-gray-500 mt-1">Bollo</p>
+                </div>
+                <div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                    :class="memoStatoClass(v.revisione.scadenza)"
+                    x-text="memoStatoLabel(v.revisione.scadenza)"></span>
+                  <p class="text-xs text-gray-500 mt-1">Revisione</p>
+                </div>
+                <div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                    :class="memoStatoClass(v.rca.scadenza)"
+                    x-text="memoStatoLabel(v.rca.scadenza)"></span>
+                  <p class="text-xs text-gray-500 mt-1">RCA</p>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Modal dettaglio veicolo -->
+        <div x-show="showMemoModal" class="modal-overlay" @click.self="showMemoModal = false">
+          <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl p-6 z-50 max-h-[88vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <span class="targa-badge" x-text="memoSelectedVeicolo?.targa"></span>
+                <p class="text-xs text-gray-500 mt-1" x-text="memoSelectedVeicolo?.marca + ' ' + memoSelectedVeicolo?.modello"></p>
+              </div>
+              <button @click="showMemoModal = false" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-times text-xl"></i>
+              </button>
+            </div>
+            <div class="space-y-3">
+              <!-- Bollo -->
+              <div class="bg-gray-50 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="fa fa-file-invoice text-gray-500 text-sm"></i>
+                    <span class="font-semibold text-gray-800 text-sm">Bollo auto</span>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold"
+                    :class="memoSelectedVeicolo?.bollo.pagato ? 'bg-blue-100 text-blue-700' : memoStatoClass(memoSelectedVeicolo?.bollo.scadenza)"
+                    x-text="memoSelectedVeicolo?.bollo.pagato ? 'Pagato' : memoStatoLabel(memoSelectedVeicolo?.bollo.scadenza)"></span>
+                </div>
+                <p class="text-sm text-gray-600">Scadenza: <strong x-text="memoSelectedVeicolo ? memoFormatDate(memoSelectedVeicolo.bollo.scadenza) : ''"></strong></p>
+                <p class="text-sm text-gray-600 mt-1">Importo: <strong x-text="memoSelectedVeicolo ? '€ ' + memoSelectedVeicolo.bollo.importo.toFixed(2) : ''"></strong></p>
+                <button x-show="memoSelectedVeicolo && !memoSelectedVeicolo.bollo.pagato"
+                  @click="memoOpenPay(memoSelectedVeicolo)"
+                  class="w-full mt-3 bg-eni-teal text-white font-bold py-2.5 rounded-lg hover:bg-eni-teal-darker transition text-sm">
+                  <i class="fa fa-credit-card mr-2"></i>Paga ora
+                </button>
+                <div x-show="memoSelectedVeicolo?.bollo.pagato" class="mt-2 text-center text-green-600 text-sm font-semibold">
+                  <i class="fa fa-check-circle mr-1"></i>Bollo pagato
+                </div>
+              </div>
+              <!-- Revisione -->
+              <div class="bg-gray-50 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="fa fa-tools text-gray-500 text-sm"></i>
+                    <span class="font-semibold text-gray-800 text-sm">Revisione</span>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold"
+                    :class="memoStatoClass(memoSelectedVeicolo?.revisione.scadenza)"
+                    x-text="memoStatoLabel(memoSelectedVeicolo?.revisione.scadenza)"></span>
+                </div>
+                <p class="text-sm text-gray-600">Scadenza: <strong x-text="memoSelectedVeicolo ? memoFormatDate(memoSelectedVeicolo.revisione.scadenza) : ''"></strong></p>
+                <button class="w-full mt-3 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-100 transition text-sm">
+                  <i class="fa fa-calendar-check mr-2"></i>Prenota revisione
+                </button>
+              </div>
+              <!-- RCA -->
+              <div class="bg-gray-50 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="fa fa-shield-alt text-gray-500 text-sm"></i>
+                    <span class="font-semibold text-gray-800 text-sm">RCA</span>
+                  </div>
+                  <span class="text-xs px-2 py-1 rounded-full font-semibold"
+                    :class="memoStatoClass(memoSelectedVeicolo?.rca.scadenza)"
+                    x-text="memoStatoLabel(memoSelectedVeicolo?.rca.scadenza)"></span>
+                </div>
+                <p class="text-sm text-gray-600">Scadenza: <strong x-text="memoSelectedVeicolo ? memoFormatDate(memoSelectedVeicolo.rca.scadenza) : ''"></strong></p>
+                <p class="text-sm text-gray-600 mt-1">Compagnia: <strong x-text="memoSelectedVeicolo?.rca.compagnia"></strong></p>
+                <button class="w-full mt-3 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-100 transition text-sm">
+                  <i class="fa fa-external-link-alt mr-2"></i>Rinnova RCA
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal pagamento bollo -->
+        <div x-show="showMemoPayModal" class="modal-overlay" @click.self="showMemoPayModal = false">
+          <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl p-6 z-[60]">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-bold text-gray-800">Paga Bollo Auto</h2>
+              <button @click="showMemoPayModal = false" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-times text-xl"></i>
+              </button>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 mb-4 space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Veicolo</span>
+                <span class="font-semibold" x-text="memoPayTargetVeicolo?.targa"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Periodo</span>
+                <span class="font-semibold">01/2026 — 12/2026</span>
+              </div>
+              <div class="flex justify-between border-t pt-2 mt-2">
+                <span class="font-bold text-gray-800">Totale</span>
+                <span class="font-bold text-eni-teal text-lg" x-text="memoPayTargetVeicolo ? '€ ' + memoPayTargetVeicolo.bollo.importo.toFixed(2) : ''"></span>
+              </div>
+            </div>
+            <div class="bg-eni-teal-light rounded-lg p-3 mb-4 flex items-center gap-2 text-sm">
+              <i class="fa fa-credit-card text-eni-teal"></i>
+              <span class="text-gray-700">Visa ···· 4242 <span class="text-xs text-muted">(predefinita)</span></span>
+            </div>
+            <button @click="memoConfirmPay()"
+              class="w-full bg-eni-teal text-white font-bold py-4 rounded-xl hover:bg-eni-teal-darker transition text-lg">
+              <i class="fa fa-lock mr-2"></i>Conferma pagamento
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           PARCHEGGI
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'parcheggi'" x-transition.opacity>
+        <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+            <i class="fa fa-chevron-left text-xl"></i>
+          </button>
+          <h2 class="text-xl font-bold text-gray-800">Parcheggi</h2>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="flex border-b border-gray-200">
+          <button @click="pgActiveTab = 'lista'"
+            :class="pgActiveTab === 'lista' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition">
+            Convenzionati
+          </button>
+          <button @click="pgActiveTab = 'storico'"
+            :class="pgActiveTab === 'storico' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+            class="flex-1 py-3 text-sm transition">
+            I miei accessi
+          </button>
+        </div>
+
+        <div class="px-4 py-4 pb-24">
+          <!-- Lista parcheggi -->
+          <div x-show="pgActiveTab === 'lista'">
+            <div class="bg-teal-50 border border-teal-200 rounded-xl p-3 mb-4 text-sm text-teal-800">
+              <i class="fa fa-magic mr-2"></i>La tua targa viene riconosciuta dall'antenna Movyon. Addebito su fattura mensile.
+            </div>
+            <div class="space-y-3">
+              <template x-for="p in pgList" :key="p.id">
+                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1 min-w-0">
+                      <p class="font-bold text-gray-800 text-sm" x-text="p.nome"></p>
+                      <p class="text-xs text-gray-500 mt-0.5 truncate" x-text="p.indirizzo"></p>
+                    </div>
+                    <span class="text-xs bg-teal-100 text-teal-700 font-semibold px-2 py-1 rounded-full ml-2 flex-shrink-0">Movyon</span>
+                  </div>
+                  <div class="flex items-center justify-between text-xs text-gray-600 mb-3">
+                    <span><i class="fa fa-clock mr-1"></i><span x-text="p.orari"></span></span>
+                    <span class="text-right" x-text="p.tariffa"></span>
+                  </div>
+                  <button @click="pgOpenMaps(p)"
+                    class="w-full border border-eni-teal text-eni-teal font-semibold py-2 rounded-lg hover:bg-eni-teal-light transition text-sm">
+                    <i class="fa fa-map-marker-alt mr-2"></i>Apri in Maps
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Storico accessi -->
+          <div x-show="pgActiveTab === 'storico'">
+            <div class="bg-eni-teal-light rounded-xl p-4 mb-4">
+              <p class="text-sm text-gray-600">Accessi aprile</p>
+              <p class="text-3xl font-bold text-eni-teal" x-text="pgMovimenti.filter(m => m.ingresso >= '2026-04-01').length"></p>
+              <p class="text-sm text-gray-600 mt-1">Totale: <strong class="text-eni-teal"
+                x-text="'€ ' + pgMovimenti.filter(m => m.ingresso >= \'2026-04-01\').reduce((s,m) => s + m.importo, 0).toFixed(2)"></strong></p>
+            </div>
+            <div x-show="pgMovimenti.length === 0" class="text-center py-8 text-gray-400">
+              <i class="fa fa-square-parking text-3xl mb-2 block"></i>Nessun accesso
+            </div>
+            <div class="space-y-2">
+              <template x-for="m in pgMovimenti" :key="m.id">
+                <div class="bg-gray-50 rounded-xl p-3 flex items-start gap-3">
+                  <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa fa-square-parking text-teal-600 text-sm"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm" x-text="m.parcheggio"></p>
+                    <p class="text-xs text-gray-500"
+                      x-text="new Date(m.ingresso).toLocaleDateString('it-IT') + ' · ' + m.durata + ' · ' + m.targa"></p>
+                  </div>
+                  <p class="font-bold text-eni-teal text-sm flex-shrink-0" x-text="m.importo > 0 ? '€ ' + m.importo.toFixed(2) : 'In corso'"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+           MOVIMENTI
+           ══════════════════════════════════════ -->
+      <div x-show="currentPage === 'movimenti'" x-transition.opacity>
+        <div class="px-4 pt-6 pb-2">
+          <h1 class="text-2xl font-bold text-eni-teal">Movimenti</h1>
+        </div>
+
+        <div class="px-4 pb-24 space-y-4">
+          <!-- Riepilogo mese -->
+          <div class="rounded-xl p-5 text-white" style="background: linear-gradient(135deg, #117299 0%, #0d4f6f 100%);">
+            <p class="text-xs font-semibold opacity-80">TOTALE APRILE 2026</p>
+            <p class="text-3xl font-bold mt-1" x-text="'€ ' + movimentiTotaleMese()"></p>
+            <p class="text-xs opacity-70 mt-1" x-text="movimenti.filter(m => m.data >= \'2026-04-01\').length + ' movimenti questo mese'"></p>
+          </div>
+
+          <!-- Filtri -->
+          <div class="space-y-2">
+            <div class="flex gap-2">
+              <select x-model="movimentiFilter.servizio"
+                class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-eni-teal">
+                <option :value="null">Tutti i servizi</option>
+                <option value="strisce_blu">Strisce Blu</option>
+                <option value="telepedaggio">Telepedaggio</option>
+                <option value="areac">Area C</option>
+                <option value="rsa">RSA</option>
+                <option value="parcheggi">Parcheggi</option>
+                <option value="memo">Memo</option>
+              </select>
+              <select x-model="movimentiFilter.stato"
+                class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-eni-teal">
+                <option :value="null">Tutti gli stati</option>
+                <option value="pagato">Pagato</option>
+                <option value="in_corso">In corso</option>
+                <option value="da_addebitare">Da addebitare</option>
+                <option value="errore">Errore</option>
+              </select>
+            </div>
+            <div class="flex gap-2 items-center">
+              <input type="date" x-model="movimentiFilter.dateFrom"
+                class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-eni-teal" />
+              <span class="text-gray-400 text-xs">→</span>
+              <input type="date" x-model="movimentiFilter.dateTo"
+                class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-eni-teal" />
+              <button @click="resetMovimentiFilter()" class="text-gray-400 hover:text-gray-600 transition p-1">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          </div>
+
+          <p class="text-xs text-gray-500" x-text="movimentiFiltrati().length + ' movimenti trovati'"></p>
+
+          <div x-show="movimentiFiltrati().length === 0" class="text-center py-12 text-gray-400">
+            <i class="fa fa-receipt text-4xl mb-3 block"></i>Nessun movimento trovato
+          </div>
+
+          <div class="space-y-2">
+            <template x-for="m in movimentiFiltrati()" :key="m.id">
+              <div @click="movimentiSelectedId = movimentiSelectedId === m.id ? null : m.id"
+                class="bg-white border border-gray-200 rounded-xl p-3 cursor-pointer hover:shadow-sm transition">
+                <div class="flex items-center gap-3">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                      <span class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        :class="movServiceClass(m.servizio)" x-text="movServiceLabel(m.servizio)"></span>
+                      <span class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        :class="movStatoClass(m.stato)" x-text="movStatoLabel(m.stato)"></span>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-800 truncate" x-text="m.descrizione"></p>
+                    <p class="text-xs text-gray-500" x-text="movFormatData(m.data) + ' · ' + m.targa"></p>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <p class="font-bold text-sm"
+                      :class="m.stato === 'da_addebitare' ? 'text-amber-600' : 'text-gray-800'"
+                      x-text="'€ ' + m.importo.toFixed(2)"></p>
+                    <i class="fa text-gray-400 text-xs mt-1"
+                      :class="movimentiSelectedId === m.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                  </div>
+                </div>
+                <!-- Dettaglio espanso -->
+                <div x-show="movimentiSelectedId === m.id" class="border-t border-gray-100 mt-3 pt-3 space-y-1">
+                  <p class="text-xs text-gray-500"><strong>ID:</strong> <span x-text="m.id"></span></p>
+                  <p class="text-xs text-gray-500"><strong>Data:</strong> <span x-text="new Date(m.data).toLocaleString('it-IT')"></span></p>
+                  <button @click.stop="showToast('Segnalazione inviata'); movimentiSelectedId = null"
+                    class="mt-2 text-xs text-red-500 underline">Segnala problema</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- MODAL SERVIZIO DETTAGLIO -->
+    <div x-show="showServiceDetail" class="modal-overlay" @click.self="showServiceDetail = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-eni-teal" x-text="selectedService?.name"></h2>
+          <button @click="showServiceDetail = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <template x-if="selectedService?.id === 'telepedaggio'">
+            <div>
+              <p class="text-gray-700 mb-4">Il Telepedaggio è un sistema di pagamento automatico per le tratte autostradali.</p>
+              <h3 class="font-semibold text-gray-800 mb-2">Vantaggi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Niente code ai caselli</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Sconti sulle tratte abituali</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Consulta estratti conto online</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg mt-6 hover:bg-eni-teal-darker transition">Attiva Telepedaggio</button>
+            </div>
+          </template>
+
+          <template x-if="selectedService?.id === 'lavaggio'">
+            <div>
+              <p class="text-gray-700 mb-4">Servizio di lavaggio auto professionale con prodotti eco-friendly.</p>
+              <h3 class="font-semibold text-gray-800 mb-2">Opzioni:</h3>
+              <ul class="text-sm space-y-2 text-gray-700">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Lavaggio Esterno - €8,90</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Lavaggio Completo - €14,90</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Abbonamento Mensile - €29,90</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg mt-6 hover:bg-eni-teal-darker transition">Prenota Lavaggio</button>
+            </div>
+          </template>
+
+          <template x-if="!['telepedaggio', 'lavaggio'].includes(selectedService?.id)">
+            <div>
+              <p class="text-gray-700 mb-4">Scopri di più su questo servizio e come iniziare.</p>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Continua</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL RIFORNIMENTO -->
+    <div x-show="showRefuelModal" class="modal-overlay" @click.self="showRefuelModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-eni-teal">Inizia Rifornimento</h2>
+          <button @click="showRefuelModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Stazione di Servizio</label>
+            <select x-model="selectedStation" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-eni-teal">
+              <option value="">Seleziona una stazione</option>
+              <option value="milan-centro">Stazione Milano Centro - 2 km</option>
+              <option value="milan-nord">Stazione Milano Nord - 5 km</option>
+              <option value="milan-sud">Stazione Milano Sud - 3 km</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Tipo di Carburante/Ricarica</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="selectedFuel = 'benzina'" :class="selectedFuel === 'benzina' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Benzina</button>
+              <button @click="selectedFuel = 'diesel'" :class="selectedFuel === 'diesel' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Diesel</button>
+              <button @click="selectedFuel = 'gpl'" :class="selectedFuel === 'gpl' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">GPL</button>
+              <button @click="selectedFuel = 'elettrico'" :class="selectedFuel === 'elettrico' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Ricarica</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Quantità</label>
+            <div class="flex items-center gap-2">
+              <input type="range" x-model="selectedAmount" min="10" max="100" step="10" class="flex-grow" />
+              <span class="text-lg font-bold text-eni-teal w-16" x-text="selectedAmount + ' L'"></span>
+            </div>
+            <input type="number" x-model="selectedAmount" class="w-full border border-gray-300 rounded-lg p-2 mt-2 focus:outline-none focus:ring-2 focus:ring-eni-teal" placeholder="O inserisci manualmente" />
+          </div>
+
+          <div class="bg-eni-teal-light p-4 rounded-lg">
+            <p class="text-sm text-gray-700">Prezzo stimato</p>
+            <p class="text-3xl font-bold text-eni-teal" x-text="'€ ' + (selectedAmount * 1.50).toFixed(2)"></p>
+          </div>
+
+          <button class="w-full bg-eni-teal text-white font-bold py-4 rounded-lg hover:bg-eni-teal-darker transition text-lg">
+            <i class="fa fa-arrow-right mr-2"></i>Procedi al Pagamento
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL BUNDLE DETTAGLIO -->
+    <div x-show="showBundleDetail" class="modal-overlay" @click.self="showBundleDetail = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-eni-teal" x-text="selectedBundle === 'standard' ? 'STANDARD' : selectedBundle === 'premium' ? 'PREMIUM' : 'TELEPEDAGGIO'"></h2>
+          <button @click="showBundleDetail = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <template x-if="selectedBundle === 'standard'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€0/mese</p>
+              <p class="text-gray-700 mb-4">Piano gratuito con accesso a tutte le feature base.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Early Access ai servizi</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Accesso app mobile</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Supporto clienti</li>
+                <li><i class="fa fa-times text-gray-400 mr-2"></i>Servizi premium illimitati</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Standard</button>
+            </div>
+          </template>
+
+          <template x-if="selectedBundle === 'premium'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€1,99/mese</p>
+              <p class="text-gray-700 mb-4">Piano completo con tutti i servizi premium inclusi.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Gratuito</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Strisce Blu Scontate (50%)</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Assistenza Stradale 24/7</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Priorità Supporto</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Premium</button>
+            </div>
+          </template>
+
+          <template x-if="selectedBundle === 'telepedaggio'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€2,50/mese</p>
+              <p class="text-gray-700 mb-4">Piano dedicato alla mobilità urbana.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Premium</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Area C/B Illimitata</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Consultazione Estratti Conto</li>
+              </ul>
+
+              <h3 class="font-semibold text-gray-800 mb-3">Add-on Disponibili:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-plus text-blue-500 mr-2"></i>Strisce Blu - +€0,99/mese</li>
+                <li><i class="fa fa-plus text-blue-500 mr-2"></i>Assistenza Stradale - +€4,99/mese</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Telepedaggio</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL TERMINI E CONDIZIONI STRICES BLU -->
+    <div x-show="showTermsModal" class="modal-overlay" @click.self="rejectSbTerms()">
+      <div class="fixed inset-0 max-w-md mx-auto bg-white rounded-3xl shadow-2xl modal-enter p-6 max-h-[90vh] overflow-y-auto z-50 m-4 flex flex-col">
+        
+        <!-- PULSANTE CHIUDI X -->
+        <button @click="rejectSbTerms()" class="absolute top-6 right-6 text-gray-400 hover:text-gray-700 text-2xl">
+          <i class="fa fa-times"></i>
+        </button>
+
+        <!-- HEADER -->
+        <div class="mb-6 pt-2">
+          <h2 class="text-2xl font-bold text-eni-teal mb-2">Termini e Condizioni</h2>
+          <p class="text-sm text-gray-600">Strisce Blu - Servizio di Parcheggio</p>
+        </div>
+
+        <!-- CONTENUTO FACSIMILE PDF -->
+        <div class="flex-grow overflow-y-auto mb-6 pdf-content" style="background: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 13px; line-height: 1.6; color: #333;">
+          <div style="font-family: Georgia, serif; border: 2px solid #ccc; padding: 30px; background: white;">
+            <p style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">TERMINI E CONDIZIONI DI SERVIZIO</p>
+            <p style="text-align: center; font-weight: bold; margin-bottom: 20px;">Strisce Blu - Servizio di Parcheggio Urbano</p>
+            
+            <p style="margin-bottom: 15px;"><strong>1. Descrizione del Servizio</strong></p>
+            <p style="margin-bottom: 15px;">Il servizio Strisce Blu consente di prenotare e pagare i posti auto in zone a parcheggio regolamentato. L'utente accetta di conformarsi a tutte le normative locali relative al parcheggio.</p>
+            
+            <p style="margin-bottom: 15px;"><strong>2. Responsabilità dell'Utente</strong></p>
+            <p style="margin-bottom: 15px;">L'utente è responsabile della corretta immissione dei dati del veicolo (targa) e della scelta della durata della sosta. ENI non è responsabile per errori di inserimento dati da parte dell'utente.</p>
+            
+            <p style="margin-bottom: 15px;"><strong>3. Pagamento e Tariffe</strong></p>
+            <p style="margin-bottom: 15px;">Le tariffe sono pubblicate al momento dell'utilizzo del servizio. Il pagamento è immediato. Le tariffe applicate sono quelle in vigore al momento della transazione.</p>
+            
+            <p style="margin-bottom: 15px;"><strong>4. Limitazioni di Responsabilità</strong></p>
+            <p style="margin-bottom: 15px;">ENI non è responsabile per danni al veicolo, furto, o altre problematiche derivanti dalla sosta del veicolo. ENI fornisce solo il servizio di prenotazione e pagamento.</p>
+            
+            <p style="margin-bottom: 15px;"><strong>5. Modifiche ai Termini</strong></p>
+            <p style="margin-bottom: 15px;">ENI si riserva il diritto di modificare questi termini in qualsiasi momento. L'utilizzo continuato del servizio implica accettazione delle modifiche.</p>
+            
+            <p style="margin-bottom: 15px;"><strong>6. Legge Applicabile</strong></p>
+            <p style="margin-bottom: 15px;">Questi termini sono disciplinati dalla legge italiana. Per qualsiasi controversia, è competente il foro di Milano.</p>
+            
+            <p style="margin-bottom: 15px;">Accettando questi termini, confermi di aver letto e compreso tutte le disposizioni sopra riportate.</p>
+          </div>
+        </div>
+
+        <!-- PULSANTI -->
+        <div class="flex gap-3">
+          <button @click="rejectSbTerms()" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">
+            Rifiuta
+          </button>
+          <button @click="acceptSbTerms()" class="flex-1 bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">
+            Accetta
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRISCE BLU — FULL SCREEN -->
+    <div x-show="showBlueModal" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:50;background:white;overflow:hidden;max-width:420px;margin:0 auto">
+
+      <!-- ══ PAGE: MAPPA ══ -->
+      <div x-show="sbPage === 'map'" style="position:absolute;inset:0;display:flex;flex-direction:column">
+
+        <!-- Mappa con altezza esplicita -->
+        <div id="sbZoneMap" style="height:58%;flex-shrink:0;position:relative">
+          <button @click="showBlueModal = false"
+                  style="position:absolute;top:14px;right:14px;z-index:1000;background:white;border:none;border-radius:50%;width:40px;height:40px;box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center">
+            <i class="fa fa-times" style="color:#374151;font-size:15px"></i>
+          </button>
+        </div>
+
+        <!-- Pannello inferiore sovrapposto -->
+        <div style="background:white;border-radius:22px 22px 0 0;margin-top:-22px;z-index:10;padding:0 20px 28px;flex:1;overflow-y:auto">
+          <div style="width:36px;height:4px;background:#d1d5db;border-radius:99px;margin:10px auto 16px"></div>
+          <h2 class="text-xl font-bold text-gray-800 mb-0.5">Seleziona zona</h2>
+          <p class="text-sm text-gray-500 mb-4">Tocca un'area sulla mappa per vedere dettagli e tariffe</p>
+
+          <!-- Placeholder: nessuna zona toccata -->
+          <div x-show="!sbMapSelectedZone"
+               class="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center text-sm text-gray-400 mb-4">
+            <i class="fa fa-hand-pointer text-2xl mb-2 block text-gray-300"></i>
+            Tocca una zona sulla mappa
+          </div>
+
+          <!-- Card zona selezionata -->
+          <div x-show="sbMapSelectedZone" class="mb-4">
+            <div class="border-2 rounded-xl p-4 flex items-center gap-3"
+                 :style="sbMapSelectedZone ? 'border-color:' + sbMapSelectedZone.color : ''">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg text-white flex-shrink-0"
+                   :style="sbMapSelectedZone ? 'background:' + sbMapSelectedZone.color : ''">P</div>
+              <div class="flex-1">
+                <p class="font-bold text-gray-800 text-sm leading-tight" x-text="sbMapSelectedZone?.name"></p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  <span class="font-semibold text-gray-700" x-text="sbMapSelectedZone ? '€' + sbMapSelectedZone.rate.toFixed(2) + '/ora' : ''"></span>
+                  · <span x-text="sbMapSelectedZone?.hours"></span>
+                </p>
+              </div>
+            </div>
+            <button @click="sbZoneName = sbMapSelectedZone.name; sbZoneRate = sbMapSelectedZone.rate; sbZoneHours = sbMapSelectedZone.hours; calculateSbEndTime(); sbPage = 'setup'"
+                    class="w-full mt-3 text-white font-bold py-4 rounded-xl transition text-base"
+                    :style="sbMapSelectedZone ? 'background:' + sbMapSelectedZone.color : 'background:#117299'">
+              Seleziona questa zona →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: SETUP ══ -->
+      <div x-show="sbPage === 'setup'" style="position:absolute;inset:0;overflow-y:auto;">
+
+        <!-- Header fisso -->
+        <div style="position:sticky;top:0;z-index:1;padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;background:white">
+          <button @click="_openMapPage()" style="background:#f3f4f6;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fa fa-arrow-left" style="color:#374151;font-size:14px"></i>
+          </button>
+          <h2 style="font-size:18px;font-weight:700;color:#111827;flex:1">Nuova Sosta</h2>
+          <button @click="showBlueModal = false" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:20px">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Contenuto scrollabile -->
+        <div style="padding:20px" class="space-y-4">
+
+          <!-- Zona (read-only + link cambia) -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Zona</p>
+                <p class="text-sm font-bold text-gray-800" x-text="sbZoneName"></p>
+                <p class="text-xs text-gray-500"><span x-text="'€' + sbZoneRate.toFixed(2) + '/ora'"></span> · <span x-text="sbZoneHours"></span></p>
+              </div>
+              <button @click="_openMapPage()" class="text-xs text-eni-teal font-semibold underline">Cambia</button>
+            </div>
+          </div>
+
+          <!-- Veicolo / Targa -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <!-- Riga principale: valore + bottone Cambia -->
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Veicolo</p>
+                <div x-show="sbSelectedVehicle" class="flex items-center gap-2">
+                  <span class="targa-badge text-xs" x-text="sbSelectedVehicle?.targa"></span>
+                  <span class="text-sm font-medium text-gray-800" x-text="sbSelectedVehicle?.nickname || (sbSelectedVehicle?.marca + ' ' + sbSelectedVehicle?.modello)"></span>
+                </div>
+                <p x-show="!sbSelectedVehicle" class="text-sm text-gray-400 italic">Nessun veicolo selezionato</p>
+              </div>
+              <button @click="sbShowVehicleSelector = !sbShowVehicleSelector"
+                      class="text-xs text-eni-teal font-semibold flex items-center gap-1 flex-shrink-0 ml-3">
+                Cambia
+                <i class="fa text-xs" :class="sbShowVehicleSelector ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </button>
+            </div>
+
+            <!-- Dropdown veicoli -->
+            <div x-show="sbShowVehicleSelector" class="mt-3 border-t border-gray-200 pt-2 space-y-0.5">
+              <template x-for="v in garageVehicles" :key="v.id">
+                <button type="button"
+                        @click="sbSelectedVehicle = v; sbPlate = v.targa; sbShowVehicleSelector = false"
+                        class="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 transition text-left">
+                  <span class="targa-badge text-xs flex-shrink-0" x-text="v.targa"></span>
+                  <span class="text-sm font-medium text-gray-800 flex-1" x-text="v.nickname || (v.marca + ' ' + v.modello)"></span>
+                  <i x-show="sbSelectedVehicle?.id === v.id" class="fa fa-check text-eni-teal text-sm flex-shrink-0"></i>
+                </button>
+              </template>
+              <button type="button"
+                      @click="showBlueModal = false; currentPage = 'account'; accountSection = 'garage'"
+                      class="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 transition text-eni-teal">
+                <i class="fa fa-plus text-sm flex-shrink-0"></i>
+                <span class="text-sm font-medium">Aggiungi veicolo</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modalità -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Modalità</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button @click="sbSetMode('wheel')" :class="sbMode==='wheel' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition text-sm">Rotella</button>
+              <button @click="sbSetMode('standard')" :class="sbMode==='standard' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition text-sm">Standard 2 ore</button>
+              <button @click="sbSetMode('open')" :class="sbMode==='open' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition text-sm">Illimitato</button>
+            </div>
+          </div>
+
+          <!-- Durata (solo se non open) -->
+          <div x-show="sbMode !== 'open'">
+            <label class="block text-sm font-semibold text-gray-800 mb-4">Durata</label>
+            <div class="gear-wheel">
+              <div class="gear-wheel-display">
+                <div class="gear-wheel-value" x-text="formatMs(sbMinutes * 60 * 1000)"></div>
+              </div>
+              <div class="gear-controls">
+                <button type="button" @click="sbMinutes = Math.max(15, parseInt(sbMinutes) - 15); calculateSbEndTime();" class="btn-gear">−</button>
+                <button type="button" @click="sbMinutes = Math.min(360, parseInt(sbMinutes) + 15); calculateSbEndTime();" class="btn-gear">+</button>
+              </div>
+              <div class="gear-list">
+                <button type="button" @click="sbMinutes = 30; calculateSbEndTime();" :class="parseInt(sbMinutes) === 30 ? 'gear-pill active' : 'gear-pill'" class="transition">30 min</button>
+                <button type="button" @click="sbMinutes = 60; calculateSbEndTime();" :class="parseInt(sbMinutes) === 60 ? 'gear-pill active' : 'gear-pill'" class="transition">1 ora</button>
+                <button type="button" @click="sbMinutes = 120; calculateSbEndTime();" :class="parseInt(sbMinutes) === 120 ? 'gear-pill active' : 'gear-pill'" class="transition">2 ore</button>
+                <button type="button" @click="sbMinutes = 180; calculateSbEndTime();" :class="parseInt(sbMinutes) === 180 ? 'gear-pill active' : 'gear-pill'" class="transition">3 ore</button>
+              </div>
+            </div>
+
+            <div class="bg-blue-50 p-4 rounded-lg mt-4 text-center border border-blue-200">
+              <p class="text-sm text-gray-700 mb-1">Termina alle</p>
+              <p class="text-2xl font-bold text-eni-teal" x-text="sbCalculatedEndTime"></p>
+            </div>
+            <div class="bg-eni-teal-light p-4 rounded-lg mt-3 text-center">
+              <p class="text-sm text-gray-700 mb-1">Prezzo stimato</p>
+              <p class="text-3xl font-bold text-eni-teal" x-text="'€ ' + calculateSbPrice().toFixed(2)"></p>
+            </div>
+          </div>
+
+          <!-- Metodo pagamento -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <!-- Riga principale: valore + bottone Cambia -->
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Metodo di Pagamento</p>
+                <template x-if="paymentMethods.find(p => p.id === selectedPaymentMethod)">
+                  <div class="flex items-center gap-2">
+                    <i :class="'fa ' + paymentMethods.find(p => p.id === selectedPaymentMethod).icona" class="text-eni-teal text-sm w-4 text-center flex-shrink-0"></i>
+                    <span class="text-sm font-medium text-gray-800" x-text="paymentMethods.find(p => p.id === selectedPaymentMethod).label"></span>
+                    <span x-show="paymentMethods.find(p => p.id === selectedPaymentMethod)?.predefinito" class="badge-predefinito">Predefinito</span>
+                  </div>
+                </template>
+                <p x-show="!selectedPaymentMethod" class="text-sm text-gray-400 italic">Nessun metodo selezionato</p>
+              </div>
+              <button @click="sbShowPaymentSelector = !sbShowPaymentSelector"
+                      class="text-xs text-eni-teal font-semibold flex items-center gap-1 flex-shrink-0 ml-3">
+                Cambia
+                <i class="fa text-xs" :class="sbShowPaymentSelector ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </button>
+            </div>
+
+            <!-- Dropdown metodi -->
+            <div x-show="sbShowPaymentSelector" class="mt-3 border-t border-gray-200 pt-2 space-y-0.5">
+              <template x-for="method in paymentMethods" :key="method.id">
+                <button type="button"
+                        @click="selectedPaymentMethod = method.id; sbShowPaymentSelector = false"
+                        class="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 transition text-left">
+                  <i :class="'fa ' + method.icona" class="text-eni-teal w-4 text-center flex-shrink-0"></i>
+                  <span class="text-sm font-medium text-gray-800 flex-1" x-text="method.label"></span>
+                  <span x-show="method.predefinito" class="badge-predefinito mr-1">Predefinito</span>
+                  <i x-show="selectedPaymentMethod === method.id" class="fa fa-check text-eni-teal text-sm flex-shrink-0"></i>
+                </button>
+              </template>
+              <button type="button"
+                      @click="showBlueModal = false; currentPage = 'account'; accountSection = 'pagamenti'"
+                      class="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-100 transition text-eni-teal">
+                <i class="fa fa-plus text-sm flex-shrink-0"></i>
+                <span class="text-sm font-medium">Aggiungi metodo di pagamento</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Errore pagamento (scenario emulatore) -->
+          <div x-show="sbPaymentError" class="bg-red-50 border border-red-300 rounded-lg p-3 flex items-start gap-2">
+            <i class="fa fa-triangle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+            <div class="flex-1"><p class="text-sm text-red-600" x-text="sbPaymentErrorMsg"></p></div>
+            <button @click="sbPaymentError = false; sbPaymentErrorMsg = ''" class="text-xs text-red-600 font-semibold underline flex-shrink-0">Riprova</button>
+          </div>
+
+          <div x-show="sbMetaText" class="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg" x-text="sbMetaText"></div>
+
+          <button @click="sbStart()"
+                  :disabled="sbPaymentError || !selectedPaymentMethod"
+                  :class="(sbPaymentError || !selectedPaymentMethod) ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-eni-teal hover:bg-eni-teal-darker'"
+                  class="w-full text-white font-bold py-4 rounded-xl transition text-lg">
+            <i class="fa fa-play mr-2"></i>Avvia sosta
+          </button>
+
+        </div>
+      </div>
+
+      <!-- ══ PAGE: TIMER ══ -->
+      <div x-show="sbPage === 'timer'" style="position:absolute;inset:0;overflow-y:auto;">
+
+        <!-- Header fisso -->
+        <div style="position:sticky;top:0;z-index:1;padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;background:white">
+          <h2 style="font-size:18px;font-weight:700;color:#117299;flex:1">Sosta Attiva</h2>
+          <button @click="showBlueModal = false; if(sbActive) showLockScreen = false;" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:20px">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Contenuto scrollabile -->
+        <div style="padding:20px" class="space-y-4">
+
+          <div class="timer-card">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-sm opacity-90">Targa</p>
+                <p class="text-xl font-bold" x-text="sbPlate"></p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm opacity-90 mb-1" x-text="sbZoneName"></p>
+                <p class="text-xs opacity-75" x-text="sbMode==='open' ? 'Tempo trascorso' : 'Tempo rimanente'"></p>
+              </div>
+            </div>
+            <div class="mt-4 timer-big text-center" x-text="sbTimerText"></div>
+            <div class="mt-3 text-center text-sm opacity-90" x-show="sbMode!=='open'">
+              <span x-text="'Scade alle ' + sbSostaEndTime"></span>
+            </div>
+            <div class="mt-3 text-center text-sm opacity-90" x-show="sbMode==='open'">
+              <span>Finisce quando premi "Stop"</span>
+            </div>
+          </div>
+
+          <button x-show="sbMode==='open' || sbActive" @click="sbStop()"
+                  class="w-full bg-gray-900 text-white font-bold py-4 rounded-xl hover:bg-black transition text-lg">
+            <i class="fa fa-stop mr-2"></i>Stop sosta
+          </button>
+
+          <button x-show="sbActive && sbMode !== 'open'" @click="openSbExtend()"
+                  class="w-full bg-eni-teal-light text-eni-teal font-semibold py-3 rounded-xl hover:bg-blue-100 transition border border-eni-teal">
+            <i class="fa fa-clock mr-2"></i>Modifica durata
+          </button>
+
+          <div x-show="sbMetaText && !sbActive" class="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-3 rounded-lg">
+            <span x-text="sbMetaText"></span>
+          </div>
+        </div>
+      </div>
+
+    <!-- FINE FULL SCREEN (chiude il div showBlueModal) -->
+    </div>
+
+    <!-- MODAL PAGAMENTO STRISCE BLU -->
+    <div x-show="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-eni-teal">Conferma Pagamento</h2>
+          <button @click="showPaymentModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-6">
+          <!-- RIEPILOGO -->
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <p class="text-sm text-gray-600 font-semibold">TARGA</p>
+                <p class="text-xl font-bold text-gray-800" x-text="sbPlate"></p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-gray-600 font-semibold">DURATA</p>
+                <p class="text-xl font-bold text-gray-800" x-text="sbMode === 'open' ? 'Illimitato' : formatMs(sbMinutes * 60 * 1000)"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- PREZZO -->
+          <div class="bg-eni-teal-light p-6 rounded-lg text-center border-2 border-eni-teal">
+            <p class="text-sm text-gray-700 mb-2 font-semibold">IMPORTO DA PAGARE</p>
+            <p class="text-4xl font-bold text-eni-teal" x-text="'€ ' + sbPrice.toFixed(2)"></p>
+            <p class="text-xs text-gray-600 mt-2" x-show="sbMode !== 'open'" x-text="'€' + sbZoneRate.toFixed(2) + ' all\'ora'"></p>
+          </div>
+
+          <!-- METODO PAGAMENTO -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <label class="block text-sm font-semibold text-gray-800">Metodo di Pagamento</label>
+              <button @click="showPaymentModal = false; currentPage = 'account'; accountSection = 'pagamenti'"
+                      class="text-xs text-eni-teal underline font-medium">
+                Gestisci →
+              </button>
+            </div>
+            <div class="space-y-2">
+              <template x-for="method in paymentMethods" :key="method.id">
+                <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer transition"
+                       :class="selectedPaymentMethod === method.id ? 'border-eni-teal bg-eni-teal-light' : 'border-gray-200 hover:border-eni-teal'">
+                  <input type="radio" :value="method.id" x-model.number="selectedPaymentMethod" class="mr-3 accent-eni-teal">
+                  <div class="flex items-center gap-2 flex-1">
+                    <i :class="'fa ' + method.icona" class="text-eni-teal w-5 text-center"></i>
+                    <div class="flex-1">
+                      <p class="font-semibold text-gray-800 text-sm" x-text="method.label"></p>
+                      <p class="text-xs text-gray-500" x-text="method.tipo"></p>
+                    </div>
+                    <span x-show="method.predefinito" class="badge-predefinito">Predefinito</span>
+                  </div>
+                </label>
+              </template>
+              <div x-show="paymentMethods.length === 0" class="text-center py-4 text-sm text-gray-500">
+                Nessun metodo disponibile —
+                <button @click="showPaymentModal = false; currentPage = 'account'; accountSection = 'pagamenti'"
+                        class="text-eni-teal font-semibold underline">Aggiungi in Account</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ERRORE PAGAMENTO -->
+          <div x-show="sbPaymentError" class="bg-red-50 border border-red-300 rounded-lg p-4 flex items-start gap-3">
+            <i class="fa fa-triangle-exclamation text-red-500 text-lg mt-0.5 flex-shrink-0"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-red-700 mb-1">Pagamento non riuscito</p>
+              <p class="text-sm text-red-600" x-text="sbPaymentErrorMsg"></p>
+            </div>
+            <button @click="sbPaymentError = false; sbPaymentErrorMsg = ''" class="text-xs text-red-600 font-semibold underline flex-shrink-0">Riprova</button>
+          </div>
+
+          <!-- BOTTONI -->
+          <div class="flex gap-3">
+            <button @click="showPaymentModal = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">
+              Annulla
+            </button>
+            <button @click="confirmSbPayment()" :disabled="sbPaymentError || !selectedPaymentMethod" :class="(sbPaymentError || !selectedPaymentMethod) ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-eni-teal hover:bg-eni-teal-darker'" class="flex-1 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2">
+              <i class="fa fa-check"></i> Paga e Inizia
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL SELEZIONE ZONA STRISCE BLU -->
+    <div x-show="sbShowZoneModal" class="modal-overlay">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto shadow-2xl modal-enter z-50"
+           style="height:88vh;display:flex;flex-direction:column;overflow:hidden;border-radius:24px 24px 0 0;background:#e8eaed">
+
+        <!-- MAPPA (porzione superiore) -->
+        <div style="position:relative;flex:1;min-height:0">
+          <div id="sbZoneMap" style="width:100%;height:100%"></div>
+          <!-- Bottone chiudi flottante sulla mappa -->
+          <button @click="closeSbZoneModal()"
+                  style="position:absolute;top:14px;right:14px;z-index:1000;background:white;border:none;border-radius:50%;width:38px;height:38px;box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center">
+            <i class="fa fa-times" style="color:#374151;font-size:15px"></i>
+          </button>
+        </div>
+
+        <!-- PANNELLO INFERIORE (sovrapposto, stile sheet) -->
+        <div style="background:white;border-radius:22px 22px 0 0;margin-top:-22px;z-index:10;padding:0 20px 20px;flex-shrink:0">
+          <!-- Drag handle -->
+          <div style="width:36px;height:4px;background:#d1d5db;border-radius:99px;margin:10px auto 16px"></div>
+
+          <h2 class="text-xl font-bold text-gray-800 mb-1">Seleziona zona</h2>
+          <p class="text-sm text-gray-500 mb-4">Tocca un'area colorata sulla mappa per vedere i dettagli</p>
+
+          <!-- Placeholder: nessuna zona toccata -->
+          <div x-show="!sbMapSelectedZone"
+               class="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center text-sm text-gray-400">
+            <i class="fa fa-hand-pointer text-2xl mb-2 block text-gray-300"></i>
+            Tocca una zona sulla mappa
+          </div>
+
+          <!-- Card zona selezionata -->
+          <div x-show="sbMapSelectedZone" class="border-2 rounded-xl p-4" :style="sbMapSelectedZone ? 'border-color:' + sbMapSelectedZone.color : ''">
+            <div class="flex items-start gap-3 mb-4">
+              <!-- Icona P -->
+              <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg text-white"
+                   :style="sbMapSelectedZone ? 'background:' + sbMapSelectedZone.color : ''">P</div>
+              <div class="flex-1">
+                <p class="font-bold text-gray-800 text-base leading-tight" x-text="sbMapSelectedZone?.name"></p>
+                <p class="text-sm text-gray-500 mt-0.5">
+                  <span class="font-semibold" x-text="sbMapSelectedZone ? '€' + sbMapSelectedZone.rate.toFixed(2) + '/ora' : ''"></span>
+                  · <span x-text="sbMapSelectedZone?.hours"></span>
+                </p>
+              </div>
+            </div>
+            <button @click="sbZoneName = sbMapSelectedZone.name; sbZoneRate = sbMapSelectedZone.rate; sbZoneHours = sbMapSelectedZone.hours; closeSbZoneModal()"
+                    class="w-full text-white font-bold py-3 rounded-xl transition text-sm"
+                    :style="sbMapSelectedZone ? 'background:' + sbMapSelectedZone.color : 'background:#117299'">
+              Seleziona questa zona
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL WIZARD STRISCE BLU -->
+    <div x-show="sbShowWizard" class="modal-overlay" @click.self="sbShowWizard = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 z-50">
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 bg-eni-teal-light rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa fa-square-parking text-eni-teal text-2xl"></i>
+          </div>
+          <h2 class="text-xl font-bold text-gray-800">Benvenuto nelle Strisce Blu</h2>
+          <p class="text-sm text-gray-500 mt-2">Paga la sosta direttamente dall'app, senza biglietterie o parcometri.</p>
+        </div>
+        <div class="space-y-4 mb-6">
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 bg-eni-teal-light rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fa fa-location-dot text-eni-teal text-sm"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Seleziona la zona di parcheggio sulla mappa</p>
+              <p class="text-xs text-gray-500">Tariffa e orari aggiornati in tempo reale</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 bg-eni-teal-light rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fa fa-car text-eni-teal text-sm"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Associa il tuo veicolo alla sosta</p>
+              <p class="text-xs text-gray-500">Usa i veicoli salvati nel tuo Garage</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 bg-eni-teal-light rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fa fa-clock text-eni-teal text-sm"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Scegli la durata e avvia: paghi solo ciò che usi</p>
+              <p class="text-xs text-gray-500">Puoi fermare la sosta in anticipo in qualsiasi momento</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-5 flex items-start gap-2">
+          <i class="fa fa-envelope text-gray-400 text-sm mt-0.5 flex-shrink-0"></i>
+          <p class="text-xs text-gray-500">Riceverai via email il talloncino da esporre sul veicolo</p>
+        </div>
+        <button @click="dismissSbWizard()" class="w-full bg-eni-teal text-white font-bold py-4 rounded-lg hover:bg-eni-teal-darker transition text-base">
+          Inizia
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL MODIFICA DURATA SOSTA -->
+    <div x-show="sbShowExtendModal" class="modal-overlay" @click.self="sbShowExtendModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 z-50">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-gray-800">Modifica durata sosta</h2>
+          <button @click="sbShowExtendModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <!-- Stato sosta in corso -->
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs text-gray-500 font-semibold">TEMPO RIMANENTE</p>
+              <p class="text-xl font-bold text-eni-teal" x-text="sbTimerText"></p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-500 font-semibold">SCADE ALLE</p>
+              <p class="text-lg font-bold text-gray-800" x-text="sbSostaEndTime"></p>
+            </div>
+          </div>
+        </div>
+        <!-- Pillole minuti aggiuntivi -->
+        <p class="text-sm font-semibold text-gray-800 mb-3">Aggiungi tempo</p>
+        <div class="grid grid-cols-4 gap-2 mb-4">
+          <button @click="sbExtendMinutes = 15" :class="sbExtendMinutes === 15 ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium text-sm transition">+15 min</button>
+          <button @click="sbExtendMinutes = 30" :class="sbExtendMinutes === 30 ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium text-sm transition">+30 min</button>
+          <button @click="sbExtendMinutes = 60" :class="sbExtendMinutes === 60 ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium text-sm transition">+1 ora</button>
+          <button @click="sbExtendMinutes = 120" :class="sbExtendMinutes === 120 ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium text-sm transition">+2 ore</button>
+        </div>
+        <!-- Importo aggiornato stimato -->
+        <div class="bg-eni-teal-light border border-eni-teal rounded-lg p-3 mb-5 text-center">
+          <p class="text-xs text-gray-600 mb-1">Costo aggiuntivo stimato</p>
+          <p class="text-2xl font-bold text-eni-teal" x-text="'€ ' + ((sbExtendMinutes / 60) * sbZoneRate).toFixed(2)"></p>
+        </div>
+        <div class="flex gap-3">
+          <button @click="sbShowExtendModal = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+          <button @click="confirmSbExtend()" class="flex-1 bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Conferma proroga</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL AGGIUNTA VEICOLO -->
+    <div x-show="showGarageAddModal" class="modal-overlay" @click.self="showGarageAddModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal p-6 z-50">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-gray-800">Aggiungi veicolo</h2>
+          <button @click="showGarageAddModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="space-y-3">
+          <div class="form-group">
+            <label>Targa *</label>
+            <input x-model="garageNewVehicle.targa" placeholder="Es. AB123CD" class="w-full uppercase" />
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select x-model="garageNewVehicle.tipo" class="w-full">
+              <option>Auto</option>
+              <option>Moto</option>
+              <option>Furgone</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Marca</label>
+            <input x-model="garageNewVehicle.marca" placeholder="Es. Fiat" class="w-full" />
+          </div>
+          <div class="form-group">
+            <label>Modello</label>
+            <input x-model="garageNewVehicle.modello" placeholder="Es. Panda" class="w-full" />
+          </div>
+          <div class="form-group">
+            <label>Nickname</label>
+            <input x-model="garageNewVehicle.nickname" placeholder="Es. La Panda" class="w-full" />
+          </div>
+          <div class="flex gap-3 mt-2">
+            <button @click="showGarageAddModal = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+            <button @click="confirmGarageAdd()" class="flex-1 btn-primary py-3 rounded-lg">Aggiungi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERLAY CONFERMA ELIMINA VEICOLO -->
+    <div x-show="showGarageDeleteConfirm" class="modal-overlay" @click.self="showGarageDeleteConfirm = false; garageDeleteTarget = null">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal p-6 z-50">
+        <h2 class="text-lg font-bold text-gray-800 mb-2">Rimuovere veicolo?</h2>
+        <p class="text-sm text-muted mb-6" x-text="'Rimuovere \'' + (garageDeleteTarget?.nickname || '') + '\' dal garage?'"></p>
+        <div class="flex gap-3">
+          <button @click="showGarageDeleteConfirm = false; garageDeleteTarget = null" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+          <button @click="confirmGarageDelete()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-lg hover:bg-red-600 transition">S&igrave;, rimuovi</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL AGGIUNTA METODO PAGAMENTO -->
+    <div x-show="showPaymentAddModal" class="modal-overlay" @click.self="showPaymentAddModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal p-6 z-50">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-gray-800">Aggiungi metodo</h2>
+          <button @click="showPaymentAddModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="space-y-3">
+          <div class="form-group">
+            <label>Tipo</label>
+            <select x-model="paymentNewType" class="w-full">
+              <option value="Carta di credito">Carta di credito</option>
+              <option value="PayPal">PayPal</option>
+              <option value="Apple Pay">Apple Pay</option>
+              <option value="Google Pay">Google Pay</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Label (es. numero carta o email)</label>
+            <input x-model="paymentNewLabel" placeholder="Es. Visa &bull;&bull;&bull;&bull; 1234" class="w-full" />
+          </div>
+          <div class="flex gap-3 mt-2">
+            <button @click="showPaymentAddModal = false" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+            <button @click="confirmPaymentAdd()" class="flex-1 btn-primary py-3 rounded-lg">Aggiungi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERLAY CONFERMA ELIMINA PAGAMENTO -->
+    <div x-show="showPaymentDeleteConfirm" class="modal-overlay" @click.self="showPaymentDeleteConfirm = false; paymentDeleteTarget = null">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal p-6 z-50">
+        <h2 class="text-lg font-bold text-gray-800 mb-2">Rimuovere metodo?</h2>
+        <p class="text-sm text-muted mb-6">Rimuovere questo metodo di pagamento?</p>
+        <div class="flex gap-3">
+          <button @click="showPaymentDeleteConfirm = false; paymentDeleteTarget = null" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
+          <button @click="confirmPaymentDelete()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-lg hover:bg-red-600 transition">S&igrave;, rimuovi</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOCK SCREEN STRISCE BLU -->
+    <div x-show="showLockScreen" class="lock-screen" @click="showLockScreen = false">
+      <!-- ORARIO GRANDE IN ALTO -->
+      <div class="lock-screen-time-display" x-text="lockScreenCurrentTime"></div>
+      
+      <!-- RETTANGOLO SOSTA (se attiva) -->
+      <div x-show="sbActive" @click.stop="showLockScreen = false; openBlue()" class="lock-screen-sosta-card">
+        <div class="sosta-card-header">
+          <span x-text="sbPlate" class="sosta-targa"></span>
+          <span class="sosta-timer" x-text="sbTimerText"></span>
+        </div>
+        <div class="sosta-card-footer">
+          <small>Finisce alle</small>
+          <div x-text="sbSostaEndTime" class="sosta-end-time"></div>
+        </div>
+        <div class="sosta-card-hint">Tocca per modificare</div>
+      </div>
+      
+      <!-- HINT SBLOCCO -->
+      <div class="lock-screen-hint">Tocca per sbloccare</div>
+    </div>
+
+    <!-- NAV BOTTOM -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white shadow-top border-t border-gray-200 flex justify-around items-center h-16 px-1 z-30">
+      <button @click="currentPage = 'home'" :class="currentPage === 'home' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal px-1">
+        <i class="fa fa-home text-xl"></i>
+        <span class="text-xs mt-0.5 font-medium">Home</span>
+      </button>
+      <button @click="currentPage = 'loyalty'" :class="currentPage === 'loyalty' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal px-1">
+        <i class="fa fa-star text-xl"></i>
+        <span class="text-xs mt-0.5 font-medium">Loyalty</span>
+      </button>
+      <button @click="currentPage = 'movimenti'" :class="currentPage === 'movimenti' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal px-1">
+        <i class="fa fa-receipt text-xl"></i>
+        <span class="text-xs mt-0.5 font-medium">Movimenti</span>
+      </button>
+      <button @click="currentPage = 'account'" :class="currentPage === 'account' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal px-1">
+        <i class="fa fa-user text-xl"></i>
+        <span class="text-xs mt-0.5 font-medium">Account</span>
+      </button>
+      <button @click="currentPage = 'bundle'" :class="currentPage === 'bundle' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal px-1">
+        <i class="fa fa-box text-xl"></i>
+        <span class="text-xs mt-0.5 font-medium">Bundle</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MAPPA LEAFLET — ZONE STRISCE BLU -->
+  <script>
+    window._sbInitMap = function() {
+      if (!window.L) return;
+      if (window._sbLeafletMap) {
+        window._sbLeafletMap.remove();
+        window._sbLeafletMap = null;
+      }
+      var mapEl = document.getElementById('sbZoneMap');
+      if (!mapEl) return;
+
+      var map = L.map('sbZoneMap', { zoomControl: false }).setView([45.4641, 9.1919], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '\u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
+      }).addTo(map);
+
+      // Tre zone ADIACENTI (non sovrapposte) su Milano
+      // A: quadrante nord-ovest  B: quadrante nord-est  C: striscia sud
+      var zones = [
+        {
+          name: 'Zona A \u2014 Centro Storico',
+          rate: 2.00, hours: '08:00\u201324:00', color: '#3b5bdb',
+          coords: [[45.476,9.182],[45.476,9.196],[45.462,9.196],[45.462,9.182]]
+        },
+        {
+          name: 'Zona B \u2014 Brera / Garibaldi',
+          rate: 1.50, hours: '08:00\u201320:00', color: '#2196f3',
+          coords: [[45.476,9.196],[45.476,9.210],[45.462,9.210],[45.462,9.196]]
+        },
+        {
+          name: 'Zona C \u2014 Navigli / Porta Romana',
+          rate: 1.00, hours: '09:00\u201318:00', color: '#0097a7',
+          coords: [[45.462,9.182],[45.462,9.210],[45.448,9.210],[45.448,9.182]]
+        }
+      ];
+
+      var currentPoly = null;
+
+      zones.forEach(function(zone) {
+        var poly = L.polygon(zone.coords, {
+          color: zone.color, fillColor: zone.color,
+          fillOpacity: 0.22, weight: 2
+        }).addTo(map);
+
+        // Label centrato sul poligono
+        var center = poly.getBounds().getCenter();
+        var icon = L.divIcon({
+          className: '',
+          html: '<div style="background:' + zone.color + ';color:white;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3)">' + zone.name.split('\u2014')[0].trim() + '</div>',
+          iconAnchor: [40, 10]
+        });
+        L.marker(center, { icon: icon, interactive: false }).addTo(map);
+
+        poly.on('click', function() {
+          // Reset highlight precedente
+          if (currentPoly && currentPoly !== poly) {
+            currentPoly.setStyle({ fillOpacity: 0.22, weight: 2 });
+          }
+          // Evidenzia zona cliccata
+          poly.setStyle({ fillOpacity: 0.50, weight: 3.5 });
+          currentPoly = poly;
+          // Aggiorna pannello inferiore via Alpine
+          if (window._sbHighlightZone) {
+            window._sbHighlightZone({ name: zone.name, rate: zone.rate, hours: zone.hours, color: zone.color });
+          }
+        });
+      });
+
+      window._sbLeafletMap = map;
+
+      // Auto-evidenzia la prima zona al caricamento (pannello non vuoto)
+      setTimeout(function() {
+        if (window._sbHighlightZone) {
+          window._sbHighlightZone({ name: zones[0].name, rate: zones[0].rate, hours: zones[0].hours, color: zones[0].color });
+        }
+      }, 50);
+    };
+  </script>
+
+  <!-- BRIDGE API PER LA SHELL -->
+  <script>
+    (function(){
+      window.DEMO = {
+        blueExpiry(minutes){
+          try{
+            if(window.APP && typeof window.APP.sbNotifyExpiry === 'function'){
+              window.APP.sbNotifyExpiry(minutes || 15);
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        lockScreen(minutes){
+          try{
+            if(window.APP && typeof window.APP.sbShowLockScreen === 'function'){
+              window.APP.sbShowLockScreen(minutes || 15);
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        openGarage(){
+          try{
+            if(window.APP){
+              window.APP.currentPage = 'account';
+              window.APP.accountSection = 'garage';
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        openPayments(){
+          try{
+            if(window.APP){
+              window.APP.currentPage = 'account';
+              window.APP.accountSection = 'pagamenti';
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        sbSimulatePaymentError(msg){
+          try{
+            if(window.APP && typeof window.APP.sbSimulatePaymentError === 'function'){
+              window.APP.sbSimulatePaymentError(msg || 'Carta scaduta. Seleziona un metodo alternativo.');
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        sbOpenExtend(){
+          try{
+            if(window.APP){
+              if(window.APP.sbActive){
+                window.APP.openSbExtend();
+                return true;
+              } else {
+                alert('Attiva prima una sosta');
+              }
+            }
+          }catch(e){}
+          return false;
+        }
+      };
+    })();
+  </script>
+
+  <script src="bus.js"></script>
+  <script src="proto-app.js"></script>
+</body>
+</html>
