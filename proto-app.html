@@ -61,6 +61,7 @@
           this.sbZoneHours = hours;
           this.closeSbZoneModal();
         };
+        this._initFromClienteProfile();
         this.$nextTick(() => this.busInit());
       },
 
@@ -127,11 +128,22 @@
          ACCOUNT
          ======================== */
       accountSection: 'main',
+      garageTab: 'veicoli',
+      assistenzaTab: 'disconoscimento',
+      showDisconoscimentoModal: false,
+      disconoscimentoTarget: null,
+      disconoscimentoMotivo: '',
+      disconoscimentoSuccess: false,
+      ticketCategoria: '',
+      ticketSottocategoria: '',
+      ticketDescrizione: '',
+      showTicketSuccess: false,
       userProfile: {
         nome: 'Mario Rossi',
         email: 'mario.rossi@email.it',
         telefono: '+39 333 1234567'
       },
+      _clienteCf: '',
       garageVehicles: [
         { id: 1, targa: 'AB123CD', tipo: 'Auto', marca: 'Fiat', modello: 'Panda', nickname: 'La Panda' },
         { id: 2, targa: 'EF456GH', tipo: 'Auto', marca: 'Volkswagen', modello: 'Golf', nickname: 'Golf Nera' }
@@ -548,12 +560,14 @@
       tpSospendi() {
         this.tpSospeso = true;
         this.showTpSospendModal = false;
+        this._updateServizioAttivo('telepedaggio', { attivo: false });
         if (typeof Bus !== 'undefined') Bus.emit('servizio:disattivato', { servizio: 'telepedaggio', targa: this.garageVehicles[0]?.targa || 'AB123CD', data: new Date().toISOString() });
         this.showToast('Contratto sospeso');
       },
 
       tpRiattiva() {
         this.tpSospeso = false;
+        this._updateServizioAttivo('telepedaggio', { attivo: true });
         if (typeof Bus !== 'undefined') Bus.emit('servizio:attivato', { servizio: 'telepedaggio', targa: this.garageVehicles[0]?.targa || 'AB123CD', data: new Date().toISOString() });
         this.showToast('Contratto riattivato');
       },
@@ -566,6 +580,19 @@
       rsaCallActive: false,
       rsaIframeUrl: 'about:blank',
       showRsaModal: false,
+
+      /* ========================
+         SMS EMULATORE
+         ======================== */
+      smsInbox: [],
+      showSmsWebview: false,
+      smsCurrentDoc: null,
+      showSmsNotification: false,
+      smsCurrentNotif: null,
+      smsOtpShown: null,
+      _smsNotifTimer: null,
+      mktMarketing: false,
+      mktProfilazione: false,
       rsaInterventi: [
         { id: 'rsa001', data: '2026-04-05T08:00:00', tipo: 'foratura', descrizione: 'Foratura pneumatico — A8 km 14', stato: 'chiuso', dataChiusura: '2026-04-05T09:45:00', targa: 'AB123CD' }
       ],
@@ -596,6 +623,7 @@
       acAttivaServizio() {
         this.acAttiva = true;
         this.acTargaAbilitata = this.garageVehicles[0]?.targa || 'AB123CD';
+        this._updateServizioAttivo('areac', { attivo: true, dataAttivazione: new Date().toISOString(), targa: this.acTargaAbilitata });
         if (typeof Bus !== 'undefined') Bus.emit('servizio:attivato', { servizio: 'areac', targa: this.acTargaAbilitata, data: new Date().toISOString() });
         this.showToast('Area C attivata');
       },
@@ -603,6 +631,7 @@
       acDisattivaServizio() {
         this.acAttiva = false;
         this.showAcDisattiva = false;
+        this._updateServizioAttivo('areac', { attivo: false });
         if (typeof Bus !== 'undefined') Bus.emit('servizio:disattivato', { servizio: 'areac', targa: this.acTargaAbilitata, data: new Date().toISOString() });
         this.showToast('Area C disattivata');
       },
@@ -670,7 +699,9 @@
           Bus.emit('pagamento:confermato', { servizio: 'memo', importo, metodo: 'carta', data: new Date().toISOString(), tipo: 'bollo', targa });
           Bus.emit('memo:scadenza', { tipo: 'bollo', targa, data: this.memoPayTargetVeicolo.bollo.scadenza });
         }
-        this.movimenti.unshift({ id: 'mv_' + Date.now(), data: new Date().toISOString(), servizio: 'memo', descrizione: 'Bollo auto ' + targa + ' — 2026', targa, importo, stato: 'pagato' });
+        const mvMemo = { id: 'mv_' + Date.now(), data: new Date().toISOString(), servizio: 'memo', descrizione: 'Bollo auto ' + targa + ' — 2026', targa, importo, stato: 'pagato', dettagli: {} };
+        this.movimenti.unshift(mvMemo);
+        this._persistMovimento(mvMemo);
         this.showMemoPayModal = false;
         this.showMemoModal = false;
         this.showToast('Bollo pagato con successo');
@@ -726,7 +757,7 @@
       },
 
       movimentiTotaleMese() {
-        const meseCorrente = '2026-04';
+        const meseCorrente = new Date().toISOString().substring(0, 7);
         return this.movimenti
           .filter(m => m.data.startsWith(meseCorrente) && (m.stato === 'pagato' || m.stato === 'da_addebitare'))
           .reduce((sum, m) => sum + m.importo, 0).toFixed(2);
@@ -762,10 +793,9 @@
          ======================== */
       busInit() {
         if (typeof Bus === 'undefined') return;
-        Bus.on('cliente:registrato', (p) => {
-          if (p.servizi && p.servizi.includes('telepedaggio')) this.tpActive = true;
-          if (p.servizi && p.servizi.includes('rsa'))          this.rsaAttiva = true;
-          if (p.servizi && p.servizi.includes('areac'))        { this.acAttiva = true; this.acTargaAbilitata = p.targa || 'AB123CD'; }
+        Bus.on('cliente:registrato', () => {
+          this._initFromClienteProfile();
+          this.currentPage = 'home';
         });
         Bus.on('scenario:trigger', (p) => {
           if (p.nome === 'tp:transito') {
@@ -773,14 +803,18 @@
             const m = { id: 'tp_' + Date.now(), data: new Date().toISOString(), casello: p.casello || 'Milano Nord', autostrada: p.autostrada || 'A8', importo: p.importo || 1.80, targa };
             this.tpMovimenti.unshift(m);
             this.tpSaldo = parseFloat((this.tpSaldo - m.importo).toFixed(2));
-            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.data, servizio: 'telepedaggio', descrizione: 'Transito ' + m.autostrada + ' — ' + m.casello, targa: m.targa, importo: m.importo, stato: 'pagato' });
+            const mvTp = { id: 'mv_' + Date.now(), data: m.data, servizio: 'telepedaggio', descrizione: 'Transito ' + m.autostrada + ' — ' + m.casello, targa: m.targa, importo: m.importo, stato: 'pagato', dettagli: {} };
+            this.movimenti.unshift(mvTp);
+            this._persistMovimento(mvTp);
             Bus.emit('pagamento:confermato', { servizio: 'telepedaggio', importo: m.importo, metodo: 'conto_enilive', data: m.data });
           }
           if (p.nome === 'ac:transito') {
             const ora = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
             const m = { id: 'ac_' + Date.now(), data: new Date().toISOString(), targa: this.acTargaAbilitata, importo: 7.50, stato: 'da_addebitare', note: 'Ingresso ore ' + ora };
             this.acMovimenti.unshift(m);
-            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.data, servizio: 'areac', descrizione: 'Transito Area C Milano', targa: m.targa, importo: m.importo, stato: 'da_addebitare' });
+            const mvAc = { id: 'mv_' + Date.now(), data: m.data, servizio: 'areac', descrizione: 'Transito Area C Milano', targa: m.targa, importo: m.importo, stato: 'da_addebitare', dettagli: {} };
+            this.movimenti.unshift(mvAc);
+            this._persistMovimento(mvAc);
             Bus.emit('pagamento:confermato', { servizio: 'areac', importo: 7.50, metodo: 'fattura', data: m.data });
           }
           if (p.nome === 'pg:accesso') {
@@ -788,7 +822,9 @@
             const targa = this.garageVehicles[0]?.targa || 'AB123CD';
             const m = { id: 'pg_' + Date.now(), parcheggio: park, ingresso: new Date().toISOString(), uscita: null, durata: 'In corso', importo: 0, targa, stato: 'in_corso' };
             this.pgMovimenti.unshift(m);
-            this.movimenti.unshift({ id: 'mv_' + Date.now(), data: m.ingresso, servizio: 'parcheggi', descrizione: park + ' — in corso', targa, importo: 0, stato: 'in_corso' });
+            const mvPg = { id: 'mv_' + Date.now(), data: m.ingresso, servizio: 'parcheggi', descrizione: park + ' — in corso', targa, importo: 0, stato: 'in_corso', dettagli: {} };
+            this.movimenti.unshift(mvPg);
+            this._persistMovimento(mvPg);
           }
           if (p.nome === 'pg:uscita') {
             const inCorso = this.pgMovimenti.find(m => m.stato === 'in_corso');
@@ -802,6 +838,7 @@
                 this.movimenti[mvIdx].importo = inCorso.importo;
                 this.movimenti[mvIdx].stato = 'pagato';
                 this.movimenti[mvIdx].descrizione = inCorso.parcheggio + ' — ' + inCorso.durata;
+                this._persistMovimento(this.movimenti[mvIdx]);
               }
               Bus.emit('pagamento:confermato', { servizio: 'parcheggi', importo: inCorso.importo, metodo: 'fattura', data: inCorso.uscita, parcheggio: inCorso.parcheggio });
             }
@@ -809,10 +846,445 @@
         });
         Bus.on('crm:movimento_aggiornato', (p) => {
           const idx = this.movimenti.findIndex(m => m.id === p.id);
-          if (idx >= 0) this.movimenti[idx] = { ...this.movimenti[idx], ...p };
+          if (idx >= 0) {
+            this.movimenti[idx] = { ...this.movimenti[idx], ...p };
+            this._persistMovimento(this.movimenti[idx]);
+          }
         });
+
+        Bus.on('servizio:attivato', (p) => {
+          const now = new Date().toISOString();
+          if (p.servizio === 'telepedaggio') {
+            this.tpActive = true; this.tpSospeso = false;
+            this._updateServizioAttivo('telepedaggio', { attivo: true, dataAttivazione: now, targa: p.targa, obu: p.obu || this.tpObu });
+          } else if (p.servizio === 'rsa') {
+            this.rsaAttiva = true;
+            this._updateServizioAttivo('rsa', { attivo: true, dataAttivazione: now, targhe: p.targa ? [p.targa] : [] });
+          }
+        });
+
+        Bus.on('servizio:disattivato', (p) => {
+          if (p.servizio === 'telepedaggio') {
+            this._updateServizioAttivo('telepedaggio', { attivo: false });
+          } else if (p.servizio === 'rsa') {
+            this.rsaAttiva = false;
+            this._updateServizioAttivo('rsa', { attivo: false });
+          } else if (p.servizio === 'areac') {
+            this._updateServizioAttivo('areac', { attivo: false });
+          }
+        });
+
+        Bus.on('sms:outbound', (p) => {
+          this.smsInbox.push(p);
+          this.smsOpenNotif(p);
+        });
+
+        Bus.on('cliente:cambiato', () => {
+          this._initFromClienteProfile();
+          this.currentPage = 'home';
+        });
+      },
+
+      /* ========================
+         INIT DA PROFILO CLIENTE
+         ======================== */
+      _initFromClienteProfile() {
+        // Legge da clientiDemo (nuovo schema) — fallback a clienteProfile (legacy)
+        let p = null;
+        const cf = (localStorage.getItem('clienteAttivo') || '').toUpperCase();
+
+        if (cf) {
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            if (reg[cf]) p = reg[cf];
+          } catch(_) {}
+        }
+
+        // Fallback: vecchio clienteProfile (retrocompat con emulatore non ancora refactored)
+        if (!p) {
+          try {
+            const raw = localStorage.getItem('clienteProfile');
+            if (!raw) return;
+            p = JSON.parse(raw);
+          } catch(_) { return; }
+        }
+
+        const isNewSchema = Array.isArray(p.contratti);
+        this._clienteCf = (p.cf || cf || '').toUpperCase();
+
+        // --- Profilo utente ---
+        const nomeCompleto = isNewSchema
+          ? [p.nome, p.cognome].filter(Boolean).join(' ')
+          : (p.nome || '');
+        this.userProfile = {
+          nome:     nomeCompleto    || this.userProfile.nome,
+          email:    p.email         || this.userProfile.email,
+          telefono: p.telefono      || this.userProfile.telefono,
+        };
+
+        // --- Garage ---
+        const targheSet = new Set();
+        (p.targhe || []).forEach(t => { if (t) targheSet.add(t); });
+        if (!isNewSchema) {
+          // Legacy: estrai targhe dai contratti
+          const addC = (c) => {
+            if (!c) return;
+            if (c.obu1?.targa) targheSet.add(c.obu1.targa);
+            if (c.obu2?.targa) targheSet.add(c.obu2.targa);
+            (c.rsaStandalone || []).forEach(r => { if (r.targa) targheSet.add(r.targa); });
+          };
+          addC(p.contratto1); addC(p.contratto2);
+        }
+        this.garageVehicles = [...targheSet].map((t, i) => ({
+          id: i + 1, targa: t, tipo: 'Auto', marca: '', modello: '', nickname: t
+        }));
+
+        // --- Telepedaggio ---
+        if (isNewSchema) {
+          const tp = p.serviziAttivi?.telepedaggio;
+          this.tpActive  = tp?.attivo || false;
+          this.tpObu     = tp?.obu    || '';
+        } else {
+          const obu1 = p.contratto1?.obu1;
+          this.tpActive = !!obu1;
+          this.tpObu    = obu1?.obu || '';
+        }
+        this.tpSospeso = false;
+        this.tpSaldo   = this.tpActive ? 5.00 : 0;
+
+        // --- RSA ---
+        if (isNewSchema) {
+          this.rsaAttiva = p.serviziAttivi?.rsa?.attivo || false;
+        } else {
+          const obu1 = p.contratto1?.obu1;
+          this.rsaAttiva = !!(obu1?.rsa)
+            || !!(p.contratto1?.obu2?.rsa)
+            || (p.contratto1?.rsaStandalone?.length > 0)
+            || !!(p.contratto2?.obu1?.rsa)
+            || (p.contratto2?.rsaStandalone?.length > 0);
+        }
+        if (this.rsaAttiva) {
+          const seed = parseInt((this._clienteCf).replace(/\D/g,'').slice(0, 5) || '00000', 10);
+          this.rsaCodiceTessera = 'RSA-' + new Date().getFullYear() + '-' + String(seed).padStart(5,'0');
+        } else {
+          this.rsaCodiceTessera = '';
+        }
+
+        // --- Area C ---
+        this.acAttiva         = isNewSchema ? (p.serviziAttivi?.areac?.attivo || false) : false;
+        this.acTargaAbilitata = this.garageVehicles[0]?.targa || '';
+
+        // --- Metodi di pagamento ---
+        const iban = isNewSchema
+          ? (p.contratti?.[0]?.iban || '')
+          : (p.contratto1?.iban || p.contratto2?.iban || '');
+        if (iban) {
+          const last4 = iban.replace(/\s/g, '').slice(-4);
+          this.paymentMethods = [{
+            id: 1, tipo: 'Addebito SEPA',
+            label: 'Addebito diretto IBAN \u2022\u2022\u2022\u2022' + last4,
+            icona: 'fa-university', predefinito: true,
+          }];
+        }
+
+        // --- Memo ---
+        this.memoVeicoli = this.garageVehicles.map(v => ({
+          targa:     v.targa,
+          bollo:     { scadenza: '', importo: 0, pagato: false, reminderAttivo: false },
+          revisione: { scadenza: '', reminderAttivo: false },
+          rca:       { scadenza: '', compagnia: '', reminderAttivo: false },
+        }));
+
+        // --- Movimenti: carica da clientiDemo, ordina per data desc ---
+        const movPersistiti = isNewSchema ? (p.movimenti || []) : [];
+        this.movimenti   = movPersistiti.slice().sort((a, b) => b.data.localeCompare(a.data));
+        this.tpMovimenti = [];
+        this.acMovimenti = [];
+        this.pgMovimenti = [];
+      },
+
+      /* ========================
+         PERSISTENZA CLIENTIDEMO
+         ======================== */
+      _persistMovimento(m) {
+        if (!this._clienteCf) return;
+        try {
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const record = reg[this._clienteCf];
+          if (!record) return;
+          if (!Array.isArray(record.movimenti)) record.movimenti = [];
+          // Aggiorna se già esiste (es. pg:uscita), altrimenti prepende
+          const idx = record.movimenti.findIndex(x => x.id === m.id);
+          if (idx >= 0) record.movimenti[idx] = m;
+          else record.movimenti.unshift(m);
+          localStorage.setItem('clientiDemo', JSON.stringify(reg));
+        } catch(_) {}
+      },
+
+      _updateServizioAttivo(servizio, update) {
+        if (!this._clienteCf) return;
+        try {
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const record = reg[this._clienteCf];
+          if (!record) return;
+          if (!record.serviziAttivi) record.serviziAttivi = {};
+          record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+          localStorage.setItem('clientiDemo', JSON.stringify(reg));
+        } catch(_) {}
+      },
+
+      /* ========================
+         SMS EMULATORE — metodi
+         ======================== */
+      smsOpenNotif(payload) {
+        this.smsCurrentNotif = payload;
+        this.showSmsNotification = true;
+        clearTimeout(this._smsNotifTimer);
+        this._smsNotifTimer = setTimeout(() => { this.showSmsNotification = false; }, 15000);
+      },
+
+      smsDismissNotif() {
+        this.showSmsNotification = false;
+        clearTimeout(this._smsNotifTimer);
+      },
+
+      smsOpenWebview(payload) {
+        this.smsCurrentDoc = payload || this.smsCurrentNotif;
+        this.smsOtpShown = null;
+        this.showSmsWebview = true;
+        this.showSmsNotification = false;
+      },
+
+      smsCloseWebview() {
+        this.showSmsWebview = false;
+        this.smsCurrentDoc = null;
+        this.smsOtpShown = null;
+      },
+
+      smsConfirmDoc(template) {
+        if (template === 'OTP_CONSENSI') {
+          this.smsOtpShown = '1234';
+          if (typeof Bus !== 'undefined') Bus.emit('documento:firmato', { template: 'OTP_CONSENSI' });
+        } else if (template === 'FIRMA_CONTRATTO') {
+          this.smsOtpShown = '5678';
+          if (typeof Bus !== 'undefined') Bus.emit('documento:firmato', { template: 'FIRMA_CONTRATTO' });
+        } else if (template === 'CONSENSI_MARKETING') {
+          this.smsOtpShown = '9012';
+          if (typeof Bus !== 'undefined') Bus.emit('documento:firmato', {
+            template: 'CONSENSI_MARKETING',
+            marketing: this.mktMarketing,
+            profilazione: this.mktProfilazione,
+          });
+        }
       }
     }">
+
+    <!-- ===================== SMS NOTIFICATION BANNER ===================== -->
+    <div x-show="showSmsNotification" x-transition.opacity
+      style="position:absolute;top:12px;left:12px;right:12px;z-index:200;pointer-events:auto;"
+      @click="smsOpenWebview(smsCurrentNotif)">
+      <div style="background:rgba(255,255,255,0.96);border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.18);padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;backdrop-filter:blur(10px);">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#117299,#1e9fd8);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span style="color:white;font-weight:900;font-size:14px;">E</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;color:#111827;">Enilive</div>
+          <div style="font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" x-text="smsCurrentNotif?.preview || 'Nuovo messaggio'"></div>
+        </div>
+        <button style="color:#9ca3af;background:none;border:none;padding:4px;cursor:pointer;flex-shrink:0;"
+          @click.stop="smsDismissNotif()">
+          <i class="fa fa-times text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================== SMS WEBVIEW ===================== -->
+    <div :style="'position:absolute;inset:0;z-index:300;background:white;max-width:420px;display:' + (showSmsWebview ? 'block' : 'none')">
+      <div style="display:flex;flex-direction:column;height:100%;">
+      <!-- Header webview stile iOS -->
+      <div style="background:linear-gradient(135deg,#117299,#1e9fd8);padding:16px 20px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="width:32px;height:32px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+          <span style="color:#117299;font-weight:900;font-size:13px;">E</span>
+        </div>
+        <div style="flex:1;">
+          <div style="color:white;font-weight:700;font-size:15px;line-height:1.2;">Enilive</div>
+          <div style="color:rgba(255,255,255,0.75);font-size:11px;" x-text="smsCurrentDoc?.template === 'OTP_CONSENSI' ? 'Documenti contrattuali' : smsCurrentDoc?.template === 'CONSENSI_MARKETING' ? 'Consensi facoltativi' : 'Contratto'"></div>
+        </div>
+        <button style="color:white;background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;" @click="smsCloseWebview()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+
+      <!-- OTP mostrato dopo firma -->
+      <template x-if="smsOtpShown">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:#f9fafb;">
+          <div style="width:64px;height:64px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+            <i class="fa fa-check-circle" style="color:#16a34a;font-size:28px;"></i>
+          </div>
+          <p style="font-weight:700;font-size:18px;color:#111827;margin-bottom:8px;"
+            x-text="smsCurrentDoc?.template === 'OTP_CONSENSI' ? 'Documenti accettati!' : smsCurrentDoc?.template === 'CONSENSI_MARKETING' ? 'Consensi confermati!' : 'Contratto firmato!'"></p>
+          <p style="font-size:14px;color:#6b7280;margin-bottom:28px;text-align:center;">Comunica questo codice all'operatore allo sportello</p>
+          <div style="background:white;border:2px dashed #117299;border-radius:16px;padding:20px 40px;text-align:center;">
+            <p style="font-size:12px;color:#6b7280;margin-bottom:4px;">CODICE OTP</p>
+            <p style="font-size:48px;font-weight:900;color:#117299;letter-spacing:10px;font-family:monospace;" x-text="smsOtpShown"></p>
+          </div>
+          <button style="margin-top:28px;background:#117299;color:white;border:none;border-radius:12px;padding:14px 32px;font-size:15px;font-weight:600;cursor:pointer;" @click="smsCloseWebview()">Chiudi</button>
+        </div>
+      </template>
+
+      <!-- Contenuto webview — OTP_CONSENSI -->
+      <template x-if="!smsOtpShown && smsCurrentDoc?.template === 'OTP_CONSENSI'">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="flex:1;overflow-y:auto;padding:20px;">
+            <p style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:16px;">
+              <i class="fa fa-lock mr-1"></i>Connessione sicura — enilive.it
+            </p>
+
+            <!-- Documento 1: Informativa precontrattuale -->
+            <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;gap-8px;margin-bottom:10px;">
+                <i class="fa fa-file-alt" style="color:#117299;margin-right:8px;"></i>
+                <span style="font-weight:700;font-size:14px;color:#111827;">Informativa precontrattuale</span>
+              </div>
+              <p style="font-size:12px;color:#374151;line-height:1.6;">Il presente documento fornisce informazioni chiave sui prodotti e servizi Enilive S.p.A. prima della sottoscrizione del contratto. I servizi includono Telepedaggio con dispositivo OBU, Assistenza Stradale RSA, Parcheggi convenzionati, Area C Milano, e Servizio Memo Scadenze. Il contratto ha durata indeterminata con rinnovo mensile automatico. È possibile recedere con preavviso di 30 giorni tramite app o sportello. I costi sono indicati nell'offerta personalizzata mostrata all'operatore. Il metodo di addebito è SEPA Direct Debit (SDD) sul conto corrente comunicato.</p>
+            </div>
+
+            <!-- Documento 2: N&C Memo -->
+            <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;gap-8px;margin-bottom:10px;">
+                <i class="fa fa-file-alt" style="color:#117299;margin-right:8px;"></i>
+                <span style="font-weight:700;font-size:14px;color:#111827;">Norme &amp; Condizioni — Servizio Memo</span>
+              </div>
+              <p style="font-size:12px;color:#374151;line-height:1.6;">Il Servizio Memo fornisce promemoria per le scadenze del veicolo (bollo auto, revisione periodica, scadenza assicurazione RCA). Le notifiche vengono inviate tramite app e/o SMS con anticipo configurabile. Il pagamento del bollo è gestito tramite integrazione con l'Agenzia delle Entrate — Riscossione. Enilive non è responsabile per ritardi imputabili a disservizi di terze parti. Il servizio è gratuito e incluso nei bundle con OBU.</p>
+            </div>
+
+            <!-- Documento 3: Privacy -->
+            <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:24px;">
+              <div style="display:flex;align-items:center;gap-8px;margin-bottom:10px;">
+                <i class="fa fa-shield-alt" style="color:#117299;margin-right:8px;"></i>
+                <span style="font-weight:700;font-size:14px;color:#111827;">Informativa Privacy (GDPR)</span>
+              </div>
+              <p style="font-size:12px;color:#374151;line-height:1.6;">I dati personali raccolti (anagrafica, dati veicolo, dati di utilizzo dei servizi) sono trattati da Enilive S.p.A. in qualità di Titolare del trattamento ai sensi del Regolamento UE 679/2016 (GDPR). Base giuridica: esecuzione del contratto. I dati sono conservati per la durata del rapporto contrattuale più 10 anni per obblighi fiscali. Non vengono ceduti a terzi salvo partner di servizio necessari all'erogazione (Movyon, Autostrade, Enti locali). Lei ha diritto di accesso, rettifica, cancellazione, portabilità e opposizione scrivendo a privacy@enilive.it.</p>
+            </div>
+          </div>
+
+          <div style="padding:16px;background:white;border-top:1px solid #e5e7eb;flex-shrink:0;">
+            <button style="width:100%;background:#117299;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;"
+              @click="smsConfirmDoc('OTP_CONSENSI')">
+              <i class="fa fa-check mr-2"></i>Accetto e confermo
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Contenuto webview — CONSENSI_MARKETING -->
+      <template x-if="!smsOtpShown && smsCurrentDoc?.template === 'CONSENSI_MARKETING'">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="flex:1;overflow-y:auto;padding:20px;">
+            <p style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:16px;">
+              <i class="fa fa-lock mr-1"></i>Consensi facoltativi — enilive.it
+            </p>
+
+            <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:24px;">
+              <p style="font-weight:700;font-size:14px;color:#111827;margin-bottom:6px;">
+                <i class="fa fa-bullhorn" style="color:#117299;margin-right:6px;"></i>Consensi facoltativi
+              </p>
+              <p style="font-size:12px;color:#6b7280;line-height:1.6;margin-bottom:16px;">
+                I seguenti consensi sono facoltativi e non influenzano l'accesso ai servizi Enilive. Puoi modificarli in qualsiasi momento dall'app.
+              </p>
+
+              <!-- Marketing -->
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:10px;margin-bottom:10px;cursor:pointer;"
+                :style="mktMarketing ? 'border:2px solid #117299;background:#f0f9ff;' : 'border:1px solid #e5e7eb;background:white;'"
+                @click="mktMarketing = !mktMarketing">
+                <div style="width:22px;height:22px;border-radius:6px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;"
+                  :style="mktMarketing ? 'background:#117299;border:2px solid #117299;' : 'background:white;border:2px solid #d1d5db;'">
+                  <i class="fa fa-check" style="color:white;font-size:11px;" x-show="mktMarketing"></i>
+                </div>
+                <div>
+                  <p style="font-size:14px;font-weight:600;color:#111827;margin-bottom:3px;">Marketing</p>
+                  <p style="font-size:12px;color:#6b7280;line-height:1.5;">Acconsento a ricevere comunicazioni commerciali e promozionali da Enilive S.p.A. tramite email, SMS e app.</p>
+                </div>
+              </div>
+
+              <!-- Profilazione -->
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:10px;cursor:pointer;"
+                :style="mktProfilazione ? 'border:2px solid #117299;background:#f0f9ff;' : 'border:1px solid #e5e7eb;background:white;'"
+                @click="mktProfilazione = !mktProfilazione">
+                <div style="width:22px;height:22px;border-radius:6px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;"
+                  :style="mktProfilazione ? 'background:#117299;border:2px solid #117299;' : 'background:white;border:2px solid #d1d5db;'">
+                  <i class="fa fa-check" style="color:white;font-size:11px;" x-show="mktProfilazione"></i>
+                </div>
+                <div>
+                  <p style="font-size:14px;font-weight:600;color:#111827;margin-bottom:3px;">Profilazione</p>
+                  <p style="font-size:12px;color:#6b7280;line-height:1.5;">Acconsento all'analisi dei miei dati di utilizzo per ricevere offerte e contenuti personalizzati da Enilive.</p>
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size:11px;color:#9ca3af;text-align:center;">
+              Puoi selezionare nessuno, uno o entrambi. Il tuo accesso ai servizi non viene influenzato dalla scelta.
+            </p>
+          </div>
+
+          <div style="padding:16px;background:white;border-top:1px solid #e5e7eb;flex-shrink:0;">
+            <button style="width:100%;background:#117299;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;"
+              @click="smsConfirmDoc('CONSENSI_MARKETING')">
+              <i class="fa fa-check mr-2"></i>Conferma le mie scelte
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Contenuto webview — FIRMA_CONTRATTO -->
+      <template x-if="!smsOtpShown && smsCurrentDoc?.template === 'FIRMA_CONTRATTO'">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="flex:1;overflow-y:auto;padding:20px;">
+            <p style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:16px;">
+              <i class="fa fa-lock mr-1"></i>Firma elettronica sicura — enilive.it
+            </p>
+
+            <div style="border:1px solid #e5e7eb;border-radius:12px;padding:18px;margin-bottom:16px;background:#fafafa;">
+              <p style="font-weight:800;font-size:15px;color:#111827;margin-bottom:12px;text-align:center;">
+                CONTRATTO DI SERVIZIO ENILIVE MOBILITY+
+              </p>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                  <p style="font-size:10px;color:#9ca3af;margin-bottom:2px;">Cliente</p>
+                  <p style="font-size:13px;font-weight:600;color:#111827;" x-text="smsCurrentDoc?.dati?.nome || '—'"></p>
+                </div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                  <p style="font-size:10px;color:#9ca3af;margin-bottom:2px;">Codice Fiscale</p>
+                  <p style="font-size:13px;font-weight:600;color:#111827;font-family:monospace;" x-text="smsCurrentDoc?.dati?.cf || '—'"></p>
+                </div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                  <p style="font-size:10px;color:#9ca3af;margin-bottom:2px;">Bundle</p>
+                  <p style="font-size:13px;font-weight:600;color:#117299;"
+                    x-text="smsCurrentDoc?.dati?.bundle === 'mobility' ? 'Bundle Mobility' : smsCurrentDoc?.dati?.bundle === 'obu_standalone' ? 'OBU Stand-Alone' : smsCurrentDoc?.dati?.bundle === 'rsa_standalone' ? 'RSA Stand-Alone' : '—'"></p>
+                </div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                  <p style="font-size:10px;color:#9ca3af;margin-bottom:2px;">Canone mensile</p>
+                  <p style="font-size:15px;font-weight:800;color:#117299;">€<span x-text="smsCurrentDoc?.dati?.totale?.toFixed(2) || '—'"></span>/mese</p>
+                </div>
+              </div>
+
+              <p style="font-size:12px;color:#374151;line-height:1.6;">
+                Il sottoscritto dichiara di aver preso visione dell'informativa precontrattuale, delle Norme &amp; Condizioni di tutti i servizi sottoscritti, dell'informativa privacy ai sensi del GDPR 679/2016 e del mandato SEPA Direct Debit. Il contratto ha efficacia dalla data di firma e decorre dal primo ciclo di fatturazione mensile successivo. L'addebito avverrà il giorno 15 di ogni mese sul conto corrente comunicato. Disdetta con preavviso di 30 giorni tramite app Enilive o sportello fisico.
+              </p>
+            </div>
+          </div>
+
+          <div style="padding:16px;background:white;border-top:1px solid #e5e7eb;flex-shrink:0;">
+            <button style="width:100%;background:#117299;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;"
+              @click="smsConfirmDoc('FIRMA_CONTRATTO')">
+              <i class="fa fa-pen-nib mr-2"></i>Firma il contratto
+            </button>
+          </div>
+        </div>
+      </template>
+      </div><!-- /inner flex wrapper -->
+    </div>
 
     <!-- MAIN CONTENT -->
     <main class="flex-grow overflow-y-auto pb-20">
@@ -892,6 +1364,8 @@
                 @click="
                   if (service.id === 'strisce') {
                     openBlue();
+                  } else if (service.id === 'memo') {
+                    currentPage = 'account'; accountSection = 'garage'; garageTab = 'scadenze';
                   } else {
                     currentPage = service.id;
                   }
@@ -1048,7 +1522,7 @@
                 <div class="account-row-icon mb-2"><i class="fa fa-history"></i></div>
                 <span class="text-xs font-medium text-center">Cronologia</span>
               </button>
-              <button @click="showToast('Funzione in arrivo')" class="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-eni-teal hover:text-white transition">
+              <button @click="goAccountSection('assistenza')" class="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-eni-teal hover:text-white transition">
                 <div class="account-row-icon mb-2"><i class="fa fa-headset"></i></div>
                 <span class="text-xs font-medium text-center">Assistenza</span>
               </button>
@@ -1094,34 +1568,124 @@
             <h2 class="text-xl font-bold text-gray-800">Il tuo Garage</h2>
           </div>
 
-          <div class="px-4 py-4 pb-28">
-            <div x-show="garageVehicles.length === 0" class="text-center py-16">
-              <i class="fa fa-car text-6xl text-gray-200 mb-4 block"></i>
-              <p class="text-gray-500">Nessun veicolo nel garage</p>
-            </div>
-
-            <template x-for="v in garageVehicles" :key="v.id">
-              <div class="garage-card">
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="targa-badge" x-text="v.targa"></span>
-                    <span class="font-semibold text-gray-800" x-text="v.nickname"></span>
-                  </div>
-                  <p class="text-sm text-muted" x-text="v.marca + ' ' + v.modello + ' \u00b7 ' + v.tipo"></p>
-                </div>
-                <button
-                  @click="garageDeleteTarget = v; showGarageDeleteConfirm = true"
-                  class="text-red-400 hover:text-red-600 transition p-2">
-                  <i class="fa fa-trash"></i>
-                </button>
-              </div>
-            </template>
+          <!-- Tabs: Veicoli / Scadenze -->
+          <div class="flex border-b border-gray-200">
+            <button @click="garageTab = 'veicoli'"
+              :class="garageTab === 'veicoli' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+              class="flex-1 py-3 text-sm transition">
+              <i class="fa fa-car mr-1.5"></i>Veicoli
+            </button>
+            <button @click="garageTab = 'scadenze'"
+              :class="garageTab === 'scadenze' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+              class="flex-1 py-3 text-sm transition">
+              <i class="fa fa-bell mr-1.5"></i>Scadenze
+              <span x-show="memoVeicoli.some(v => memoScadenzaStato(v.bollo.scadenza) !== 'ok' || memoScadenzaStato(v.rca.scadenza) !== 'ok')"
+                class="ml-1 inline-flex items-center justify-center w-2 h-2 bg-orange-500 rounded-full"></span>
+            </button>
           </div>
 
-          <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 pb-2">
-            <button @click="openGarageAdd()" class="btn-primary btn-block py-4 rounded-xl text-lg">
-              <i class="fa fa-plus mr-2"></i>Aggiungi veicolo
-            </button>
+          <!-- Tab: Veicoli -->
+          <div x-show="garageTab === 'veicoli'">
+            <div class="px-4 py-4 pb-28">
+              <div x-show="garageVehicles.length === 0" class="text-center py-16">
+                <i class="fa fa-car text-6xl text-gray-200 mb-4 block"></i>
+                <p class="text-gray-500">Nessun veicolo nel garage</p>
+              </div>
+
+              <template x-for="v in garageVehicles" :key="v.id">
+                <div class="garage-card">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="targa-badge" x-text="v.targa"></span>
+                      <span class="font-semibold text-gray-800" x-text="v.nickname"></span>
+                    </div>
+                    <p class="text-sm text-muted" x-text="v.marca + ' ' + v.modello + ' \u00b7 ' + v.tipo"></p>
+                    <!-- Mini scadenze per veicolo -->
+                    <template x-if="memoVeicoli.find(mv => mv.targa === v.targa)">
+                      <div class="flex gap-2 mt-2">
+                        <template x-if="memoVeicoli.find(mv => mv.targa === v.targa)">
+                          <span :class="memoStatoClass(memoVeicoli.find(mv => mv.targa === v.targa)?.bollo?.scadenza)"
+                            class="text-xs px-2 py-0.5 rounded-full font-semibold">
+                            Bollo: <span x-text="memoStatoLabel(memoVeicoli.find(mv => mv.targa === v.targa)?.bollo?.scadenza)"></span>
+                          </span>
+                        </template>
+                        <template x-if="memoVeicoli.find(mv => mv.targa === v.targa)">
+                          <span :class="memoStatoClass(memoVeicoli.find(mv => mv.targa === v.targa)?.rca?.scadenza)"
+                            class="text-xs px-2 py-0.5 rounded-full font-semibold">
+                            RCA: <span x-text="memoStatoLabel(memoVeicoli.find(mv => mv.targa === v.targa)?.rca?.scadenza)"></span>
+                          </span>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="flex flex-col items-end gap-2">
+                    <button
+                      @click="garageDeleteTarget = v; showGarageDeleteConfirm = true"
+                      class="text-red-400 hover:text-red-600 transition p-2">
+                      <i class="fa fa-trash"></i>
+                    </button>
+                    <button x-show="memoVeicoli.find(mv => mv.targa === v.targa)"
+                      @click="garageTab = 'scadenze'; memoOpenVeicolo(memoVeicoli.find(mv => mv.targa === v.targa))"
+                      class="text-xs text-eni-teal hover:underline">
+                      <i class="fa fa-bell mr-1"></i>Scadenze
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 pb-2">
+              <button @click="openGarageAdd()" class="btn-primary btn-block py-4 rounded-xl text-lg">
+                <i class="fa fa-plus mr-2"></i>Aggiungi veicolo
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab: Scadenze (Memo) -->
+          <div x-show="garageTab === 'scadenze'">
+            <div class="px-4 py-4 pb-24 space-y-3">
+              <!-- Banner scadenze imminenti -->
+              <div x-show="memoVeicoli.some(v => memoScadenzaStato(v.bollo.scadenza) !== 'ok' || memoScadenzaStato(v.rca.scadenza) !== 'ok')"
+                class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-800">
+                <i class="fa fa-exclamation-triangle mr-2"></i>Hai scadenze imminenti o già scadute. Controlla i dettagli.
+              </div>
+
+              <template x-for="v in memoVeicoli" :key="v.targa">
+                <div @click="memoOpenVeicolo(v)"
+                  class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm cursor-pointer hover:shadow-md transition">
+                  <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-eni-teal-light rounded-lg flex items-center justify-center flex-shrink-0">
+                      <i class="fa fa-car text-eni-teal text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                      <span class="targa-badge" x-text="v.targa"></span>
+                      <p class="text-xs text-gray-500 mt-0.5" x-text="v.marca + ' ' + v.modello"></p>
+                    </div>
+                    <i class="fa fa-chevron-right text-gray-400"></i>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                        :class="v.bollo.pagato ? 'bg-blue-100 text-blue-700' : memoStatoClass(v.bollo.scadenza)"
+                        x-text="v.bollo.pagato ? 'Pagato' : memoStatoLabel(v.bollo.scadenza)"></span>
+                      <p class="text-xs text-gray-500 mt-1">Bollo</p>
+                    </div>
+                    <div>
+                      <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                        :class="memoStatoClass(v.revisione.scadenza)"
+                        x-text="memoStatoLabel(v.revisione.scadenza)"></span>
+                      <p class="text-xs text-gray-500 mt-1">Revisione</p>
+                    </div>
+                    <div>
+                      <span class="text-xs px-2 py-1 rounded-full font-semibold block"
+                        :class="memoStatoClass(v.rca.scadenza)"
+                        x-text="memoStatoLabel(v.rca.scadenza)"></span>
+                      <p class="text-xs text-gray-500 mt-1">RCA</p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
 
@@ -1161,6 +1725,181 @@
                 </div>
               </template>
             </div>
+          </div>
+        </div>
+
+        <!-- ASSISTENZA -->
+        <div x-show="accountSection === 'assistenza'">
+          <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
+            <button @click="backToAccountMain()" class="text-gray-500 hover:text-eni-teal transition">
+              <i class="fa fa-chevron-left text-xl"></i>
+            </button>
+            <h2 class="text-xl font-bold text-gray-800">Assistenza</h2>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex border-b border-gray-200">
+            <button @click="assistenzaTab = 'disconoscimento'; disconoscimentoSuccess = false; showTicketSuccess = false"
+              :class="assistenzaTab === 'disconoscimento' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+              class="flex-1 py-3 text-sm transition">
+              <i class="fa fa-question-circle mr-1.5"></i>Disconoscimento
+            </button>
+            <button @click="assistenzaTab = 'ticket'; disconoscimentoSuccess = false; showTicketSuccess = false"
+              :class="assistenzaTab === 'ticket' ? 'text-eni-teal border-b-2 border-eni-teal font-semibold' : 'text-gray-500'"
+              class="flex-1 py-3 text-sm transition">
+              <i class="fa fa-ticket-alt mr-1.5"></i>Apri Ticket
+            </button>
+          </div>
+
+          <!-- Tab: Disconoscimento transiti -->
+          <div x-show="assistenzaTab === 'disconoscimento'" class="px-4 py-4 pb-24">
+            <p class="text-sm text-gray-500 mb-4">Contesta un transito che non riconosci o che ritieni errato.</p>
+
+            <!-- Banner successo disconoscimento -->
+            <div x-show="disconoscimentoSuccess"
+              class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+              <i class="fa fa-check-circle text-green-500 text-xl"></i>
+              <div>
+                <p class="font-semibold text-green-800">Disconoscimento inviato</p>
+                <p class="text-sm text-green-600">Il ticket è stato aperto. Riceverai una risposta entro 5 giorni lavorativi.</p>
+              </div>
+            </div>
+
+            <!-- Lista movimenti contestabili (telepedaggio + areac) -->
+            <div class="space-y-2">
+              <template x-for="m in movimenti.filter(mv => mv.servizio === 'telepedaggio' || mv.servizio === 'areac')" :key="m.id">
+                <div class="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    :class="m.servizio === 'telepedaggio' ? 'bg-blue-100' : 'bg-indigo-100'">
+                    <i :class="m.servizio === 'telepedaggio' ? 'fa fa-road text-blue-600' : 'fa fa-city text-indigo-600'" class="text-sm"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm" x-text="m.descrizione"></p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <p class="text-xs text-gray-500" x-text="new Date(m.data).toLocaleDateString('it-IT')"></p>
+                      <span class="targa-badge text-xs" x-text="m.targa"></span>
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <p class="font-bold text-sm text-gray-800" x-text="'€ ' + m.importo.toFixed(2)"></p>
+                    <button
+                      @click="disconoscimentoTarget = m; disconoscimentoMotivo = ''; showDisconoscimentoModal = true"
+                      class="text-xs text-eni-teal hover:underline font-semibold mt-1 block">
+                      Contesta
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Tab: Apri Ticket -->
+          <div x-show="assistenzaTab === 'ticket'" class="px-4 py-4 pb-24">
+            <!-- Banner successo ticket -->
+            <div x-show="showTicketSuccess"
+              class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+              <i class="fa fa-check-circle text-green-500 text-xl"></i>
+              <div>
+                <p class="font-semibold text-green-800">Ticket aperto con successo</p>
+                <p class="text-sm text-green-600">Il numero ticket è <strong x-text="'TK' + Date.now().toString().slice(-6)"></strong>. Risposta attesa entro 3 gg lavorativi.</p>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Categoria</label>
+                <select x-model="ticketCategoria" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-eni-teal focus:ring-2 focus:ring-eni-teal focus:ring-opacity-20 outline-none">
+                  <option value="">Seleziona categoria...</option>
+                  <option value="telepedaggio">Telepedaggio</option>
+                  <option value="rsa">RSA — Assistenza stradale</option>
+                  <option value="areac">Area C Milano</option>
+                  <option value="parcheggi">Parcheggi</option>
+                  <option value="fatturazione">Fatturazione e pagamenti</option>
+                  <option value="tecnico">Problema tecnico app</option>
+                  <option value="altro">Altro</option>
+                </select>
+              </div>
+
+              <div x-show="ticketCategoria">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Sottocategoria</label>
+                <select x-model="ticketSottocategoria" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-eni-teal outline-none">
+                  <option value="">Seleziona...</option>
+                  <template x-if="ticketCategoria === 'telepedaggio'">
+                    <template x-for="opt in ['Transito non riconosciuto', 'OBU non funzionante', 'Addebito errato', 'Altro']">
+                      <option :value="opt" x-text="opt"></option>
+                    </template>
+                  </template>
+                  <template x-if="ticketCategoria === 'rsa'">
+                    <template x-for="opt in ['Intervento non effettuato', 'Rimborso spese', 'Cancellazione abbonamento', 'Altro']">
+                      <option :value="opt" x-text="opt"></option>
+                    </template>
+                  </template>
+                  <template x-if="ticketCategoria === 'fatturazione'">
+                    <template x-for="opt in ['Fattura non ricevuta', 'Addebito errato', 'Rimborso', 'Aggiornamento IBAN']">
+                      <option :value="opt" x-text="opt"></option>
+                    </template>
+                  </template>
+                  <template x-if="!['telepedaggio','rsa','fatturazione'].includes(ticketCategoria)">
+                    <template x-for="opt in ['Problema generale', 'Richiesta informazioni', 'Reclamo', 'Altro']">
+                      <option :value="opt" x-text="opt"></option>
+                    </template>
+                  </template>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Descrivi il problema</label>
+                <textarea x-model="ticketDescrizione" rows="4"
+                  placeholder="Descrivi il problema nel dettaglio. Includi date, importi e targhe se rilevanti."
+                  class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-eni-teal focus:ring-2 focus:ring-eni-teal focus:ring-opacity-20 outline-none resize-none"></textarea>
+              </div>
+
+              <button
+                @click="if(ticketCategoria && ticketDescrizione.trim()) { showTicketSuccess = true; ticketCategoria = ''; ticketSottocategoria = ''; ticketDescrizione = ''; showToast('Ticket aperto con successo'); } else { showToast('Compila categoria e descrizione'); }"
+                class="w-full bg-eni-teal text-white font-bold py-3.5 rounded-xl hover:bg-eni-teal-darker transition text-sm">
+                <i class="fa fa-paper-plane mr-2"></i>Invia ticket
+              </button>
+
+              <p class="text-xs text-gray-400 text-center">
+                <i class="fa fa-info-circle mr-1"></i>Il ticket viene inoltrato al team di supporto Enilive Mobility+.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal disconoscimento -->
+        <div x-show="showDisconoscimentoModal" class="modal-overlay" @click.self="showDisconoscimentoModal = false">
+          <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl p-6 z-50">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-bold text-gray-800">Disconosci transito</h2>
+              <button @click="showDisconoscimentoModal = false" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-times text-xl"></i>
+              </button>
+            </div>
+            <div x-show="disconoscimentoTarget" class="bg-gray-50 rounded-xl p-4 mb-4 space-y-1 text-sm">
+              <p class="font-semibold text-gray-800" x-text="disconoscimentoTarget?.descrizione"></p>
+              <p class="text-gray-500" x-text="disconoscimentoTarget ? new Date(disconoscimentoTarget.data).toLocaleDateString('it-IT', { weekday:'long', day:'2-digit', month:'long', year:'numeric' }) : ''"></p>
+              <div class="flex items-center justify-between pt-1 border-t border-gray-200 mt-2">
+                <span class="targa-badge" x-text="disconoscimentoTarget?.targa"></span>
+                <span class="font-bold text-eni-teal" x-text="disconoscimentoTarget ? '€ ' + disconoscimentoTarget.importo.toFixed(2) : ''"></span>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Motivo del disconoscimento</label>
+              <div class="space-y-2">
+                <template x-for="motivo in ['Il veicolo non transitava in quella zona', 'OBU non montato sul veicolo', 'Transito duplicato', 'Importo errato', 'Altro']">
+                  <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50">
+                    <input type="radio" :value="motivo" x-model="disconoscimentoMotivo" class="accent-eni-teal w-4 h-4 flex-shrink-0" />
+                    <span class="text-sm" x-text="motivo"></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+            <button
+              @click="if(disconoscimentoMotivo) { showDisconoscimentoModal = false; disconoscimentoSuccess = true; showToast('Disconoscimento inviato'); } else { showToast('Seleziona un motivo'); }"
+              class="w-full bg-eni-teal text-white font-bold py-3.5 rounded-xl hover:bg-eni-teal-darker transition">
+              <i class="fa fa-paper-plane mr-2"></i>Invia contestazione
+            </button>
           </div>
         </div>
 
@@ -1558,7 +2297,7 @@
            ══════════════════════════════════════ -->
       <div x-show="currentPage === 'memo'" x-transition.opacity>
         <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-200">
-          <button @click="currentPage = 'home'" class="text-gray-500 hover:text-eni-teal transition">
+          <button @click="currentPage = 'account'; accountSection = 'garage'; garageTab = 'scadenze'" class="text-gray-500 hover:text-eni-teal transition">
             <i class="fa fa-chevron-left text-xl"></i>
           </button>
           <h2 class="text-xl font-bold text-gray-800">Memo Scadenze</h2>

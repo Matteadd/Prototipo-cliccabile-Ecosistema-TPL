@@ -38,6 +38,10 @@
       display: grid;
       grid-template-columns: 25% 45% 30%;
       height: calc(100vh - 56px);
+      transition: grid-template-columns 0.25s ease;
+    }
+    .crm-layout.log-collapsed {
+      grid-template-columns: 25% calc(75% - 32px) 32px;
     }
 
     .col-scroll {
@@ -193,6 +197,36 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+    .log-collapsed-tab {
+      background: #1e293b;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 14px;
+      gap: 10px;
+      cursor: pointer;
+      border-left: 1px solid #0f172a;
+      transition: background 0.15s;
+    }
+    .log-collapsed-tab:hover { background: #263549; }
+    .log-collapsed-tab .log-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .log-collapsed-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #64748b;
+      white-space: nowrap;
     }
     .log-header {
       padding: 10px 14px;
@@ -356,6 +390,9 @@
         showNuovoCaso: false,
         nuovoCasoForm: { tipo: 'app', descrizione: '', targa: '' },
 
+        // Log panel collapse
+        logCollapsed: false,
+
         // ── Log eventi ──────────────────────────────────────────────
         logEventi: [],
         logPaused: false,
@@ -363,8 +400,19 @@
 
         // ────────────────────────────────────────────────────────────
         init() {
+          // Carica clienti persistiti + importa da clientiDemo
+          this._loadClienti();
+
+          // Reset completo: svuota state e ricarica da clientiDemo (che potrebbe essere vuoto)
+          Bus.on('registry:reset', () => {
+            this.clienti = [this.clienti.find(c => c.id === 'c_mock_01') || this.clienti[0]];
+            this.clienteAttivoId = 'c_mock_01';
+            this._loadClienti();
+            this._addLog('registry:reset', { info: 'clientiDemo svuotato, stato CRM azzerato' });
+          });
+
           const events = [
-            'cliente:registrato',
+            'cliente:registrato', 'cliente:cambiato',
             'servizio:attivato', 'servizio:disattivato',
             'pagamento:confermato', 'pagamento:errore',
             'sosta:avviata', 'sosta:terminata',
@@ -384,7 +432,140 @@
             });
           });
 
-          setTimeout(() => this._addLog('crm:avviato', { stato: 'connesso', pannello: 'CRM Simulato Enilive' }), 400);
+          setTimeout(() => this._addLog('crm:avviato', { stato: 'connesso', clienti: this.clienti.length }), 400);
+        },
+
+        // ── Persistenza clienti ──────────────────────────────────────
+        // crmClienti è stato eliminato — clientiDemo è il single source of truth.
+        // casiAssistenza è ora persistito direttamente in clientiDemo[cf].casiAssistenza.
+
+        _loadClienti() {
+          const CF_MOCK = 'BNCMRC85M10F205Z';
+
+          // Legge clientiDemo — unica fonte di verità
+          let reg = {};
+          try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+
+          // Se clientiDemo è vuoto mostra solo il cliente mock (nessun fallback su crmClienti)
+          if (Object.keys(reg).length === 0) return;
+
+          // Costruisce lista clienti da clientiDemo
+          const lista = [];
+
+          Object.values(reg).forEach(d => {
+            const cf = (d.cf || '').toUpperCase();
+            if (!cf) return;
+
+            const isNew = Array.isArray(d.contratti);
+
+            // serviziInfo: derivato da clientiDemo.serviziAttivi
+            const si = _emptyServiziInfo();
+            if (isNew && d.serviziAttivi) {
+              Object.entries(d.serviziAttivi).forEach(([key, val]) => {
+                if (!si[key]) return;
+                si[key].attivo = val.attivo || false;
+                if (!val.attivo) si[key].sospeso = false;
+                if (val.dataAttivazione) si[key].dataAttivazione = val.dataAttivazione;
+                if (val.obu)   si[key].obu   = val.obu;
+              });
+            }
+
+            // tcFlags: derivato da clientiDemo.consensi + serviziAttivi
+            const tc = _emptyTcFlags();
+            if (isNew && d.consensi) {
+              tc.privacy_marketing.accettato    = !!d.consensi.marketing;
+              tc.privacy_marketing.data         = d.consensi.marketing    ? d.consensi.dataFirma : null;
+              tc.privacy_profilazione.accettato = !!d.consensi.profilazione;
+              tc.privacy_profilazione.data      = d.consensi.profilazione ? d.consensi.dataFirma : null;
+            }
+            if (d.serviziAttivi?.telepedaggio?.attivo) {
+              tc.tc_telepedaggio.accettato = true;
+              tc.tc_telepedaggio.data = tc.tc_telepedaggio.data || d.serviziAttivi.telepedaggio.dataAttivazione || null;
+            }
+            if (d.serviziAttivi?.rsa?.attivo) {
+              tc.tc_rsa.accettato = true;
+              tc.tc_rsa.data = tc.tc_rsa.data || d.serviziAttivi.rsa.dataAttivazione || null;
+            }
+
+            // veicoli con servizi per targa
+            const veicoli = (d.targhe || []).filter(Boolean).map(t => ({
+              targa: t, tipo: 'auto', marca: '', modello: '',
+              servizi: Object.entries(d.serviziAttivi || {})
+                .filter(([, v]) => v.attivo && (v.targa === t || (v.targhe || []).includes(t)))
+                .map(([k]) => k),
+            }));
+            // fallback vecchio schema: _targa singola
+            if (veicoli.length === 0 && d._targa) veicoli.push({ targa: d._targa, tipo: 'auto', marca: '', modello: '', servizi: [] });
+
+            // movimenti: da clientiDemo (source of truth), ordinati per data desc
+            const movimenti = isNew
+              ? (d.movimenti || []).slice().sort((a, b) => b.data.localeCompare(a.data))
+              : [];
+
+            const id = cf === CF_MOCK ? 'c_mock_01' : 'c_demo_' + cf;
+
+            lista.push({
+              id,
+              anagrafica: {
+                nome:           [d.nome, d.cognome].filter(Boolean).join(' ') || 'Cliente',
+                cf,
+                email:          d.email     || '',
+                telefono:       d.telefono  || '',
+                dataNascita:    d.dataNascita || '',
+                dataIscrizione: (d.dataRegistrazione || '').split('T')[0] || new Date().toISOString().split('T')[0],
+                canale:         d.canale    || 'stazione',
+              },
+              veicoli,
+              serviziInfo: si,
+              tcFlags: tc,
+              movimenti,
+              // casiAssistenza: da clientiDemo (source of truth)
+              casiAssistenza: Array.isArray(d.casiAssistenza) ? d.casiAssistenza : [],
+            });
+          });
+
+          // c_mock_01 sempre presente e sempre primo
+          if (!lista.find(c => c.id === 'c_mock_01')) lista.push(this.clienti[0]);
+          lista.sort((a, b) => (a.id === 'c_mock_01' ? -1 : b.id === 'c_mock_01' ? 1 : 0));
+          this.clienti = lista;
+        },
+
+        // ── Persistenza clientiDemo (write-back per azioni CRM-initiated) ──
+        _persistCasiAssistenza(cf, casi) {
+          if (!cf) return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            record.casiAssistenza = casi;
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
+        },
+
+        _persistMovimentoDemo(cf, m) {
+          if (!cf) return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            if (!Array.isArray(record.movimenti)) record.movimenti = [];
+            const idx = record.movimenti.findIndex(x => x.id === m.id);
+            if (idx >= 0) record.movimenti[idx] = m;
+            else record.movimenti.unshift(m);
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
+        },
+
+        _updateServizioAttivoDemo(cf, servizio, update) {
+          if (!cf) return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            if (!record.serviziAttivi) record.serviziAttivi = {};
+            record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
         },
 
         // ── Getter cliente attivo ────────────────────────────────────
@@ -479,90 +660,20 @@
         },
 
         // ── Bus handlers ────────────────────────────────────────────
+        on_cliente_cambiato(p) {
+          if (!p?.cf) return;
+          const cf = p.cf.toUpperCase();
+          const found = this.clienti.find(c => (c.anagrafica.cf || '').toUpperCase() === cf);
+          if (found) this.selezionaCliente(found.id);
+        },
+
         on_cliente_registrato(p) {
-          // Controlla se il CF esiste già
-          const existing = this.clienti.find(c => c.anagrafica.cf === p.cf);
-          if (existing) {
-            // Aggiorna dati
-            if (p.nome)     existing.anagrafica.nome = p.nome;
-            if (p.email)    existing.anagrafica.email = p.email;
-            if (p.telefono) existing.anagrafica.telefono = p.telefono;
-            this._mergeTarghe(existing, p);
-            this._mergeServizi(existing, p);
-            this.clienteAttivoId = existing.id;
-            return;
-          }
-
-          // Crea nuovo cliente
-          const newId = 'c_' + Date.now();
-          const targhe = Array.isArray(p.targhe) ? p.targhe : (p.targa ? [p.targa] : []);
-          const servizi = Array.isArray(p.servizi) ? p.servizi : [];
-
-          const nuovoCliente = {
-            id: newId,
-            anagrafica: {
-              nome:           p.nome || 'Cliente',
-              cf:             p.cf || '',
-              email:          p.email || '',
-              telefono:       p.telefono || '',
-              dataIscrizione: new Date().toISOString().split('T')[0],
-              canale:         p.canale || 'stazione',
-            },
-            veicoli: targhe.map(t => ({
-              targa: t, tipo: 'auto', marca: '', modello: '',
-              servizi: servizi.filter(s => ['telepedaggio','rsa','memo','areac','parcheggi'].includes(s))
-            })),
-            serviziInfo: _emptyServiziInfo(),
-            tcFlags: _emptyTcFlags(),
-            movimenti: [],
-            casiAssistenza: [],
-          };
-
-          // Attiva i servizi inclusi nel payload
-          servizi.forEach(s => {
-            if (nuovoCliente.serviziInfo[s]) {
-              nuovoCliente.serviziInfo[s].attivo = true;
-              nuovoCliente.serviziInfo[s].dataAttivazione = p.dataRegistrazione || new Date().toISOString();
-            }
-            // Attiva T&C per i servizi
-            const tcKey = 'tc_' + s;
-            if (nuovoCliente.tcFlags[tcKey]) {
-              nuovoCliente.tcFlags[tcKey].accettato = true;
-              nuovoCliente.tcFlags[tcKey].data = new Date().toISOString();
-            }
-          });
-
-          // Se il bundle include tolling → attiva telepedaggio + imposta OBU
-          if (p.bundle && p.bundle !== 'rsa_standalone' && p.obu) {
-            nuovoCliente.serviziInfo.telepedaggio.attivo = true;
-            nuovoCliente.serviziInfo.telepedaggio.dataAttivazione = new Date().toISOString();
-            nuovoCliente.serviziInfo.telepedaggio.obu = p.obu;
-            nuovoCliente.serviziInfo.telepedaggio.saldo = 0;
-            nuovoCliente.tcFlags.tc_telepedaggio.accettato = true;
-            nuovoCliente.tcFlags.tc_telepedaggio.data = new Date().toISOString();
-          }
-
-          this.clienti.unshift(nuovoCliente);
-          this.clienteAttivoId = newId;
-        },
-
-        _mergeTarghe(clienteObj, p) {
-          const targhe = Array.isArray(p.targhe) ? p.targhe : (p.targa ? [p.targa] : []);
-          targhe.forEach(t => {
-            if (!clienteObj.veicoli.find(v => v.targa === t)) {
-              clienteObj.veicoli.push({ targa: t, tipo: 'auto', marca: '', modello: '', servizi: [] });
-            }
-          });
-        },
-
-        _mergeServizi(clienteObj, p) {
-          const servizi = Array.isArray(p.servizi) ? p.servizi : [];
-          servizi.forEach(s => {
-            if (clienteObj.serviziInfo[s] && !clienteObj.serviziInfo[s].attivo) {
-              clienteObj.serviziInfo[s].attivo = true;
-              clienteObj.serviziInfo[s].dataAttivazione = new Date().toISOString();
-            }
-          });
+          // Ricarica SEMPRE da clientiDemo (source of truth) quando arriva cliente:registrato
+          this._loadClienti();
+          const cf = (p.cf || '').toUpperCase();
+          // Cerca il cliente appena registrato e lo seleziona se presente
+          const found = this.clienti.find(c => c.anagrafica.cf === cf);
+          if (found) this.clienteAttivoId = found.id;
         },
 
         on_servizio_attivato(p) {
@@ -622,6 +733,7 @@
             dataChiusura: null,
             targa: p.targa || '',
           });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
         },
 
         on_sosta_avviata(p) {
@@ -664,6 +776,7 @@
             dataChiusura: null,
             targa: p.targa || '',
           });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
           if (c.serviziInfo.rsa) {
             c.serviziInfo.rsa.interventiMese = (c.serviziInfo.rsa.interventiMese || 0) + 1;
           }
@@ -695,6 +808,7 @@
             dataChiusura: null,
             targa: p.targa || '',
           });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
         },
 
         on_obu_associato(p) {
@@ -724,6 +838,7 @@
           if (!caso) return;
           caso.stato = 'chiuso';
           caso.dataChiusura = new Date().toISOString();
+          this._persistCasiAssistenza(this.ac().anagrafica.cf, this.ac().casiAssistenza);
           Bus.emit('crm:caso_chiuso', { id, targa: caso.targa, descrizione: caso.descrizione });
           this._addLog('crm:caso_chiuso', { id, targa: caso.targa });
         },
@@ -741,6 +856,7 @@
             dataChiusura: null,
             targa: this.nuovoCasoForm.targa || (c.veicoli[0]?.targa || ''),
           });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
           this._addLog('crm:caso_aperto', { id, tipo: this.nuovoCasoForm.tipo });
           this.nuovoCasoForm = { tipo: 'app', descrizione: '', targa: '' };
           this.showNuovoCaso = false;
@@ -750,7 +866,7 @@
           const c = this.ac();
           const mov = c.movimenti.find(m => m.id === id);
           if (!mov) return;
-          c.movimenti.unshift({
+          const storno = {
             id: 'storno_' + Date.now(),
             data: new Date().toISOString(),
             servizio: mov.servizio,
@@ -759,8 +875,11 @@
             importo: -Math.abs(mov.importo),
             stato: 'pagato',
             source: 'crm',
-          });
-          Bus.emit('crm:movimento_aggiornato', { tipo: 'storno', movimentoId: id, importo: -Math.abs(mov.importo), targa: mov.targa, servizio: mov.servizio });
+            dettagli: {},
+          };
+          c.movimenti.unshift(storno);
+          this._persistMovimentoDemo(c.anagrafica.cf, storno);
+          Bus.emit('crm:movimento_aggiornato', { tipo: 'storno', movimentoId: id, importo: storno.importo, targa: mov.targa, servizio: mov.servizio });
           this._addLog('crm:movimento_aggiornato', { tipo: 'storno', movimentoId: id });
         },
 
@@ -768,6 +887,7 @@
           const c = this.ac();
           if (!c.serviziInfo[key]) return;
           c.serviziInfo[key].sospeso = true;
+          this._updateServizioAttivoDemo(c.anagrafica.cf, key, { attivo: false });
           Bus.emit('crm:servizio_sospeso', { servizio: key, clienteId: c.id });
           this._addLog('crm:servizio_sospeso', { servizio: key });
         },
@@ -776,6 +896,8 @@
           const c = this.ac();
           if (!c.serviziInfo[key]) return;
           c.serviziInfo[key].sospeso = false;
+          c.serviziInfo[key].attivo  = true;
+          this._updateServizioAttivoDemo(c.anagrafica.cf, key, { attivo: true });
           this._addLog('crm:servizio_riattivato', { servizio: key });
         },
 
@@ -968,7 +1090,7 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        MAIN GRID
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="crm-layout">
+  <div class="crm-layout" :class="{ 'log-collapsed': logCollapsed }">
 
     <!-- ██████████████████████████████████████████████████████████████
          COLONNA SINISTRA — Scheda cliente
@@ -1330,7 +1452,19 @@
     <!-- ██████████████████████████████████████████████████████████████
          COLONNA DESTRA — Log eventi live
          ██████████████████████████████████████████████████████████████ -->
-    <div class="log-panel">
+    <div style="height:100%;overflow:hidden;">
+
+    <!-- Stato collassato: tab verticale -->
+    <div x-show="logCollapsed" class="log-collapsed-tab" @click="logCollapsed = false" title="Apri log eventi">
+      <div class="log-live-dot" :class="logPaused ? 'bg-yellow-500' : 'animate-pulse'"></div>
+      <span class="log-collapsed-label">Log eventi</span>
+      <span x-show="logEventi.length > 0"
+            class="text-xs font-bold text-slate-500 mt-auto mb-3"
+            x-text="logEventi.length"></span>
+    </div>
+
+    <!-- Stato espanso: pannello completo -->
+    <div x-if="!logCollapsed" class="log-panel">
 
       <div class="log-header">
         <div class="flex items-center gap-2">
@@ -1352,6 +1486,11 @@
           <button @click="clearLog()"
             class="text-xs px-2.5 py-1 rounded bg-slate-600 text-slate-200 hover:bg-slate-500 transition flex items-center gap-1.5 font-medium">
             <i class="fa-solid fa-trash-can"></i>
+          </button>
+          <button @click="logCollapsed = true"
+            class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200 transition"
+            title="Nascondi log">
+            <i class="fa-solid fa-chevron-right"></i>
           </button>
         </div>
       </div>
@@ -1398,7 +1537,8 @@
           </div>
         </template>
       </div>
-    </div><!-- /col-destra -->
+    </div><!-- /log-panel espanso -->
+    </div><!-- /col-destra wrapper -->
 
   </div><!-- /crm-layout -->
 

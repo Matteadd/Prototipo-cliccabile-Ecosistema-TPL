@@ -12,6 +12,15 @@
 
   <!-- LEFT: SCENARI E IMPOSTAZIONI -->
   <aside class="controls">
+    <!-- CLIENTE ATTIVO -->
+    <section class="control-section" id="clienteSelectorSection">
+      <h2>Cliente attivo</h2>
+      <div id="clienteList"></div>
+      <p id="clienteListEmpty" style="display:none;font-size:11px;color:#888;margin-top:4px;">
+        Nessun cliente censito.<br>Registra un cliente dal tablet.
+      </p>
+    </section>
+
     <!-- SCENARI -->
     <section class="control-section">
       <h2>Scenari</h2>
@@ -88,6 +97,15 @@
       <div class="muted">Apre direttamente la sezione Metodi di Pagamento</div>
     </section>
 
+    <!-- SMS / DOCUMENTI -->
+    <section class="control-section">
+      <h2>SMS / Documenti</h2>
+      <button id="btnSmsInformativa">Apri Informativa precontrattuale</button>
+      <div class="muted">Apre direttamente il webview OTP_CONSENSI nell'app</div>
+      <button id="btnSmsContratto">Apri Firma contratto</button>
+      <div class="muted">Apre direttamente il webview FIRMA_CONTRATTO nell'app</div>
+    </section>
+
     <!-- IMPOSTAZIONI SCENARI -->
     <section class="control-section">
       <h2>Impostazioni Scenari</h2>
@@ -95,6 +113,7 @@
       <label for="iframeSelect">Carica iframe:</label>
       <select id="iframeSelect">
         <option value="proto-app.html">App Principale (proto-app)</option>
+        <option value="android-home.html">Android Home Screen</option>
         <option value="onboarding.html">Onboarding Cliente</option>
       </select>
 

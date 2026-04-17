@@ -12,6 +12,8 @@ function initializeShell() {
   const frame = document.getElementById('appFrame');
   const toastEl = document.getElementById('shellToast');
   let isFrameReady = false;
+  let profiloAttivo = null;
+  let pendingSmsPayload = null;
   
   // Impostazioni correnti session
   let currentSettings = {
@@ -48,6 +50,32 @@ function initializeShell() {
             isFrameReady = true;
             clearInterval(checkReady);
             console.log('Content pronto!');
+            // Re-emette SMS pendente (dopo ritorno da android-home).
+            // w.document è sempre truthy subito dopo il load, ma w.APP viene
+            // impostato da Alpine nel suo init() — potrebbe non essere ancora pronto.
+            // Quindi facciamo un secondo polling dedicato solo per w.APP.
+            if (pendingSmsPayload) {
+              const sms = pendingSmsPayload;
+              pendingSmsPayload = null;
+              let appWaitAttempts = 0;
+              const waitForApp = setInterval(() => {
+                appWaitAttempts++;
+                try {
+                  const w2 = frame.contentWindow;
+                  if (w2 && w2.APP && typeof w2.APP.smsOpenWebview === 'function') {
+                    clearInterval(waitForApp);
+                    setTimeout(() => {
+                      w2.APP.smsCurrentNotif = sms;
+                      w2.APP.smsOpenWebview(sms);
+                    }, 200);
+                  }
+                } catch(e) {}
+                if (appWaitAttempts > 30) {
+                  clearInterval(waitForApp);
+                  console.warn('APP non pronto per SMS webview — timeout');
+                }
+              }, 100);
+            }
           }
         } catch(e) {}
         
@@ -223,6 +251,89 @@ function initializeShell() {
     console.log('Impostazioni salvate:', settings);
   }
 
+  // Selettore cliente da localStorage
+  function loadClientiSelector() {
+    const listEl  = document.getElementById('clienteList');
+    const emptyEl = document.getElementById('clienteListEmpty');
+    if (!listEl) return;
+
+    let reg = {};
+    try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+
+    const clienti = Object.values(reg);
+    listEl.innerHTML = '';
+
+    if (clienti.length === 0) {
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const cfAttivo = (localStorage.getItem('clienteAttivo') || '').toUpperCase();
+
+    try {
+      const raw = localStorage.getItem('clienteProfile');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if ((parsed.cf || '').toUpperCase() === cfAttivo) profiloAttivo = parsed;
+      }
+    } catch(_) {}
+
+    clienti.forEach(c => {
+      const cf    = (c.cf || '').toUpperCase();
+      const label = [c.nome, c.cognome].filter(Boolean).join(' ') || cf;
+      const isActive = cf === cfAttivo;
+
+      const btn = document.createElement('button');
+      btn.textContent = label + (isActive ? ' \u2713' : '');
+      btn.title = cf;
+      if (isActive) btn.style.cssText = 'background:#117299;color:white;width:100%;margin-bottom:4px;';
+      else btn.style.cssText = 'width:100%;margin-bottom:4px;';
+      btn.addEventListener('click', () => selezionaCliente(cf));
+      listEl.appendChild(btn);
+    });
+  }
+
+  function selezionaCliente(cf) {
+    if (!cf) return;
+    localStorage.setItem('clienteAttivo', cf);
+
+    let profilo = null;
+    try {
+      const raw = localStorage.getItem('clienteProfile');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if ((parsed.cf || '').toUpperCase() === cf.toUpperCase()) profilo = parsed;
+      }
+    } catch(_) {}
+
+    if (!profilo) {
+      try {
+        const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+        const d   = reg[cf];
+        if (d) {
+          profilo = {
+            nome: [d.nome, d.cognome].filter(Boolean).join(' '),
+            cf: d.cf, email: d.email || '', telefono: d.telefono || '',
+            targhe: d._targa ? [d._targa] : [],
+            contratto1: null, dataRegistrazione: new Date().toISOString(),
+          };
+          localStorage.setItem('clienteProfile', JSON.stringify(profilo));
+        }
+      } catch(_) {}
+    }
+
+    profiloAttivo = profilo;
+    loadClientiSelector();
+    busEmit('cliente:cambiato', { cf });
+
+    setTimeout(() => {
+      if (frame && frame.src) frame.src = frame.src;
+    }, 150);
+
+    showShellToast('Cliente: ' + (profilo?.nome || cf));
+  }
+
   // BOTTONE: Carica Impostazioni
   if (btnLoadSettings) {
     btnLoadSettings.addEventListener('click', () => {
@@ -295,7 +406,7 @@ function initializeShell() {
   const btnRsaChiamata = document.getElementById('btnRsaChiamata');
   if (btnRsaChiamata) {
     btnRsaChiamata.addEventListener('click', () => {
-      busEmit('rsa:chiamata', { targa: 'AB123CD', posizione: 'A8 km 12 direzione Milano', tipo: 'guasto meccanico' });
+      busEmit('rsa:chiamata', { targa: profiloAttivo?.targhe?.[0] || 'AB123CD', posizione: 'A8 km 12 direzione Milano', tipo: 'guasto meccanico' });
       showShellToast('Chiamata soccorso RSA inviata al CRM');
     });
   }
@@ -304,14 +415,101 @@ function initializeShell() {
   const btnMemoScadenza = document.getElementById('btnMemoScadenza');
   if (btnMemoScadenza) {
     btnMemoScadenza.addEventListener('click', () => {
-      busEmit('memo:scadenza', { tipo: 'bollo', targa: 'AB123CD', data: '2026-05-31' });
+      busEmit('memo:scadenza', { tipo: 'bollo', targa: profiloAttivo?.targhe?.[0] || 'AB123CD', data: '2026-05-31' });
       showShellToast('Scadenza bollo inviata al CRM');
+    });
+  }
+
+  // SMS / Documenti — apre il webview direttamente nell'app senza passare per android-home
+  function openSmsWebviewInApp(template) {
+    const payload = {
+      id: 'sms_demo_' + template.toLowerCase(),
+      to: profiloAttivo?.telefono || '+39 333 0000000',
+      template: template,
+      preview: template === 'OTP_CONSENSI'
+        ? 'Conferma i tuoi dati e accetta i documenti Enilive: [link mock]'
+        : 'Firma il tuo contratto Enilive: [link mock]',
+      documenti: template === 'OTP_CONSENSI'
+        ? ['informativa_precontrattuale', 'norme_memo', 'privacy']
+        : [],
+      dati: template === 'FIRMA_CONTRATTO' ? {
+        nome: profiloAttivo ? (profiloAttivo.nome + ' ' + profiloAttivo.cognome) : 'Cliente Demo',
+        cf: profiloAttivo?.cf || 'DEMO0000000000',
+        bundle: 'obu_standalone',
+        totale: 4.50,
+      } : undefined,
+    };
+
+    const callWebview = (w) => {
+      w.APP.smsCurrentNotif = payload;
+      w.APP.smsOpenWebview(payload);
+      showShellToast('Webview ' + template + ' aperta');
+    };
+
+    const w = frame.contentWindow;
+    if (w && w.APP && typeof w.APP.smsOpenWebview === 'function') {
+      callWebview(w);
+    } else {
+      // proto-app non ancora caricata: carica e aspetta APP
+      if (!frame.src || !frame.src.includes('proto-app')) {
+        loadAppFrame('proto-app.html');
+      }
+      let attempts = 0;
+      const wait = setInterval(() => {
+        attempts++;
+        try {
+          const w2 = frame.contentWindow;
+          if (w2 && w2.APP && typeof w2.APP.smsOpenWebview === 'function') {
+            clearInterval(wait);
+            setTimeout(() => callWebview(w2), 200);
+          }
+        } catch(e) {}
+        if (attempts > 30) clearInterval(wait);
+      }, 100);
+    }
+  }
+
+  const btnSmsInformativa = document.getElementById('btnSmsInformativa');
+  if (btnSmsInformativa) {
+    btnSmsInformativa.addEventListener('click', () => openSmsWebviewInApp('OTP_CONSENSI'));
+  }
+  const btnSmsContratto = document.getElementById('btnSmsContratto');
+  if (btnSmsContratto) {
+    btnSmsContratto.addEventListener('click', () => openSmsWebviewInApp('FIRMA_CONTRATTO'));
+  }
+
+  // Torna all'app dopo aver visto la notifica su android-home
+  // Chiamato da android-home.html via window.parent.tornaAllApp(payload)
+  function tornaAllApp(smsPayload) {
+    pendingSmsPayload = smsPayload || null;
+    loadAppFrame('proto-app.html');
+    showShellToast('Apertura app…');
+  }
+  // Espone la funzione al parent scope (android-home.html la chiama via window.parent)
+  window.tornaAllApp = tornaAllApp;
+
+  // Automaticamente: switch a android-home quando arriva un sms:outbound dal tablet
+  if (typeof Bus !== 'undefined') {
+    Bus.on('sms:outbound', (p) => {
+      // Passa il payload via localStorage (android-home lo legge all'avvio)
+      try { localStorage.setItem('androidPendingSms', JSON.stringify(p)); } catch(_) {}
+      // Switcha l'iframe solo se siamo su proto-app (non su android-home già)
+      if (frame && !frame.src.includes('android-home')) {
+        loadAppFrame('android-home.html');
+        showShellToast('SMS in arrivo — schermata Android');
+      }
     });
   }
 
   // boot: carica impostazioni salvate e avvia app
   loadSavedSettings();
+  loadClientiSelector();
   loadAppFrame(currentSettings.iframeUrl);
+
+  // Aggiorna selettore se tablet registra un nuovo cliente in altro tab
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'clientiDemo' || e.key === 'clienteProfile') loadClientiSelector();
+  });
 }
 
 
