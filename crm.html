@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM Simulato — Enilive</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="bus.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --color-primary:        #117299;
+      --color-primary-dark:   #0d4f6f;
+      --color-primary-light:  #e6f0f6;
+      --color-primary-lighter:#1e9fd8;
+      --color-bg:             #f1f5f9;
+      --color-text:           #111827;
+      --color-text-muted:     #6b7280;
+      --color-border:         #e5e7eb;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--color-bg);
+      margin: 0; padding: 0;
+      min-height: 100vh;
+    }
+
+    /* ─── Layout ──────────────────────────────────────────────── */
+    .crm-layout {
+      display: grid;
+      grid-template-columns: 25% 45% 30%;
+      height: calc(100vh - 56px);
+      transition: grid-template-columns 0.25s ease;
+    }
+    .crm-layout.log-collapsed {
+      grid-template-columns: 25% calc(75% - 32px) 32px;
+    }
+
+    .col-scroll {
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .col-scroll::-webkit-scrollbar { width: 4px; }
+    .col-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+    /* ─── Cards ───────────────────────────────────────────────── */
+    .card {
+      background: white;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fafafa;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+    }
+    .card-body { padding: 12px 14px; }
+
+    /* ─── Badge ───────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ─── Field rows ──────────────────────────────────────────── */
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px dashed #f0f0f0;
+      font-size: 13px;
+      gap: 8px;
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-label { color: var(--color-text-muted); font-size: 12px; flex-shrink: 0; }
+    .field-value { font-weight: 500; text-align: right; }
+
+    /* ─── Service cards ───────────────────────────────────────── */
+    .service-card {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 10px;
+      background: white;
+      transition: box-shadow 0.15s;
+    }
+    .service-card.attivo  { border-left: 3px solid #22c55e; }
+    .service-card.sospeso { border-left: 3px solid #f97316; }
+    .service-card.inattivo { border-left: 3px solid #d1d5db; background: #fafafa; }
+
+    /* ─── Tables ──────────────────────────────────────────────── */
+    .crm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .crm-table th {
+      text-align: left;
+      padding: 6px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text-muted);
+      border-bottom: 2px solid var(--color-border);
+      background: #fafafa;
+      white-space: nowrap;
+    }
+    .crm-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #f5f5f5;
+      vertical-align: middle;
+    }
+    .crm-table tr:last-child td { border-bottom: none; }
+    .crm-table tr:hover td { background: #fafcff; }
+
+    /* ─── Roster drawer ───────────────────────────────────────── */
+    .roster-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 40;
+    }
+    .roster-panel {
+      position: fixed;
+      top: 56px; right: 0;
+      width: 340px;
+      height: calc(100vh - 56px);
+      background: white;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+    }
+    .roster-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fafafa;
+      flex-shrink: 0;
+    }
+    .roster-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .roster-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.12s;
+      margin-bottom: 4px;
+    }
+    .roster-item:hover  { background: var(--color-primary-light); border-color: var(--color-primary-lighter); }
+    .roster-item.active { background: var(--color-primary-light); border-color: var(--color-primary); }
+    .roster-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    /* ─── Log panel ───────────────────────────────────────────── */
+    .log-panel {
+      background: #0f172a;
+      color: #e2e8f0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .log-collapsed-tab {
+      background: #1e293b;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 14px;
+      gap: 10px;
+      cursor: pointer;
+      border-left: 1px solid #0f172a;
+      transition: background 0.15s;
+    }
+    .log-collapsed-tab:hover { background: #263549; }
+    .log-collapsed-tab .log-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .log-collapsed-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .log-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #1e293b;
+      flex-shrink: 0;
+    }
+    .log-entries {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .log-entries::-webkit-scrollbar { width: 3px; }
+    .log-entries::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .log-entry {
+      animation: fadeSlideIn 0.25s ease;
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      background: #1e293b;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .log-entry:hover { background: #263549; }
+    .log-entry-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+    }
+    .log-ts {
+      font-family: monospace;
+      color: #64748b;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .log-event-name { font-weight: 600; font-size: 12px; }
+    .log-summary {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+      padding-left: 18px;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-payload {
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: #0f172a;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 10px;
+      color: #7dd3fc;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+
+  <script>
+    // ── Dati mock per il cliente precaricato ───────────────────────────
+    function _mockServiziInfo() {
+      return {
+        telepedaggio: { nome: 'Telepedaggio', icon: 'fa-road',           attivo: true,  sospeso: false, dataAttivazione: '2024-11-15T10:32:00', obu: 'OBU-IT-00123456', saldo: 45.30 },
+        strisce_blu:  { nome: 'Strisce Blu',  icon: 'fa-parking',        attivo: false, sospeso: false, dataAttivazione: null },
+        rsa:          { nome: 'RSA',           icon: 'fa-truck-medical',  attivo: true,  sospeso: false, dataAttivazione: '2024-11-15T10:33:00', codice: 'RSA-2024-98765', interventiMese: 1 },
+        areac:        { nome: 'Area C',        icon: 'fa-city',           attivo: false, sospeso: false, dataAttivazione: null, transitiMese: 0 },
+        memo:         { nome: 'Memo',          icon: 'fa-bell',           attivo: true,  sospeso: false, dataAttivazione: '2024-11-15T10:33:00', scadenzeImminenti: 2 },
+        parcheggi:    { nome: 'Parcheggi',     icon: 'fa-square-parking', attivo: false, sospeso: false, dataAttivazione: null, accessiMese: 0 },
+      };
+    }
+
+    function _mockTcFlags() {
+      return {
+        tc_telepedaggio:      { label: 'T&C Telepedaggio',      accettato: true,  data: '2024-11-15T10:32:00' },
+        tc_strisce_blu:       { label: 'T&C Strisce Blu',       accettato: true,  data: '2025-01-08T14:21:00' },
+        tc_rsa:               { label: 'T&C RSA',               accettato: true,  data: '2024-11-15T10:33:00' },
+        tc_areac:             { label: 'T&C Area C',            accettato: false, data: null },
+        tc_memo:              { label: 'T&C Memo',              accettato: true,  data: '2024-11-15T10:33:00' },
+        privacy_marketing:    { label: 'Consenso Marketing',    accettato: false, data: null },
+        privacy_profilazione: { label: 'Consenso Profilazione', accettato: true,  data: '2024-11-15T10:32:00' },
+        informativa_precontrattuale: { label: 'Informativa precontrattuale', accettato: true,  data: '2024-11-15T10:32:00' },
+        privacy:               { label: 'Privacy',               accettato: true,  data: '2024-11-15T10:32:00' },
+      };
+    }
+
+    function _emptyTcFlags() {
+      return {
+        tc_telepedaggio:      { label: 'T&C Telepedaggio',      accettato: false, data: null },
+        tc_strisce_blu:       { label: 'T&C Strisce Blu',       accettato: false, data: null },
+        tc_rsa:               { label: 'T&C RSA',               accettato: false, data: null },
+        tc_areac:             { label: 'T&C Area C',            accettato: false, data: null },
+        tc_memo:              { label: 'T&C Memo',              accettato: false, data: null },
+        privacy_marketing:    { label: 'Consenso Marketing',    accettato: false, data: null },
+        privacy_profilazione: { label: 'Consenso Profilazione', accettato: false, data: null },
+        informativa_precontrattuale: { label: 'Informativa precontrattuale', accettato: false, data: null },
+        privacy:               { label: 'Privacy',               accettato: false, data: null },
+      };
+    }
+
+    function _emptyServiziInfo() {
+      return {
+        telepedaggio: { nome: 'Telepedaggio', icon: 'fa-road',           attivo: false, sospeso: false, dataAttivazione: null },
+        strisce_blu:  { nome: 'Strisce Blu',  icon: 'fa-parking',        attivo: false, sospeso: false, dataAttivazione: null },
+        rsa:          { nome: 'RSA',           icon: 'fa-truck-medical',  attivo: false, sospeso: false, dataAttivazione: null, interventiMese: 0 },
+        areac:        { nome: 'Area C',        icon: 'fa-city',           attivo: false, sospeso: false, dataAttivazione: null, transitiMese: 0 },
+        memo:         { nome: 'Memo',          icon: 'fa-bell',           attivo: false, sospeso: false, dataAttivazione: null, scadenzeImminenti: 0 },
+        parcheggi:    { nome: 'Parcheggi',     icon: 'fa-square-parking', attivo: false, sospeso: false, dataAttivazione: null, accessiMese: 0 },
+      };
+    }
+
+    // Colori avatar roster (ciclici)
+    const AVATAR_COLORS = ['#117299','#7c3aed','#0f766e','#b45309','#be185d','#1d4ed8','#15803d'];
+
+    function crmData() {
+      return {
+
+        // ── Lista clienti ───────────────────────────────────────────
+        clienti: [
+          {
+            id: 'c_mock_01',
+            anagrafica: {
+              nome: 'Marco Bianchi',
+              cf: 'BNCMRC85M10F205Z',
+              email: 'marco.bianchi@email.it',
+              telefono: '+39 339 1234567',
+              dataIscrizione: '2024-11-15',
+              canale: 'stazione'
+            },
+            veicoli: [
+              { targa: 'AB123CD', tipo: 'auto', marca: 'Volkswagen', modello: 'Golf', servizi: ['telepedaggio','memo','rsa'] },
+              { targa: 'EF456GH', tipo: 'auto', marca: 'Fiat',       modello: '500',  servizi: ['memo'] },
+            ],
+            serviziInfo: _mockServiziInfo(),
+            tcFlags: _mockTcFlags(),
+            movimenti: [
+              { id: 'm001', data: '2026-04-09T09:15:00', servizio: 'strisce_blu',  descrizione: 'Sosta Zona A — 1h 30m',   targa: 'AB123CD', importo: 2.25, stato: 'pagato' },
+              { id: 'm002', data: '2026-04-08T17:40:00', servizio: 'telepedaggio', descrizione: 'Transito A8 Milano Nord', targa: 'AB123CD', importo: 1.80, stato: 'pagato' },
+              { id: 'm003', data: '2026-04-07T11:00:00', servizio: 'rsa',          descrizione: 'Canone mensile RSA',      targa: 'AB123CD', importo: 2.00, stato: 'pagato' },
+            ],
+            casiAssistenza: [
+              { id: '#0001', dataApertura: '2026-04-05T08:00:00', tipo: 'rsa', descrizione: 'Intervento foratura A8 km 14', stato: 'chiuso',  dataChiusura: '2026-04-05T09:45:00', targa: 'AB123CD' },
+              { id: '#0002', dataApertura: '2026-04-09T10:30:00', tipo: 'app', descrizione: 'Errore pagamento Strisce Blu', stato: 'aperto', dataChiusura: null,                   targa: 'AB123CD' },
+            ],
+          }
+        ],
+
+        clienteAttivoId: 'c_mock_01',
+        showRoster: false,
+
+        // Filtri movimenti (per cliente attivo)
+        movFiltroServizio: '',
+        movFiltroStato: '',
+
+        // Form nuovo caso
+        showNuovoCaso: false,
+        nuovoCasoForm: { tipo: 'app', descrizione: '', targa: '' },
+
+        // Log panel collapse
+        logCollapsed: false,
+
+        // ── Log eventi ──────────────────────────────────────────────
+        logEventi: [],
+        logPaused: false,
+        logBuffer: [],
+
+        // ────────────────────────────────────────────────────────────
+        init() {
+          // Carica clienti persistiti + importa da clientiDemo
+          this._loadClienti();
+
+          // Reset completo: svuota state e ricarica da clientiDemo (che potrebbe essere vuoto)
+          Bus.on('registry:reset', () => {
+            this.clienti = [this.clienti.find(c => c.id === 'c_mock_01') || this.clienti[0]];
+            this.clienteAttivoId = 'c_mock_01';
+            this._loadClienti();
+            this._addLog('registry:reset', { info: 'clientiDemo svuotato, stato CRM azzerato' });
+          });
+
+          const events = [
+            'cliente:registrato', 'cliente:cambiato', 'cliente:profilo_aggiornato',
+            'servizio:attivato', 'servizio:disattivato',
+            'pagamento:confermato', 'pagamento:errore',
+            'sosta:avviata', 'sosta:terminata',
+            'rsa:chiamata', 'memo:scadenza',
+            'consenso:aggiornato', 'gestore:interazione',
+            'scenario:trigger',
+            'sms:outbound', 'email:outbound',
+            'obu:associato', 'contratto:inviato', 'assistenza:obu_sostituito',
+            'crm:movimento_aggiornato',
+          ];
+
+          events.forEach(evt => {
+            Bus.on(evt, (payload) => {
+              this._addLog(evt, payload);
+              const method = 'on_' + evt.replace(/[^a-zA-Z0-9]/g, '_');
+              if (typeof this[method] === 'function') this[method](payload);
+            });
+          });
+
+          setTimeout(() => this._addLog('crm:avviato', { stato: 'connesso', clienti: this.clienti.length }), 400);
+        },
+
+        // ── Persistenza clienti ──────────────────────────────────────
+        // crmClienti è stato eliminato — clientiDemo è il single source of truth.
+        // casiAssistenza è ora persistito direttamente in clientiDemo[cf].casiAssistenza.
+
+        _loadClienti() {
+          const CF_MOCK = 'BNCMRC85M10F205Z';
+
+          // Legge clientiDemo — unica fonte di verità
+          let reg = {};
+          try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+
+          // Se clientiDemo è vuoto mostra solo il cliente mock (nessun fallback su crmClienti)
+          if (Object.keys(reg).length === 0) return;
+
+          // Migra tutti i record al nuovo schema (idempotente) e salva batch
+          let migrated = false;
+          Object.entries(reg).forEach(([k, v]) => {
+            if (!Array.isArray(v.veicoli)) { reg[k] = migrateClienteRecord(v); migrated = true; }
+          });
+          if (migrated) {
+            try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(_) {}
+          }
+
+          // Costruisce lista clienti da clientiDemo
+          const lista = [];
+
+          Object.values(reg).forEach(d => {
+            const cf = (d.cf || '').toUpperCase();
+            if (!cf) return;
+
+            // serviziInfo: telepedaggio derivato da contratti[].dispositivi[], rsa da serviziRsa[]
+            const si = _emptyServiziInfo();
+            const obuDisp = (d.contratti || []).flatMap(c => (c.dispositivi || []).filter(dd => dd.tipo === 'obu'));
+            si.telepedaggio.attivo = obuDisp.some(dd => dd.stato === 'attivo');
+            si.telepedaggio.obu    = obuDisp[0]?.codice || '';
+            si.rsa.attivo          = (d.serviziRsa || []).some(r => r.stato === 'attivo');
+            si.rsa.dataAttivazione = (d.serviziRsa || [])[0]?.dataAttivazione || null;
+            // areac, parcheggi, strisceBlu, memo — da serviziAttivi
+            if (d.serviziAttivi) {
+              ['areac', 'parcheggi', 'strisceBlu', 'memo'].forEach(key => {
+                if (!si[key] || !d.serviziAttivi[key]) return;
+                si[key].attivo = d.serviziAttivi[key].attivo || false;
+                if (d.serviziAttivi[key].dataAttivazione) si[key].dataAttivazione = d.serviziAttivi[key].dataAttivazione;
+              });
+            }
+
+            // tcFlags: derivato da clientiDemo.consensi + contratti/serviziRsa
+            const tc = _emptyTcFlags();
+            if (d.consensi) {
+              tc.privacy_marketing.accettato    = !!d.consensi.marketing;
+              tc.privacy_marketing.data         = d.consensi.marketing    ? d.consensi.dataFirma : null;
+              tc.privacy_profilazione.accettato = !!d.consensi.profilazione;
+              tc.privacy_profilazione.data      = d.consensi.profilazione ? d.consensi.dataFirma : null;
+              tc.informativa_precontrattuale.accettato = !!d.consensi.informativaPrecontrattuale;
+              tc.informativa_precontrattuale.data      = d.consensi.informativaPrecontrattuale ? d.consensi.dataFirma : null;
+              tc.privacy.accettato                     = !!d.consensi.privacy;
+              tc.privacy.data                          = d.consensi.privacy ? d.consensi.dataFirma : null;
+            }
+            if (si.telepedaggio.attivo) {
+              tc.tc_telepedaggio.accettato = true;
+              tc.tc_telepedaggio.data = (d.contratti || [])[0]?.dataAttivazione || null;
+            }
+            if (si.rsa.attivo) {
+              tc.tc_rsa.accettato = true;
+              tc.tc_rsa.data = si.rsa.dataAttivazione || null;
+            }
+
+            // veicoli: da d.veicoli[], con servizi derivati per targa
+            const veicoli = (d.veicoli || []).filter(Boolean).map(v => {
+              const vid = v.id;
+              const hasObu = obuDisp.some(dd => dd.veicoloId === vid && dd.stato === 'attivo');
+              const hasRsa = (d.serviziRsa || []).some(r => r.veicoloId === vid && r.stato === 'attivo');
+              const servizi = [
+                ...(hasObu ? ['telepedaggio'] : []),
+                ...(hasRsa ? ['rsa'] : []),
+              ];
+              return { targa: v.targa, veicoloId: v.id, tipo: v.tipo || 'auto', marca: v.marca || '', modello: v.modello || '', servizi };
+            });
+            // fallback vecchio schema: _targa singola
+            if (veicoli.length === 0 && d._targa) veicoli.push({ targa: d._targa, veicoloId: 'v_' + d._targa, tipo: 'auto', marca: '', modello: '', servizi: [] });
+
+            // movimenti: da clientiDemo (source of truth), ordinati per data desc
+            const movimenti = (d.movimenti || []).slice().sort((a, b) => b.data.localeCompare(a.data));
+
+            // indirizzo: supporta sia new-schema (object) che old-schema (string)
+            const ind = d.indirizzo;
+            const indirizzoStr = ind && typeof ind === 'object'
+              ? [ind.via, ind.civico, ind.comune].filter(Boolean).join(', ')
+              : [ind, d.civico, d.comune].filter(Boolean).join(', ');
+
+            const id = cf === CF_MOCK ? 'c_mock_01' : 'c_demo_' + cf;
+
+            lista.push({
+              id,
+              anagrafica: {
+                nome:           [d.nome, d.cognome].filter(Boolean).join(' ') || 'Cliente',
+                cf,
+                email:          d.contatti?.email    || d.email    || '',
+                telefono:       d.contatti?.telefono || d.telefono || '',
+                indirizzo:      indirizzoStr,
+                dataNascita:    d.dataNascita || '',
+                dataIscrizione: (d.dataRegistrazione || '').split('T')[0] || new Date().toISOString().split('T')[0],
+                canale:         d.canale    || 'stazione',
+              },
+              veicoli,
+              serviziInfo: si,
+              tcFlags: tc,
+              movimenti,
+              // casiAssistenza: da clientiDemo (source of truth)
+              casiAssistenza: Array.isArray(d.casiAssistenza) ? d.casiAssistenza : [],
+            });
+          });
+
+          // c_mock_01 sempre presente e sempre primo
+          if (!lista.find(c => c.id === 'c_mock_01')) lista.push(this.clienti[0]);
+          lista.sort((a, b) => (a.id === 'c_mock_01' ? -1 : b.id === 'c_mock_01' ? 1 : 0));
+          this.clienti = lista;
+        },
+
+        // ── Persistenza clientiDemo (write-back per azioni CRM-initiated) ──
+        _persistCasiAssistenza(cf, casi) {
+          if (!cf) return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            record.casiAssistenza = casi;
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
+        },
+
+        _persistMovimentoDemo(cf, m) {
+          if (!cf) return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            if (!Array.isArray(record.movimenti)) record.movimenti = [];
+            const idx = record.movimenti.findIndex(x => x.id === m.id);
+            if (idx >= 0) record.movimenti[idx] = m;
+            else record.movimenti.unshift(m);
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
+        },
+
+        _updateServizioAttivoDemo(cf, servizio, update) {
+          if (!cf) return;
+          // rsa e telepedaggio sono derivati — non in serviziAttivi
+          if (servizio === 'rsa' || servizio === 'telepedaggio') return;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf.toUpperCase()];
+            if (!record) return;
+            if (!record.serviziAttivi) record.serviziAttivi = {};
+            record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          } catch(_) {}
+        },
+
+        // ── Getter cliente attivo ────────────────────────────────────
+        ac() {
+          return this.clienti.find(c => c.id === this.clienteAttivoId) || this.clienti[0];
+        },
+
+        // Shorthand computed per i template
+        get cliente()       { return this.ac().anagrafica; },
+        get veicoli()       { return this.ac().veicoli; },
+        get serviziInfo()   { return this.ac().serviziInfo; },
+        get tcFlags()       { return this.ac().tcFlags; },
+        get movimenti()     { return this.ac().movimenti; },
+        get casiAssistenza(){ return this.ac().casiAssistenza; },
+
+        // ── Roster helpers ───────────────────────────────────────────
+        avatarInitials(nome) {
+          const parts = (nome || '').split(' ').filter(Boolean);
+          if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+          return (nome || '?').slice(0,2).toUpperCase();
+        },
+
+        avatarColor(idx) {
+          return AVATAR_COLORS[idx % AVATAR_COLORS.length];
+        },
+
+        selezionaCliente(id) {
+          this.clienteAttivoId = id;
+          this.showRoster = false;
+          this.movFiltroServizio = '';
+          this.movFiltroStato = '';
+          this.showNuovoCaso = false;
+        },
+
+        // Trova a quale cliente appartiene una targa (fallback: cliente attivo)
+        _clienteByTarga(targa) {
+          if (!targa) return this.ac();
+          return this.clienti.find(c => c.veicoli.some(v => v.targa === targa)) || this.ac();
+        },
+
+        // ── Log helpers ─────────────────────────────────────────────
+        _addLog(evento, payload) {
+          const entry = {
+            id: Date.now() + '_' + Math.random().toString(36).slice(2),
+            ts: new Date().toLocaleTimeString('it-IT'),
+            evento,
+            payload: payload || {},
+            expanded: false
+          };
+          if (this.logPaused) {
+            this.logBuffer.push(entry);
+          } else {
+            this.logEventi.unshift(entry);
+            if (this.logEventi.length > 50) this.logEventi.pop();
+          }
+        },
+
+        toggleLogPause() {
+          this.logPaused = !this.logPaused;
+          if (!this.logPaused && this.logBuffer.length) {
+            const buf = [...this.logBuffer].reverse();
+            this.logEventi.unshift(...buf);
+            this.logBuffer = [];
+            if (this.logEventi.length > 50) this.logEventi = this.logEventi.slice(0, 50);
+          }
+        },
+
+        clearLog() { this.logEventi = []; this.logBuffer = []; },
+
+        logDotColor(evento) {
+          if (evento.startsWith('cliente:'))            return '#117299';
+          if (evento.startsWith('servizio:'))           return '#3b82f6';
+          if (evento === 'pagamento:confermato')         return '#22c55e';
+          if (evento === 'pagamento:errore')             return '#ef4444';
+          if (evento.startsWith('pagamento:'))          return '#22c55e';
+          if (evento.startsWith('sosta:'))              return '#8b5cf6';
+          if (evento.startsWith('rsa:'))                return '#f97316';
+          if (evento.startsWith('memo:'))               return '#f59e0b';
+          if (evento.startsWith('consenso:'))           return '#eab308';
+          if (evento.startsWith('gestore:'))            return '#10b981';
+          if (evento.startsWith('sms:') || evento.startsWith('email:')) return '#06b6d4';
+          if (evento.startsWith('crm:'))                return '#94a3b8';
+          return '#64748b';
+        },
+
+        payloadSummary(payload) {
+          if (!payload || typeof payload !== 'object') return '';
+          return Object.entries(payload)
+            .slice(0, 3)
+            .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+            .join(' · ');
+        },
+
+        // ── Bus handlers ────────────────────────────────────────────
+        on_cliente_cambiato(p) {
+          if (!p?.cf) return;
+          const cf = p.cf.toUpperCase();
+          const found = this.clienti.find(c => (c.anagrafica.cf || '').toUpperCase() === cf);
+          if (found) this.selezionaCliente(found.id);
+        },
+
+        on_cliente_registrato(p) {
+          // Ricarica SEMPRE da clientiDemo (source of truth) quando arriva cliente:registrato
+          this._loadClienti();
+          const cf = (p.cf || '').toUpperCase();
+          // Cerca il cliente appena registrato e lo seleziona se presente
+          const found = this.clienti.find(c => c.anagrafica.cf === cf);
+          if (found) this.clienteAttivoId = found.id;
+        },
+
+        on_cliente_profilo_aggiornato(p) {
+          // Ricarica da clientiDemo quando il profilo viene aggiornato (es. dopo registrazione parziale)
+          this._loadClienti();
+          const cf = (p.cf || '').toUpperCase();
+          const found = this.clienti.find(c => c.anagrafica.cf === cf);
+          if (found) this.clienteAttivoId = found.id;
+        },
+
+        on_servizio_attivato(p) {
+          const c = p.veicoloId
+            ? (this.clienti.find(cl => cl.veicoli.some(v => v.veicoloId === p.veicoloId)) || this._clienteByTarga(p.targa))
+            : this._clienteByTarga(p.targa);
+          if (p.servizio && c.serviziInfo[p.servizio]) {
+            c.serviziInfo[p.servizio].attivo = true;
+            c.serviziInfo[p.servizio].sospeso = false;
+            c.serviziInfo[p.servizio].dataAttivazione = p.data || new Date().toISOString();
+            if (p.obu) c.serviziInfo[p.servizio].obu = p.obu;
+          }
+          const targa = p.targa || (p.veicoloId ? p.veicoloId.replace(/^v_/, '') : '');
+          if (targa && p.servizio) {
+            const v = c.veicoli.find(v => v.targa === targa || v.veicoloId === p.veicoloId);
+            if (v && !v.servizi.includes(p.servizio)) v.servizi.push(p.servizio);
+          }
+        },
+
+        on_servizio_disattivato(p) {
+          const c = this._clienteByTarga(p.targa);
+          if (p.servizio && c.serviziInfo[p.servizio]) {
+            c.serviziInfo[p.servizio].attivo = false;
+            c.serviziInfo[p.servizio].sospeso = false;
+          }
+        },
+
+        on_pagamento_confermato(p) {
+          const c = this._clienteByTarga(p.targa);
+          c.movimenti.unshift({
+            id: 'm' + Date.now(),
+            data: p.data || new Date().toISOString(),
+            servizio: p.servizio || 'altro',
+            descrizione: p.descrizione || ('Pagamento ' + (p.servizio || '')),
+            targa: p.targa || (c.veicoli[0]?.targa || ''),
+            importo: p.importo || 0,
+            stato: 'pagato',
+            source: 'app',
+          });
+        },
+
+        on_pagamento_errore(p) {
+          const c = this._clienteByTarga(p.targa);
+          c.movimenti.unshift({
+            id: 'm' + Date.now(),
+            data: p.data || new Date().toISOString(),
+            servizio: p.servizio || 'altro',
+            descrizione: p.descrizione || ('Errore pagamento ' + (p.servizio || '')),
+            targa: p.targa || (c.veicoli[0]?.targa || ''),
+            importo: p.importo || 0,
+            stato: 'errore',
+            source: 'app',
+          });
+          c.casiAssistenza.unshift({
+            id: this._nextCasoIdFor(c),
+            dataApertura: new Date().toISOString(),
+            tipo: 'app',
+            descrizione: 'Errore pagamento: ' + (p.descrizione || p.servizio || ''),
+            stato: 'aperto',
+            dataChiusura: null,
+            targa: p.targa || '',
+          });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
+        },
+
+        on_sosta_avviata(p) {
+          const c = this._clienteByTarga(p.targa);
+          c.movimenti.unshift({
+            id: 'sosta_' + Date.now(),
+            data: new Date().toISOString(),
+            servizio: 'strisce_blu',
+            descrizione: 'Sosta ' + (p.zona || '') + ' — in corso',
+            targa: p.targa || '',
+            importo: 0,
+            stato: 'in corso',
+            source: 'app',
+          });
+        },
+
+        on_sosta_terminata(p) {
+          const c = this._clienteByTarga(p.targa);
+          const idx = c.movimenti.findIndex(m =>
+            m.stato === 'in corso' && m.servizio === 'strisce_blu' && m.targa === p.targa
+          );
+          if (idx >= 0) {
+            c.movimenti[idx] = {
+              ...c.movimenti[idx],
+              stato: 'pagato',
+              importo: p.importo || 0,
+              descrizione: c.movimenti[idx].descrizione.replace('— in corso', '— completata'),
+            };
+          }
+        },
+
+        on_rsa_chiamata(p) {
+          const c = this._clienteByTarga(p.targa);
+          c.casiAssistenza.unshift({
+            id: this._nextCasoIdFor(c),
+            dataApertura: new Date().toISOString(),
+            tipo: 'rsa',
+            descrizione: 'Chiamata soccorso — ' + (p.tipo || '') + (p.posizione ? ' @ ' + p.posizione : ''),
+            stato: 'in lavorazione',
+            dataChiusura: null,
+            targa: p.targa || '',
+          });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
+          if (c.serviziInfo.rsa) {
+            c.serviziInfo.rsa.interventiMese = (c.serviziInfo.rsa.interventiMese || 0) + 1;
+          }
+        },
+
+        on_memo_scadenza(p) {
+          const c = this._clienteByTarga(p.targa);
+          if (c.serviziInfo.memo) {
+            c.serviziInfo.memo.scadenzeImminenti = (c.serviziInfo.memo.scadenzeImminenti || 0) + 1;
+          }
+        },
+
+        on_consenso_aggiornato(p) {
+          const c = this.ac();
+          if (p.flag && c.tcFlags[p.flag]) {
+            c.tcFlags[p.flag].accettato = !!p.accettato;
+            c.tcFlags[p.flag].data = p.accettato ? new Date().toISOString() : null;
+          }
+        },
+
+        on_gestore_interazione(p) {
+          const c = this._clienteByTarga(p.targa);
+          c.casiAssistenza.unshift({
+            id: this._nextCasoIdFor(c),
+            dataApertura: new Date().toISOString(),
+            tipo: 'gestore_stazione',
+            descrizione: p.descrizione || 'Interazione con gestore stazione',
+            stato: 'aperto',
+            dataChiusura: null,
+            targa: p.targa || '',
+          });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
+        },
+
+        on_obu_associato(p) {
+          const c = this._clienteByTarga(p.targa);
+          if (c.serviziInfo.telepedaggio) {
+            c.serviziInfo.telepedaggio.obu = p.obu || '';
+          }
+        },
+
+        on_assistenza_obu_sostituito(p) {
+          const c = this.clienti.find(cl => cl.anagrafica?.cf?.toUpperCase() === (p.cf || '').toUpperCase());
+          if (!c) return;
+          if (c.serviziInfo.telepedaggio && p.obu_nuovo) {
+            c.serviziInfo.telepedaggio.obu = p.obu_nuovo;
+          }
+        },
+
+        on_crm_movimento_aggiornato(p) {
+          // Ricevuto da sé stesso quando si fa storno — no-op per evitare loop
+        },
+
+        on_scenario_trigger(p) { /* solo log */ },
+        on_sms_outbound(p)     { /* solo log */ },
+        on_email_outbound(p)   { /* solo log */ },
+        on_contratto_inviato(p){ /* solo log */ },
+
+        // ── Azioni CRM ──────────────────────────────────────────────
+        _nextCasoIdFor(clienteObj) {
+          const n = (clienteObj || this.ac()).casiAssistenza.length + 1;
+          return '#' + String(n).padStart(4, '0');
+        },
+
+        chiudiCaso(id) {
+          const caso = this.casiAssistenza.find(c => c.id === id);
+          if (!caso) return;
+          caso.stato = 'chiuso';
+          caso.dataChiusura = new Date().toISOString();
+          this._persistCasiAssistenza(this.ac().anagrafica.cf, this.ac().casiAssistenza);
+          Bus.emit('crm:caso_chiuso', { id, targa: caso.targa, descrizione: caso.descrizione });
+          this._addLog('crm:caso_chiuso', { id, targa: caso.targa });
+        },
+
+        aggiungiCaso() {
+          if (!this.nuovoCasoForm.descrizione.trim()) return;
+          const c = this.ac();
+          const id = this._nextCasoIdFor(c);
+          c.casiAssistenza.unshift({
+            id,
+            dataApertura: new Date().toISOString(),
+            tipo: this.nuovoCasoForm.tipo,
+            descrizione: this.nuovoCasoForm.descrizione.trim(),
+            stato: 'aperto',
+            dataChiusura: null,
+            targa: this.nuovoCasoForm.targa || (c.veicoli[0]?.targa || ''),
+          });
+          this._persistCasiAssistenza(c.anagrafica.cf, c.casiAssistenza);
+          this._addLog('crm:caso_aperto', { id, tipo: this.nuovoCasoForm.tipo });
+          this.nuovoCasoForm = { tipo: 'app', descrizione: '', targa: '' };
+          this.showNuovoCaso = false;
+        },
+
+        stornoMovimento(id) {
+          const c = this.ac();
+          const mov = c.movimenti.find(m => m.id === id);
+          if (!mov) return;
+          const storno = {
+            id: 'storno_' + Date.now(),
+            data: new Date().toISOString(),
+            servizio: mov.servizio,
+            descrizione: 'Storno: ' + mov.descrizione,
+            targa: mov.targa,
+            importo: -Math.abs(mov.importo),
+            stato: 'pagato',
+            source: 'crm',
+            dettagli: {},
+          };
+          c.movimenti.unshift(storno);
+          this._persistMovimentoDemo(c.anagrafica.cf, storno);
+          Bus.emit('crm:movimento_aggiornato', { tipo: 'storno', movimentoId: id, importo: storno.importo, targa: mov.targa, servizio: mov.servizio });
+          this._addLog('crm:movimento_aggiornato', { tipo: 'storno', movimentoId: id });
+        },
+
+        sospendiServizio(key) {
+          const c = this.ac();
+          if (!c.serviziInfo[key]) return;
+          c.serviziInfo[key].sospeso = true;
+          this._updateServizioAttivoDemo(c.anagrafica.cf, key, { attivo: false });
+          Bus.emit('crm:servizio_sospeso', { servizio: key, clienteId: c.id });
+          this._addLog('crm:servizio_sospeso', { servizio: key });
+        },
+
+        riattivaServizio(key) {
+          const c = this.ac();
+          if (!c.serviziInfo[key]) return;
+          c.serviziInfo[key].sospeso = false;
+          c.serviziInfo[key].attivo  = true;
+          this._updateServizioAttivoDemo(c.anagrafica.cf, key, { attivo: true });
+          this._addLog('crm:servizio_riattivato', { servizio: key });
+        },
+
+        // ── Computed ────────────────────────────────────────────────
+        serviziList() {
+          return Object.entries(this.serviziInfo).map(([key, val]) => ({ key, ...val }));
+        },
+
+        tcFlagsList() {
+          return Object.entries(this.tcFlags).map(([key, val]) => ({ key, ...val }));
+        },
+
+        movimentiFiltrati() {
+          return this.movimenti.filter(m => {
+            if (this.movFiltroServizio && m.servizio !== this.movFiltroServizio) return false;
+            if (this.movFiltroStato   && m.stato    !== this.movFiltroStato)    return false;
+            return true;
+          });
+        },
+
+        // ── Helpers UI ──────────────────────────────────────────────
+        formatDate(iso) {
+          if (!iso) return '—';
+          const s = (iso + '').split('T')[0];
+          const [y, m, d] = s.split('-');
+          return `${d}/${m}/${y}`;
+        },
+
+        formatDateTime(iso) {
+          if (!iso) return '—';
+          const d = new Date(iso);
+          const pad = n => String(n).padStart(2, '0');
+          return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${String(d.getFullYear()).slice(2)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        },
+
+        formatEur(val) {
+          if (val === undefined || val === null) return '—';
+          return (val < 0 ? '−' : '') + '€\u202f' + Math.abs(val).toFixed(2);
+        },
+
+        canaleClass(c) {
+          return { stazione: 'bg-orange-100 text-orange-700', app: 'bg-blue-100 text-blue-700', web: 'bg-green-100 text-green-700' }[c] || 'bg-gray-100 text-gray-600';
+        },
+        canaleLabel(c) {
+          return { stazione: 'Stazione', app: 'App', web: 'Web' }[c] || c;
+        },
+
+        servizioClass(s) {
+          return {
+            telepedaggio: 'bg-blue-100 text-blue-700',
+            strisce_blu:  'bg-indigo-100 text-indigo-700',
+            rsa:          'bg-orange-100 text-orange-700',
+            areac:        'bg-purple-100 text-purple-700',
+            memo:         'bg-amber-100 text-amber-700',
+            parcheggi:    'bg-teal-100 text-teal-700',
+            altro:        'bg-gray-100 text-gray-600',
+          }[s] || 'bg-gray-100 text-gray-600';
+        },
+        servizioLabel(s) {
+          return { telepedaggio: 'Telepedaggio', strisce_blu: 'Strisce Blu', rsa: 'RSA', areac: 'Area C', memo: 'Memo', parcheggi: 'Parcheggi', altro: 'Altro' }[s] || s;
+        },
+
+        statoMovClass(s) {
+          return { pagato: 'bg-green-100 text-green-700', 'in corso': 'bg-yellow-100 text-yellow-700', errore: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600';
+        },
+
+        statoCasoClass(s) {
+          return { aperto: 'bg-red-100 text-red-700', 'in lavorazione': 'bg-yellow-100 text-yellow-700', chiuso: 'bg-gray-100 text-gray-500' }[s] || 'bg-gray-100 text-gray-600';
+        },
+
+        tipoCasoClass(t) {
+          return { rsa: 'bg-orange-100 text-orange-700', app: 'bg-blue-100 text-blue-700', gestore_stazione: 'bg-green-100 text-green-700', customer_care: 'bg-purple-100 text-purple-700' }[t] || 'bg-gray-100 text-gray-600';
+        },
+        tipoCasoLabel(t) {
+          return { rsa: 'RSA', app: 'App', gestore_stazione: 'Gestore stazione', customer_care: 'Customer care' }[t] || t;
+        },
+
+        veicoloIcon(t) {
+          return { auto: 'fa-car', moto: 'fa-motorcycle', furgone: 'fa-truck' }[t] || 'fa-car';
+        },
+
+        sourceIcon(s) {
+          return { app: 'fa-mobile-screen', crm: 'fa-building' }[s] || null;
+        },
+      };
+    }
+  </script>
+</head>
+
+<body x-data="crmData()">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════════════════════════════ -->
+  <header style="background: var(--color-primary-dark); height: 56px;"
+          class="flex items-center px-6 justify-between shadow-md relative z-10">
+
+    <!-- Logo + titolo -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+        <span style="color: var(--color-primary-dark); font-weight: 900; font-size: 13px; letter-spacing: -0.5px;">EN</span>
+      </div>
+      <span class="text-white font-bold text-base tracking-tight">Enilive</span>
+      <span class="text-white/30 text-lg font-thin mx-0.5">|</span>
+      <span class="text-white/70 text-sm font-medium">CRM Simulato</span>
+    </div>
+
+    <!-- Destra: log pause + switcher clienti -->
+    <div class="flex items-center gap-3">
+      <!-- Pausa log indicator -->
+      <div x-show="logPaused" class="flex items-center gap-1.5 bg-yellow-500/20 rounded-full px-3 py-1">
+        <i class="fa-solid fa-pause text-yellow-400 text-xs"></i>
+        <span class="text-yellow-300 text-xs font-semibold">Log in pausa</span>
+        <span x-show="logBuffer.length > 0"
+              class="bg-yellow-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold leading-none"
+              x-text="logBuffer.length"></span>
+      </div>
+
+      <!-- Switcher clienti -->
+      <button @click="showRoster = true"
+              class="flex items-center gap-2.5 bg-white/10 hover:bg-white/20 rounded-full px-4 py-1.5 transition cursor-pointer">
+        <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0"></div>
+        <span class="text-white text-sm font-semibold" x-text="ac().anagrafica.nome"></span>
+        <span class="text-white/40 text-xs hidden sm:inline" x-text="ac().anagrafica.cf"></span>
+        <span class="bg-white/20 text-white text-xs rounded-full px-2 py-0.5 font-bold ml-1"
+              x-text="clienti.length"></span>
+        <i class="fa-solid fa-chevron-down text-white/50 text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       ROSTER DRAWER — Lista clienti
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div x-show="showRoster" x-transition.opacity class="roster-overlay" @click="showRoster = false"></div>
+
+  <div x-show="showRoster"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="transform translate-x-full"
+       x-transition:enter-end="transform translate-x-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="transform translate-x-0"
+       x-transition:leave-end="transform translate-x-full"
+       class="roster-panel">
+
+    <div class="roster-header">
+      <div>
+        <div class="font-semibold text-gray-800 text-sm">Clienti registrati</div>
+        <div class="text-xs text-gray-400 mt-0.5" x-text="clienti.length + ' client' + (clienti.length === 1 ? 'e' : 'i')"></div>
+      </div>
+      <button @click="showRoster = false" class="text-gray-400 hover:text-gray-600 p-1 rounded transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="roster-list">
+      <template x-for="(c, idx) in clienti" :key="c.id">
+        <div class="roster-item"
+             :class="c.id === clienteAttivoId ? 'active' : ''"
+             @click="selezionaCliente(c.id)">
+
+          <!-- Avatar -->
+          <div class="roster-avatar"
+               :style="'background:' + avatarColor(idx)">
+            <span x-text="avatarInitials(c.anagrafica.nome)"></span>
+          </div>
+
+          <!-- Info -->
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm text-gray-800 truncate" x-text="c.anagrafica.nome"></div>
+            <div class="text-xs text-gray-400 font-mono truncate" x-text="c.anagrafica.cf"></div>
+            <div class="flex items-center gap-1 mt-1 flex-wrap">
+              <span class="badge" :class="canaleClass(c.anagrafica.canale)" x-text="canaleLabel(c.anagrafica.canale)"></span>
+              <span class="text-xs text-gray-400"
+                    x-text="Object.values(c.serviziInfo).filter(s => s.attivo).length + ' servizi attivi'"></span>
+            </div>
+          </div>
+
+          <!-- Check se attivo -->
+          <div x-show="c.id === clienteAttivoId" style="color: var(--color-primary);">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       MAIN GRID
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="crm-layout" :class="{ 'log-collapsed': logCollapsed }">
+
+    <!-- ██████████████████████████████████████████████████████████████
+         COLONNA SINISTRA — Scheda cliente
+         ██████████████████████████████████████████████████████████████ -->
+    <div class="col-scroll" style="border-right: 1px solid var(--color-border);">
+
+      <!-- Anagrafica ──────────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-user mr-1.5"></i>Anagrafica</span>
+          <span class="badge" :class="canaleClass(cliente.canale)" x-text="canaleLabel(cliente.canale)"></span>
+        </div>
+        <div class="card-body">
+          <div class="field-row">
+            <span class="field-label">Nome</span>
+            <span class="field-value" x-text="cliente.nome"></span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Codice Fiscale</span>
+            <span class="field-value font-mono" style="font-size: 11px;" x-text="cliente.cf"></span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Email</span>
+            <span class="field-value" style="font-size: 12px;" x-text="cliente.email"></span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Telefono</span>
+            <span class="field-value" x-text="cliente.telefono"></span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Iscritto dal</span>
+            <span class="field-value" x-text="formatDate(cliente.dataIscrizione)"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Garage veicoli ─────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-car mr-1.5"></i>Garage veicoli</span>
+          <span class="text-xs text-gray-400"
+                x-text="veicoli.length + ' veicol' + (veicoli.length === 1 ? 'o' : 'i')"></span>
+        </div>
+        <div class="card-body" style="padding-top: 8px; padding-bottom: 8px;">
+          <template x-for="v in veicoli" :key="v.targa">
+            <div class="rounded-lg p-3 mb-2 last:mb-0" style="background: #f8fafc; border: 1px solid #f0f0f0;">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid text-gray-400 text-xs" :class="veicoloIcon(v.tipo)"></i>
+                  <span class="font-bold font-mono text-sm" x-text="v.targa"></span>
+                </div>
+                <span class="text-xs text-gray-500" x-text="(v.marca + ' ' + v.modello).trim() || '—'"></span>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <template x-for="s in v.servizi" :key="s">
+                  <span class="badge" :class="servizioClass(s)" x-text="servizioLabel(s)"></span>
+                </template>
+                <span x-show="v.servizi.length === 0" class="text-xs text-gray-400 italic">Nessun servizio</span>
+              </div>
+            </div>
+          </template>
+          <div x-show="veicoli.length === 0" class="text-xs text-gray-400 italic text-center py-3">
+            Nessun veicolo registrato
+          </div>
+        </div>
+      </div>
+
+      <!-- Consensi & T&C ─────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-file-contract mr-1.5"></i>Consensi & T&C</span>
+          <span class="text-xs text-gray-400"
+                x-text="tcFlagsList().filter(f => f.accettato).length + '/' + tcFlagsList().length"></span>
+        </div>
+        <div style="padding: 0;">
+          <template x-for="flag in tcFlagsList()" :key="flag.key">
+            <div class="flex items-center justify-between px-4 py-2.5"
+                 style="border-bottom: 1px solid #f5f5f5;">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-solid text-sm flex-shrink-0"
+                   :class="flag.accettato ? 'fa-circle-check text-green-500' : 'fa-circle-xmark text-red-400'"></i>
+                <span class="text-xs font-medium" x-text="flag.label"></span>
+              </div>
+              <span class="text-xs text-gray-400 font-mono flex-shrink-0 ml-2"
+                    x-text="flag.data ? formatDate(flag.data) : '—'"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div><!-- /col-sinistra -->
+
+
+    <!-- ██████████████████████████████████████████████████████████████
+         COLONNA CENTRALE — Servizi, Movimenti, Casi
+         ██████████████████████████████████████████████████████████████ -->
+    <div class="col-scroll" style="border-right: 1px solid var(--color-border);">
+
+      <!-- Servizi ────────────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-table-cells-large mr-1.5"></i>Servizi</span>
+          <span class="text-xs text-gray-400"
+                x-text="serviziList().filter(s => s.attivo).length + ' attivi su ' + serviziList().length"></span>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-cols-3 gap-2">
+            <template x-for="s in serviziList()" :key="s.key">
+              <div class="service-card"
+                   :class="s.sospeso ? 'sospeso' : (s.attivo ? 'attivo' : 'inattivo')">
+
+                <div class="flex items-center gap-1.5 mb-1.5">
+                  <i class="fa-solid text-xs" :class="s.icon"
+                     :style="s.attivo ? 'color: var(--color-primary)' : 'color: #9ca3af'"></i>
+                  <span class="text-xs font-semibold leading-tight truncate" x-text="s.nome"></span>
+                </div>
+
+                <div class="mb-2">
+                  <span x-show="s.attivo && !s.sospeso" class="badge bg-green-100 text-green-700">
+                    <i class="fa-solid fa-circle text-green-500" style="font-size: 6px;"></i> Attivo
+                  </span>
+                  <span x-show="s.sospeso" class="badge bg-orange-100 text-orange-700">
+                    <i class="fa-solid fa-pause text-orange-500" style="font-size: 8px;"></i> Sospeso
+                  </span>
+                  <span x-show="!s.attivo && !s.sospeso" class="badge bg-gray-100 text-gray-500">Inattivo</span>
+                </div>
+
+                <div class="text-xs text-gray-500 space-y-0.5" style="min-height: 32px;">
+                  <template x-if="s.key === 'telepedaggio' && s.attivo">
+                    <div>
+                      <div class="font-mono text-gray-600 truncate" style="font-size: 10px;" x-text="s.obu || '—'"></div>
+                      <div>Saldo: <span class="font-semibold text-gray-700" x-text="'€ ' + (s.saldo || 0).toFixed(2)"></span></div>
+                    </div>
+                  </template>
+                  <template x-if="s.key === 'rsa' && s.attivo">
+                    <div>
+                      <div class="font-mono text-gray-600 truncate" style="font-size: 10px;" x-text="s.codice || '—'"></div>
+                      <div>Interventi: <span class="font-semibold text-gray-700" x-text="s.interventiMese || 0"></span></div>
+                    </div>
+                  </template>
+                  <template x-if="s.key === 'areac' && s.attivo">
+                    <div>Transiti/mese: <span class="font-semibold text-gray-700" x-text="s.transitiMese || 0"></span></div>
+                  </template>
+                  <template x-if="s.key === 'memo' && s.attivo">
+                    <div>
+                      Scad. imminenti:
+                      <span class="font-semibold"
+                            :class="(s.scadenzeImminenti || 0) > 0 ? 'text-amber-600' : 'text-gray-700'"
+                            x-text="s.scadenzeImminenti || 0"></span>
+                    </div>
+                  </template>
+                  <template x-if="s.key === 'parcheggi' && s.attivo">
+                    <div>Accessi/mese: <span class="font-semibold text-gray-700" x-text="s.accessiMese || 0"></span></div>
+                  </template>
+                  <div x-show="s.attivo && s.dataAttivazione"
+                       class="text-gray-400" style="font-size: 10px;"
+                       x-text="'Dal ' + formatDate(s.dataAttivazione)"></div>
+                  <div x-show="!s.attivo" class="text-gray-400 italic" style="font-size: 10px;">Non attivato</div>
+                </div>
+
+                <div class="mt-2" x-show="s.attivo">
+                  <button x-show="!s.sospeso" @click="sospendiServizio(s.key)"
+                    class="text-xs px-2 py-0.5 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 transition w-full">
+                    Sospendi
+                  </button>
+                  <button x-show="s.sospeso" @click="riattivaServizio(s.key)"
+                    class="text-xs px-2 py-0.5 rounded border border-green-200 text-green-600 hover:bg-green-50 transition w-full">
+                    Riattiva
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Movimenti ──────────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <i class="fa-solid fa-list mr-1.5"></i>Movimenti
+            <span class="text-gray-400 ml-1 normal-case font-normal"
+                  x-text="'(' + movimentiFiltrati().length + ')'"></span>
+          </span>
+          <div class="flex items-center gap-2">
+            <select x-model="movFiltroServizio"
+              class="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-600 bg-white focus:outline-none focus:border-blue-300">
+              <option value="">Tutti i servizi</option>
+              <option value="telepedaggio">Telepedaggio</option>
+              <option value="strisce_blu">Strisce Blu</option>
+              <option value="rsa">RSA</option>
+              <option value="areac">Area C</option>
+              <option value="memo">Memo</option>
+              <option value="parcheggi">Parcheggi</option>
+            </select>
+            <select x-model="movFiltroStato"
+              class="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-600 bg-white focus:outline-none focus:border-blue-300">
+              <option value="">Tutti gli stati</option>
+              <option value="pagato">Pagato</option>
+              <option value="in corso">In corso</option>
+              <option value="errore">Errore</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="crm-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Servizio</th>
+                <th>Descrizione</th>
+                <th>Targa</th>
+                <th style="text-align: right;">€</th>
+                <th>Stato</th>
+                <th>Src</th>
+                <th style="width: 28px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="m in movimentiFiltrati()" :key="m.id">
+                <tr>
+                  <td class="text-gray-500 whitespace-nowrap" x-text="formatDateTime(m.data)"></td>
+                  <td><span class="badge" :class="servizioClass(m.servizio)" x-text="servizioLabel(m.servizio)"></span></td>
+                  <td class="text-gray-700" style="max-width: 160px;">
+                    <span class="block truncate" x-text="m.descrizione"></span>
+                  </td>
+                  <td class="font-mono text-gray-600" style="font-size: 11px;" x-text="m.targa"></td>
+                  <td style="text-align: right; white-space: nowrap;"
+                      class="font-semibold"
+                      :class="m.importo < 0 ? 'text-red-600' : 'text-gray-800'"
+                      x-text="formatEur(m.importo)"></td>
+                  <td><span class="badge" :class="statoMovClass(m.stato)" x-text="m.stato"></span></td>
+                  <td class="text-gray-400">
+                    <i class="fa-solid"
+                       :class="m.source === 'app' ? 'fa-mobile-screen text-blue-400' : m.source === 'crm' ? 'fa-building text-gray-400' : 'fa-circle text-gray-300'"
+                       :title="m.source === 'app' ? 'Da app cliente' : m.source === 'crm' ? 'Da CRM' : ''"
+                       style="font-size: 10px;"></i>
+                  </td>
+                  <td>
+                    <button x-show="m.stato === 'pagato' && m.importo > 0"
+                      @click="stornoMovimento(m.id)"
+                      class="text-gray-400 hover:text-red-500 transition p-1 rounded hover:bg-red-50"
+                      title="Esegui storno">
+                      <i class="fa-solid fa-rotate-left" style="font-size: 11px;"></i>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="movimentiFiltrati().length === 0">
+                <td colspan="8" class="text-center text-gray-400 py-5 text-xs italic">
+                  Nessun movimento trovato
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Casi assistenza ────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-headset mr-1.5"></i>Casi assistenza</span>
+          <button @click="showNuovoCaso = !showNuovoCaso"
+            class="text-xs font-semibold px-3 py-1 rounded-full transition flex items-center gap-1"
+            style="background: var(--color-primary-light); color: var(--color-primary);">
+            <i class="fa-solid" :class="showNuovoCaso ? 'fa-xmark' : 'fa-plus'"></i>
+            <span x-text="showNuovoCaso ? 'Annulla' : 'Nuovo caso'"></span>
+          </button>
+        </div>
+
+        <!-- Form nuovo caso -->
+        <div x-show="showNuovoCaso" x-transition class="p-4 border-b border-blue-100" style="background: #eff6ff;">
+          <div class="grid gap-3 mb-3" style="grid-template-columns: 1fr 1fr auto;">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Tipo</label>
+              <select x-model="nuovoCasoForm.tipo"
+                class="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-blue-300">
+                <option value="app">App</option>
+                <option value="rsa">RSA</option>
+                <option value="gestore_stazione">Gestore stazione</option>
+                <option value="customer_care">Customer care</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Targa</label>
+              <select x-model="nuovoCasoForm.targa"
+                class="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-blue-300">
+                <template x-for="v in veicoli" :key="v.targa">
+                  <option :value="v.targa" x-text="v.targa"></option>
+                </template>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button @click="aggiungiCaso()"
+                class="text-sm font-semibold px-4 py-1.5 rounded-md text-white transition whitespace-nowrap"
+                style="background: var(--color-primary);">
+                <i class="fa-solid fa-save mr-1"></i>Salva
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Descrizione</label>
+            <input x-model="nuovoCasoForm.descrizione" type="text"
+                   placeholder="Descrizione del caso..."
+                   class="w-full text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-300"
+                   @keydown.enter="aggiungiCaso()" />
+          </div>
+        </div>
+
+        <!-- Tabella casi -->
+        <div class="overflow-x-auto">
+          <table class="crm-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Aperto</th>
+                <th>Tipo</th>
+                <th>Descrizione</th>
+                <th>Targa</th>
+                <th>Stato</th>
+                <th>Chiuso</th>
+                <th style="width: 28px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="c in casiAssistenza" :key="c.id">
+                <tr>
+                  <td class="font-mono text-gray-500" style="font-size: 11px;" x-text="c.id"></td>
+                  <td class="text-gray-500 whitespace-nowrap" style="font-size: 11px;" x-text="formatDateTime(c.dataApertura)"></td>
+                  <td><span class="badge" :class="tipoCasoClass(c.tipo)" x-text="tipoCasoLabel(c.tipo)"></span></td>
+                  <td class="text-gray-700" style="max-width: 150px;">
+                    <span class="block truncate text-xs" x-text="c.descrizione"></span>
+                  </td>
+                  <td class="font-mono text-gray-600" style="font-size: 11px;" x-text="c.targa"></td>
+                  <td><span class="badge" :class="statoCasoClass(c.stato)" x-text="c.stato"></span></td>
+                  <td class="text-gray-400 whitespace-nowrap" style="font-size: 11px;" x-text="formatDateTime(c.dataChiusura)"></td>
+                  <td>
+                    <button x-show="c.stato !== 'chiuso'" @click="chiudiCaso(c.id)"
+                      class="text-gray-400 hover:text-green-600 transition p-1 rounded hover:bg-green-50"
+                      title="Chiudi caso">
+                      <i class="fa-solid fa-check" style="font-size: 11px;"></i>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="casiAssistenza.length === 0">
+                <td colspan="8" class="text-center text-gray-400 py-5 text-xs italic">
+                  Nessun caso di assistenza
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /col-centrale -->
+
+
+    <!-- ██████████████████████████████████████████████████████████████
+         COLONNA DESTRA — Log eventi live
+         ██████████████████████████████████████████████████████████████ -->
+    <div style="height:100%;overflow:hidden;">
+
+    <!-- Stato collassato: tab verticale -->
+    <div x-show="logCollapsed" class="log-collapsed-tab" @click="logCollapsed = false" title="Apri log eventi">
+      <div class="log-live-dot" :class="logPaused ? 'bg-yellow-500' : 'animate-pulse'"></div>
+      <span class="log-collapsed-label">Log eventi</span>
+      <span x-show="logEventi.length > 0"
+            class="text-xs font-bold text-slate-500 mt-auto mb-3"
+            x-text="logEventi.length"></span>
+    </div>
+
+    <!-- Stato espanso: pannello completo -->
+    <div x-if="!logCollapsed" class="log-panel">
+
+      <div class="log-header">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full flex-shrink-0"
+               :class="logPaused ? 'bg-yellow-500' : 'bg-green-400 animate-pulse'"></div>
+          <span class="text-white text-sm font-semibold">Log eventi live</span>
+          <span x-show="logEventi.length > 0" class="text-slate-400 text-xs"
+                x-text="logEventi.length + '/50'"></span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button @click="toggleLogPause()"
+            class="text-xs px-2.5 py-1 rounded flex items-center gap-1.5 transition font-medium"
+            :class="logPaused
+              ? 'bg-yellow-500/80 text-white hover:bg-yellow-500'
+              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'">
+            <i class="fa-solid" :class="logPaused ? 'fa-play' : 'fa-pause'"></i>
+            <span x-text="logPaused ? 'Riprendi' : 'Pausa'"></span>
+          </button>
+          <button @click="clearLog()"
+            class="text-xs px-2.5 py-1 rounded bg-slate-600 text-slate-200 hover:bg-slate-500 transition flex items-center gap-1.5 font-medium">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+          <button @click="logCollapsed = true"
+            class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200 transition"
+            title="Nascondi log">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Buffer notice -->
+      <div x-show="logPaused && logBuffer.length > 0"
+           class="flex items-center justify-between px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/20">
+        <span class="text-yellow-300 text-xs">
+          <i class="fa-solid fa-clock mr-1"></i>
+          <span x-text="logBuffer.length + ' event' + (logBuffer.length === 1 ? 'o' : 'i') + ' in coda'"></span>
+        </span>
+        <button @click="toggleLogPause()"
+          class="text-yellow-400 text-xs font-semibold hover:text-yellow-300 transition">
+          Pubblica ora →
+        </button>
+      </div>
+
+      <div class="log-entries">
+        <div x-show="logEventi.length === 0"
+             class="flex flex-col items-center justify-center h-full py-16 text-slate-600">
+          <i class="fa-solid fa-satellite-dish text-3xl mb-4 opacity-50"></i>
+          <div class="text-sm font-medium text-slate-500">In attesa di eventi</div>
+          <div class="text-xs mt-1 text-slate-600 text-center leading-relaxed px-4">
+            Apri l'app cliente o il tablet operatore<br>per vedere i messaggi qui in tempo reale
+          </div>
+        </div>
+
+        <template x-for="entry in logEventi" :key="entry.id">
+          <div class="log-entry" @click="entry.expanded = !entry.expanded">
+            <div class="log-entry-header">
+              <div class="w-2 h-2 rounded-full flex-shrink-0"
+                   :style="'background:' + logDotColor(entry.evento)"></div>
+              <span class="log-ts" x-text="entry.ts"></span>
+              <span class="log-event-name flex-1 truncate"
+                    :style="'color:' + logDotColor(entry.evento)"
+                    x-text="entry.evento"></span>
+              <i class="fa-solid fa-chevron-down text-slate-600 transition-transform duration-150 flex-shrink-0"
+                 style="font-size: 9px;"
+                 :style="entry.expanded ? 'transform: rotate(180deg)' : ''"></i>
+            </div>
+            <div class="log-summary" x-text="payloadSummary(entry.payload)"></div>
+            <div x-show="entry.expanded" x-transition class="log-payload"
+                 x-text="JSON.stringify(entry.payload, null, 2)"></div>
+          </div>
+        </template>
+      </div>
+    </div><!-- /log-panel espanso -->
+    </div><!-- /col-destra wrapper -->
+
+  </div><!-- /crm-layout -->
+
+</body>
+</html>

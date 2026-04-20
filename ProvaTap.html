@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Tablet - Nexi Integration</title>
+    <script src="https://tailwindcss.com"></script>
+    <style>
+        .nfc-pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .hidden-step { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex items-center justify-center p-4">
+
+    <!-- Tablet Container -->
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border-8 border-gray-800">
+        
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold">Attivazione Mandato SDD</h1>
+            <p class="text-blue-100 text-sm">Configurazione conto corrente cliente</p>
+        </div>
+
+        <div class="p-8">
+            
+            <!-- STEP 1: NFC TAP -->
+            <div id="step-nfc" class="text-center py-10">
+                <div class="nfc-pulse w-32 h-32 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8">
+                    <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A10.003 10.003 0 0012 3m0 0c.345 0 .685.027 1.016.078M12 3a10.003 10.003 0 011.233 19.866M12 21c-3.517 0-6.799-1.009-9.571-2.753m0 0L2.1 18.1m0 0a10.003 10.003 0 0119.866-1.233M12 21c.345 0 .685-.027 1.016-.078"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold mb-2">Avvicina la carta al sensore</h2>
+                <p class="text-gray-500 mb-6">Stiamo cercando di identificare l'IBAN tramite NFC...</p>
+                <button onclick="simulateFailure()" class="text-blue-600 underline text-sm">La carta non risponde? Usa QR Code</button>
+            </div>
+
+            <!-- STEP 2: LOADING -->
+            <div id="step-loading" class="hidden-step text-center py-10">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-lg">Interrogazione Nexi Open in corso...</p>
+            </div>
+
+            <!-- STEP 3: NEXI OPEN QR CODE -->
+            <div id="step-qr" class="hidden-step text-center py-4">
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 text-left">
+                    <p class="text-sm text-yellow-700">IBAN non trovato via NFC. Per favore, inquadra il QR Code per accedere alla tua banca.</p>
+                </div>
+                <div class="bg-white p-4 border-2 border-gray-200 inline-block rounded-xl mb-4">
+                    <!-- Placeholder per QR Code Nexi -->
+                    <img src="https://qrserver.com" alt="QR Code" class="w-48 h-48">
+                </div>
+                <h2 class="text-lg font-bold">Scansiona con il tuo smartphone</h2>
+                <p class="text-gray-500 text-sm">Autorizza l'invio dell'IBAN in 10 secondi</p>
+            </div>
+
+            <!-- STEP 4: SUCCESS -->
+            <div id="step-success" class="hidden-step text-center py-10 text-green-600">
+                <svg class="w-20 h-20 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h2 class="text-2xl font-bold">IBAN Ricevuto!</h2>
+                <p class="text-gray-700 mt-2 font-mono bg-gray-100 p-2 rounded">IT 99 X 01234 05678 000012345678</p>
+                <button class="mt-8 bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">Firma Mandato SDD</button>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 p-4 border-t border-gray-100 flex justify-between items-center px-8">
+            <span class="text-xs text-gray-400 font-bold uppercase tracking-widest">Powered by Nexi Open</span>
+            <span class="text-xs text-blue-500">ID Sessione: #849201</span>
+        </div>
+    </div>
+
+    <script>
+        function simulateFailure() {
+            // Nasconde NFC e mostra Loading
+            document.getElementById('step-nfc').classList.add('hidden-step');
+            document.getElementById('step-loading').classList.remove('hidden-step');
+
+            // Dopo 2 secondi mostra il QR Code (Fallimento NFC -> Fallback Open Banking)
+            setTimeout(() => {
+                document.getElementById('step-loading').classList.add('hidden-step');
+                document.getElementById('step-qr').classList.remove('hidden-step');
+                
+                // Simula ricezione dati dopo 5 secondi (il cliente scansiona)
+                setTimeout(() => {
+                    document.getElementById('step-qr').classList.add('hidden-step');
+                    document.getElementById('step-success').classList.remove('hidden-step');
+                }, 5000);
+
+            }, 2000);
+        }
+
+        // Simula il tap automatico dopo 3 secondi per mostrare l'animazione
+        setTimeout(simulateFailure, 4000);
+    </script>
+</body>
+</html>

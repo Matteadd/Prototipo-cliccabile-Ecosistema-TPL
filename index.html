@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enilive — Demo System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:       #117299;
+    --teal-dark:  #0d4f6f;
+    --teal-light: #e6f4f9;
+    --teal-mid:   #1e9fd8;
+    --ink:        #0f1923;
+    --ink-2:      #2c3e4a;
+    --muted:      #6b8190;
+    --border:     #dde6eb;
+    --bg:         #f5f8fa;
+    --white:      #ffffff;
+    --green:      #0f9d6a;
+    --amber:      #d97706;
+    --purple:     #6d4bb5;
+    --coral:      #d94f3d;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 0 48px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    background: var(--teal);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-mark svg { width: 18px; height: 18px; }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+  }
+
+  .logo-text span { color: var(--teal); }
+
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 48px 80px;
+  }
+
+  /* ── TITOLO TOP ── */
+  .page-title {
+    margin-bottom: 32px;
+  }
+
+  .page-title h1 {
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--ink);
+    letter-spacing: -0.8px;
+    margin-bottom: 6px;
+  }
+
+  .page-title h1 strong {
+    font-weight: 600;
+    color: var(--teal);
+  }
+
+  .page-title p {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── PANNELLI PRINCIPALI ── */
+  .panels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .panel-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-card:hover {
+    box-shadow: 0 8px 32px rgba(17, 114, 153, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .panel-card-top {
+    padding: 24px 24px 18px;
+    border-bottom: 1px solid var(--border);
+    flex: 1;
+  }
+
+  .panel-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 20px;
+  }
+
+  .panel-card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+
+  .panel-card .filename {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .panel-card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+
+  .panel-card-bottom {
+    padding: 16px 24px;
+    background: var(--bg);
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot.green  { background: var(--green); }
+  .dot.amber  { background: var(--amber); }
+
+  .open-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--white);
+    background: var(--teal);
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+
+  .open-btn:hover { background: var(--teal-dark); }
+  .open-btn svg { width: 15px; height: 15px; }
+
+  /* ── COLORI PANNELLI ── */
+  .c-blue   { background: #eef5ff; }
+  .c-blue   .panel-icon { background: #dbeafe; }
+  .c-green  { background: #edfaf4; }
+  .c-green  .panel-icon { background: #d1fae9; }
+  .c-purple { background: #f3f0ff; }
+  .c-purple .panel-icon { background: #ede9fe; }
+
+  .tag-blue   { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+  .tag-green  { background: #d1fae9; color: #065f46; border-color: #a7f3d0; }
+  .tag-purple { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+
+  /* ── GUIDA IN ROSSO ── */
+  .guida {
+    background: #fff5f5;
+    border: 2px solid #fca5a5;
+    border-radius: 14px;
+    padding: 24px 28px;
+    margin-bottom: 48px;
+  }
+
+  .guida-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #b91c1c;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .guida-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .guida-step {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .guida-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #b91c1c;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .guida-step strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: #7f1d1d;
+    line-height: 1.3;
+  }
+
+  .guida-step p {
+    font-size: 12px;
+    color: #991b1b;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .guida-note {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #fca5a5;
+    font-size: 12px;
+    color: #b91c1c;
+    font-weight: 500;
+  }
+
+  /* ── FLOWCHART ── */
+  .flows-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 48px;
+    transition: box-shadow 0.2s;
+  }
+
+  .flows-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+
+  .flows-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .flows-info p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .flows-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .chip {
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  /* ── SERVIZI ── */
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+
+  .service-pill {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .service-pill .s-icon { font-size: 22px; }
+  .service-pill .s-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+  .service-pill .s-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .s-done { background: #e6f7f1; color: #0a7a52; border: 1px solid #9de0c6; }
+  .s-wip  { background: #fff8e6; color: #92580a; border: 1px solid #f5d08a; }
+  .s-todo { background: #f0f4f7; color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── BUS INFO ── */
+  .bus-section {
+    background: var(--ink);
+    border-radius: 16px;
+    padding: 28px 32px;
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+  }
+
+  .bus-left { flex: 1; }
+  .bus-left h3 {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--teal-mid);
+    margin-bottom: 8px;
+  }
+  .bus-left p { font-size: 13px; color: #8aa3b0; line-height: 1.65; }
+
+  .bus-events {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .bus-event {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bus-event .ev-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .ev-teal   { background: rgba(30,159,216,0.15); color: #5dc8f0; }
+  .ev-teal   .ev-dot { background: #1e9fd8; }
+  .ev-blue   { background: rgba(99,148,220,0.15); color: #8ab4f0; }
+  .ev-blue   .ev-dot { background: #6394dc; }
+  .ev-green  { background: rgba(15,157,106,0.15); color: #4dc99a; }
+  .ev-green  .ev-dot { background: #0f9d6a; }
+  .ev-purple { background: rgba(109,75,181,0.15); color: #b09ee0; }
+  .ev-purple .ev-dot { background: #6d4bb5; }
+  .ev-amber  { background: rgba(217,119,6,0.15); color: #f5c26e; }
+  .ev-amber  .ev-dot { background: #d97706; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-card { animation: fadeUp 0.4s ease both; }
+  .panel-card:nth-child(2) { animation-delay: 0.06s; }
+  .panel-card:nth-child(3) { animation-delay: 0.12s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/>
+        <path d="M9 5v4l2.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-text"><span>Enilive</span> Demo System</span>
+  </div>
+  <span class="header-badge">PROTOTYPE · NOT FOR PRODUCTION</span>
+</header>
+
+<main class="main">
+
+  <div class="page-title">
+    <h1>Demo <strong>multi-pannello</strong> — Telepedaggio + Servizi Ancillari</h1>
+    <p>Apri i tre pannelli in finestre separate e interagisci: le azioni si propagano in tempo reale.</p>
+  </div>
+
+  <!-- PANNELLI PRINCIPALI — PRIMA COSA -->
+  <div class="section-label">Pannelli — aprire in finestre separate</div>
+  <div class="panels-grid">
+
+    <div class="panel-card">
+      <div class="panel-card-top c-blue">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
+        <div class="panel-icon">📱</div>
+        <h3>App Cliente</h3>
+        <div class="filename">protoConEmulatore.html</div>
+        <p>App mobile Enilive con pannello scenari per attivare situazioni di demo: notifiche, errori pagamento, lock screen, proroga sosta.</p>
+        <div class="tag-list">
+          <span class="tag tag-blue">Alpine.js</span>
+          <span class="tag tag-blue">Emulatore</span>
+          <span class="tag tag-blue">Bus</span>
+        </div>
+      </div>
+      <div class="panel-card-bottom">
+        <a href="protoConEmulatore.html" target="_blank" class="open-btn">
+          Apri
+          <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-card-top c-purple">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
+        <div class="panel-icon">🖥️</div>
+        <h3>CRM Simulato</h3>
+        <div class="filename">crm.html</div>
+        <p>Pannello back-office con scheda cliente, stato servizi e log eventi live. Si aggiorna in tempo reale dalle azioni dell'app e del tablet.</p>
+        <div class="tag-list">
+          <span class="tag tag-purple">Scheda cliente</span>
+          <span class="tag tag-purple">Log eventi</span>
+          <span class="tag tag-purple">Bus</span>
+        </div>
+      </div>
+      <div class="panel-card-bottom">
+        <a href="crm.html" target="_blank" class="open-btn">
+          Apri
+          <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-card-top c-green">
+        <div class="status-dot" style="margin-bottom:14px;"><div class="dot green"></div> Operativo</div>
+        <div class="panel-icon">📋</div>
+        <h3>Tablet Operatore</h3>
+        <div class="filename">tablet.html</div>
+        <p>Tablet del gestore Enilive Station per l'onboarding del cliente: anagrafica, veicolo, firma contratto Telepedaggio e attivazione servizi.</p>
+        <div class="tag-list">
+          <span class="tag tag-green">Onboarding</span>
+          <span class="tag tag-green">Firma contratto</span>
+          <span class="tag tag-green">Bus</span>
+        </div>
+      </div>
+      <div class="panel-card-bottom">
+        <a href="tablet.html" target="_blank" class="open-btn">
+          Apri
+          <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GUIDA IN ROSSO -->
+  <div class="guida">
+    <div class="guida-title">⚠️ Come usare la demo</div>
+    <div class="guida-steps">
+
+      <div class="guida-step">
+        <div class="guida-num">1</div>
+        <strong>Apri i 3 pannelli in finestre separate</strong>
+        <p>Tutti nello <strong>stesso browser</strong> sullo stesso dispositivo — necessario per la comunicazione in tempo reale.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">2</div>
+        <strong>Registra un cliente dal Tablet</strong>
+        <p>Compila il form di onboarding sul 📋 Tablet: anagrafica, veicolo, piano, servizi. Clicca <em>Conferma</em>: il 🖥️ CRM si aggiorna automaticamente.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">3</div>
+        <strong>Usa l'App per generare eventi</strong>
+        <p>Avvia soste, attiva servizi, chiama RSA. Ogni azione appare in tempo reale nel log del 🖥️ CRM.</p>
+      </div>
+
+      <div class="guida-step">
+        <div class="guida-num">4</div>
+        <strong>Usa il pannello scenari</strong>
+        <p>Nel pannello a destra dell'📱 App trovi bottoni scenario preconfigurati per mostrare flussi edge-case in un click.</p>
+      </div>
+
+    </div>
+    <div class="guida-note">
+      ⚠️ La comunicazione funziona solo tra tab dello <strong>stesso browser sullo stesso dispositivo</strong>. Per demo remote: aprire i pannelli sulla macchina del presentatore e condividere lo schermo.
+    </div>
+  </div>
+
+  <!-- FLOWCHART -->
+  <div class="section-label">Documentazione flussi backend</div>
+  <div class="flows-card">
+    <div class="flows-info">
+      <h3>Flowchart processi backend</h3>
+      <p>Swimlane interattive per ogni servizio — attori, passaggi e integrazioni con partner esterni. Documentazione per IT e consulenti.</p>
+      <div class="flows-chips">
+        <span class="chip">Telepedaggio</span>
+        <span class="chip">Strisce Blu</span>
+        <span class="chip">RSA</span>
+        <span class="chip">Area C</span>
+        <span class="chip">Memo</span>
+        <span class="chip">Parcheggi</span>
+      </div>
+    </div>
+    <a href="flows.html" target="_blank" class="open-btn" style="flex-shrink:0; padding: 12px 24px; font-size: 14px;">
+      Apri flowchart
+      <svg viewBox="0 0 13 13" fill="none"><path d="M2 11L11 2M11 2H6M11 2v5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+
+  <!-- SERVIZI -->
+  <div class="section-label">Servizi implementati nell'app</div>
+  <div class="services-grid">
+    <div class="service-pill">
+      <div class="s-icon">🛣️</div>
+      <div class="s-name">Telepedaggio</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🔵</div>
+      <div class="s-name">Strisce Blu</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🅿️</div>
+      <div class="s-name">Parcheggi</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🚗</div>
+      <div class="s-name">Area C</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🆘</div>
+      <div class="s-name">RSA</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">🔔</div>
+      <div class="s-name">Memo</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">📊</div>
+      <div class="s-name">Movimenti</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">⭐</div>
+      <div class="s-name">Loyalty</div>
+      <span class="s-status s-wip">Display only</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">📦</div>
+      <div class="s-name">Bundle</div>
+      <span class="s-status s-wip">Display only</span>
+    </div>
+    <div class="service-pill">
+      <div class="s-icon">👤</div>
+      <div class="s-name">Account</div>
+      <span class="s-status s-done">Completo</span>
+    </div>
+  </div>
+
+  <!-- EVENT BUS -->
+  <div class="bus-section">
+    <div class="bus-left">
+      <h3>bus.js — Event Bus</h3>
+      <p>Tutti i pannelli comunicano tramite BroadcastChannel nativo del browser. Ogni azione genera un evento che gli altri pannelli ascoltano in tempo reale. Nessun server, zero latenza.</p>
+      <p style="margin-top: 10px; font-size: 12px; color: #5a7585;">⚠️ Funziona solo tra tab dello stesso browser sullo stesso dispositivo.</p>
+    </div>
+    <div class="bus-events">
+      <div class="bus-event ev-teal"><div class="ev-dot"></div>cliente:registrato</div>
+      <div class="bus-event ev-blue"><div class="ev-dot"></div>servizio:attivato</div>
+      <div class="bus-event ev-green"><div class="ev-dot"></div>pagamento:confermato</div>
+      <div class="bus-event ev-purple"><div class="ev-dot"></div>sosta:avviata</div>
+      <div class="bus-event ev-amber"><div class="ev-dot"></div>rsa:chiamata</div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

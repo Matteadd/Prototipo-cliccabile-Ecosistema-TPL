@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flussi di Business — Enilive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-primary: #117299;
+    --color-primary-dark: #0d5a79;
+    --color-primary-light: #e6f2f7;
+    --color-primary-lighter: #1e9fd8;
+    --color-bg: #f5f8fa;
+    --color-surface: #ffffff;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+    --color-border: #dde6eb;
+    --color-border-light: #eef2f5;
+    --color-actor-inactive: #c9d5db;
+    --sidebar-width: 260px;
+    --header-height: 56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── HEADER ─── */
+  .app-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--header-height);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    z-index: 100;
+    gap: 12px;
+  }
+  .app-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+  .app-header .logo-mark {
+    width: 32px;
+    height: 32px;
+    background: var(--color-primary);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .app-header .logo-mark svg { width: 18px; height: 18px; }
+  .app-header .logo-text { font-size: 15px; font-weight: 700; color: var(--color-text); }
+  .app-header .logo-text span { color: var(--color-primary); }
+  .app-header .header-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--color-border);
+    margin: 0 4px;
+  }
+  .app-header .page-title {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    display: flex;
+    margin-top: var(--header-height);
+    min-height: calc(100vh - var(--header-height));
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    position: fixed;
+    top: var(--header-height);
+    bottom: 0;
+    left: 0;
+    overflow-y: auto;
+    z-index: 50;
+    padding: 16px 0;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+
+  .sidebar-group { margin-bottom: 4px; }
+
+  .sidebar-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    transition: color 0.15s;
+  }
+  .sidebar-group-header:hover { color: var(--color-text); }
+  .sidebar-group-header .chevron {
+    transition: transform 0.2s;
+    font-size: 10px;
+  }
+  .sidebar-group-header.collapsed .chevron { transform: rotate(-90deg); }
+
+  .sidebar-group-items { overflow: hidden; }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px 8px 20px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    border-radius: 0;
+    transition: background 0.12s, color 0.12s;
+    line-height: 1.4;
+    border-left: 3px solid transparent;
+  }
+  .sidebar-item:hover { background: var(--color-bg); color: var(--color-text); }
+  .sidebar-item.active {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-left-color: var(--color-primary);
+    font-weight: 600;
+  }
+  .sidebar-item .item-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: inherit;
+    opacity: 0.6;
+    min-width: 18px;
+  }
+
+  /* ─── MAIN CONTENT ─── */
+  .main {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    padding: 32px 40px 80px;
+    min-height: calc(100vh - var(--header-height));
+  }
+
+  /* Flow header */
+  .flow-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+  }
+  .flow-title-block {}
+  .flow-group-tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    margin-bottom: 6px;
+  }
+  .flow-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+
+  .step-counter-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+    min-width: 110px;
+  }
+  .step-counter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+  .step-progress-bar {
+    width: 110px;
+    height: 4px;
+    background: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .step-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 4px;
+    transition: width 0.35s ease;
+  }
+
+  /* ─── ACTORS STRIP ─── */
+  .actors-strip {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .actors-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
+    justify-content: center;
+    position: relative;
+    min-height: 80px;
+  }
+
+  .actor-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: 12px;
+    transition: opacity 0.3s, border-color 0.3s, box-shadow 0.3s;
+    cursor: default;
+    min-width: 88px;
+    flex: 0 0 auto;
+  }
+  .actor-box.active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(17,114,153,0.1);
+    opacity: 1;
+  }
+  .actor-box.inactive {
+    opacity: 0.3;
+    border-color: var(--color-border-light);
+  }
+  .actor-icon { font-size: 24px; line-height: 1; }
+  .actor-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: center;
+    line-height: 1.3;
+    max-width: 80px;
+  }
+
+  /* SVG arrows overlay */
+  .arrows-svg-container {
+    position: relative;
+    margin-top: -8px;
+    margin-bottom: 4px;
+    height: 48px;
+    overflow: visible;
+  }
+  .arrows-svg-container svg {
+    width: 100%;
+    height: 48px;
+    overflow: visible;
+  }
+
+  /* ─── STEP CARD ─── */
+  .step-card-wrapper {
+    position: relative;
+    min-height: 160px;
+  }
+  .step-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 24px 28px;
+    position: absolute;
+    width: 100%;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .step-card.entering {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  .step-card.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .step-card.leaving {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+
+  .step-num-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .step-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 8px;
+  }
+  .step-card-desc {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    line-height: 1.65;
+  }
+
+  /* Arrow label pill */
+  .arrow-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--color-primary);
+  }
+
+  /* ─── NAVIGATION ─── */
+  .step-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+  }
+  .step-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .step-nav-btn:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+  .step-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .step-nav-btn.primary {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+  .step-nav-btn.primary:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: #fff;
+  }
+
+  .step-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .step-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-border);
+    transition: background 0.2s, transform 0.2s;
+  }
+  .step-dot.active {
+    background: var(--color-primary);
+    transform: scale(1.3);
+  }
+
+  /* ─── WELCOME STATE ─── */
+  .welcome-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    gap: 12px;
+  }
+  .welcome-state .welcome-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+  }
+  .welcome-state h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+  .welcome-state p {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    max-width: 360px;
+    line-height: 1.6;
+  }
+
+  /* ─── MOBILE DROPDOWN ─── */
+  .mobile-flow-selector {
+    display: none;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-surface);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--color-text);
+    margin-bottom: 20px;
+    cursor: pointer;
+    outline: none;
+  }
+  .mobile-flow-selector:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(17,114,153,0.1);
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 20px 16px 60px; }
+    .mobile-flow-selector { display: block; }
+    .actors-row { gap: 6px; }
+    .actor-box { min-width: 70px; padding: 8px 8px; }
+    .actor-icon { font-size: 20px; }
+    .actor-name { font-size: 9px; }
+    .flow-title { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <a class="logo" href="#">
+    <div class="logo-mark">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 2L14.196 5V11L9 14L3.804 11V5L9 2Z" stroke="white" stroke-width="1.5" fill="none"/>
+        <circle cx="9" cy="8.5" r="2" fill="white"/>
+      </svg>
+    </div>
+    <span class="logo-text">Eni<span>live</span></span>
+  </a>
+  <div class="header-sep"></div>
+  <span class="page-title">Flussi di Business</span>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- MAIN -->
+  <main class="main" id="main-content">
+    <select class="mobile-flow-selector" id="mobileSelect">
+      <option value="">— Seleziona un flusso —</option>
+    </select>
+    <div id="flow-view">
+      <div class="welcome-state">
+        <div class="welcome-icon">🗺️</div>
+        <h2>Flussi di Business Enilive</h2>
+        <p>Seleziona un flusso dalla barra laterale per visualizzare il processo step-by-step con gli attori coinvolti.</p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────
+
+const ALL_ACTORS = {
+  cliente:       { icon: '👤', name: 'Cliente' },
+  app:           { icon: '📱', name: 'App Enilive' },
+  sistema:       { icon: '⚙️',  name: 'Sistema Enilive' },
+  pagamenti:     { icon: '🏦', name: 'Sistema Pagamenti' },
+  movyon:        { icon: '🛣️', name: 'Sistema Movyon' },
+  mit:           { icon: '🚗', name: 'Sistema MIT' },
+  rsa:           { icon: '🆘', name: 'Sistema RSA Partner' },
+  fatturazione:  { icon: '🧾', name: 'Sistema Fatturazione' },
+  gestore:       { icon: '👨‍💼', name: 'Gestore Stazione' },
+};
+
+const FLOWS = [
+  // ── ONBOARDING ──
+  {
+    id: 1,
+    group: 'Onboarding',
+    title: 'Onboarding via App',
+    actors: ['cliente','app','sistema','pagamenti'],
+    steps: [
+      {
+        title: 'Registrazione e accettazione T&C',
+        desc: 'Il cliente scarica l\'app e avvia la registrazione. Inserisce i dati anagrafici (nome, CF, email, telefono) e accetta i Termini e Condizioni del servizio. L\'App esegue una validazione sintattica dei campi prima di inviare.',
+        flow: [['cliente','app','Inserisce dati']]
+      },
+      {
+        title: 'Aggiunta del primo veicolo',
+        desc: 'Il cliente aggiunge il primo veicolo inserendo targa, tipo (auto/moto/furgone) e marca/modello. Il Sistema Enilive verifica che la targa non sia già registrata su un altro contratto attivo.',
+        flow: [['cliente','app','Aggiunge veicolo'],['app','sistema','Verifica targa']]
+      },
+      {
+        title: 'Scelta piano e servizi opzionali',
+        desc: 'Il cliente sceglie il piano Telepedaggio (Standard, Premium o Telepedaggio Plus) e i servizi opzionali: RSA, Area C Milano, Servizio Memo. L\'App mostra il riepilogo costi mensili aggiornato in tempo reale.',
+        flow: [['cliente','app','Seleziona piano']]
+      },
+      {
+        title: 'Inserimento e validazione metodo di pagamento',
+        desc: 'Il cliente inserisce il metodo di pagamento preferito (carta di credito, SDD bancario). L\'App trasmette i dati tokenizzati al Sistema Pagamenti per la validazione e l\'autorizzazione iniziale.',
+        flow: [['app','pagamenti','Valida pagamento']]
+      },
+      {
+        title: 'Creazione contratto e conferma',
+        desc: 'Il Sistema Enilive crea il contratto, genera il codice cliente univoco e restituisce all\'App la conferma con tutti i dettagli del piano sottoscritto. Il Sistema Pagamenti registra il metodo di pagamento validato.',
+        flow: [['sistema','app','Crea contratto'],['sistema','pagamenti','Registra metodo']]
+      },
+      {
+        title: 'Notifica di attivazione',
+        desc: 'Il cliente riceve una notifica push e un\'email di benvenuto con il riepilogo dei servizi attivati. Da questo momento può utilizzare tutti i servizi sottoscritti direttamente dall\'app.',
+        flow: [['sistema','cliente','Notifica attivazione']]
+      },
+    ]
+  },
+  {
+    id: 2,
+    group: 'Onboarding',
+    title: 'Onboarding via Gestore Stazione',
+    actors: ['cliente','gestore','app','sistema','pagamenti'],
+    steps: [
+      {
+        title: 'Accoglienza cliente in stazione',
+        desc: 'Il cliente si presenta alla Enilive Station. Il Gestore apre il tablet dedicato, accede al pannello operatore e avvia un nuovo form di onboarding cliente.',
+        flow: [['cliente','gestore','Si presenta'],['gestore','app','Avvia form']]
+      },
+      {
+        title: 'Raccolta dati anagrafici e veicolo',
+        desc: 'Il Gestore inserisce i dati anagrafici del cliente (nome, CF, email, telefono) e i dati del veicolo (targa, tipo, marca/modello). Il cliente può visionare i dati in tempo reale sullo schermo del tablet.',
+        flow: [['gestore','app','Inserisce dati']]
+      },
+      {
+        title: 'Selezione piano e firma digitale',
+        desc: 'Il Gestore seleziona il piano Telepedaggio e i servizi opzionali per conto del cliente. Il cliente firma digitalmente il contratto direttamente sul tablet tramite touch screen.',
+        flow: [['gestore','app','Seleziona piano'],['cliente','app','Firma digitale']]
+      },
+      {
+        title: 'Trasmissione dati e creazione contratto',
+        desc: 'Il tablet trasmette i dati raccolti al Sistema Enilive tramite il bus eventi. Il Sistema valida i dati, crea il contratto e genera il codice cliente univoco.',
+        flow: [['app','sistema','Trasmette dati']]
+      },
+      {
+        title: 'Registrazione metodo di pagamento',
+        desc: 'Il Sistema Pagamenti registra il metodo di pagamento fornito dal cliente (carta, IBAN per SDD). Viene eseguita una micro-transazione di verifica che viene immediatamente rimborsata.',
+        flow: [['sistema','pagamenti','Registra pagamento']]
+      },
+      {
+        title: 'Invio credenziali e attivazione',
+        desc: 'Il cliente riceve via email le credenziali di accesso all\'app e la conferma dell\'attivazione del contratto. Il Gestore stampa o invia digitalmente il riepilogo contrattuale.',
+        flow: [['sistema','cliente','Invia credenziali']]
+      },
+    ]
+  },
+
+  // ── FATTURAZIONE ATTIVA ──
+  {
+    id: 3,
+    group: 'Fatturazione Attiva',
+    title: 'Fatturazione mensile Telepedaggio',
+    actors: ['sistema','movyon','fatturazione','pagamenti','cliente'],
+    steps: [
+      {
+        title: 'Interrogazione transiti del periodo',
+        desc: 'A fine mese il Sistema Enilive avvia il processo di fatturazione. Interroga il Sistema Movyon per ottenere la lista completa dei transiti autostradali del cliente nel periodo di riferimento.',
+        flow: [['sistema','movyon','Richiede transiti']]
+      },
+      {
+        title: 'Ricezione lista transiti',
+        desc: 'Il Sistema Movyon restituisce la lista dei transiti con tutti i dettagli: data, ora, casello di entrata e uscita, tratta percorsa e importo pedaggio per ciascun transito.',
+        flow: [['movyon','sistema','Restituisce transiti']]
+      },
+      {
+        title: 'Aggregazione e calcolo importo totale',
+        desc: 'Il Sistema Enilive aggrega i transiti autostradali e aggiunge le quote fisse mensili dei servizi attivi (canone RSA €2/mese, eventuale quota Area C, ecc.). Calcola l\'importo totale da fatturare.',
+        flow: [['sistema','fatturazione','Invia dati fattura']]
+      },
+      {
+        title: 'Emissione e invio fattura',
+        desc: 'Il Sistema Fatturazione genera la fattura mensile in formato PDF/XML, la invia al cliente via email e la rende disponibile nella sezione "Movimenti" dell\'app sotto "Documenti".',
+        flow: [['fatturazione','cliente','Invia fattura']]
+      },
+      {
+        title: 'Addebito importo',
+        desc: 'Il Sistema Pagamenti addebita l\'importo totale sul metodo di pagamento registrato (carta o SDD). In caso di fallimento, avvia il processo di retry con notifica al cliente.',
+        flow: [['fatturazione','pagamenti','Autorizza addebito'],['pagamenti','cliente','Addebita importo']]
+      },
+      {
+        title: 'Conferma addebito in app',
+        desc: 'Il cliente riceve una notifica push di conferma dell\'avvenuto addebito. Può consultare il dettaglio completo dei transiti e delle voci di costo nell\'app, con possibilità di esportare il PDF.',
+        flow: [['sistema','cliente','Notifica addebito']]
+      },
+    ]
+  },
+  {
+    id: 4,
+    group: 'Fatturazione Attiva',
+    title: 'Fatturazione Area C',
+    actors: ['sistema','movyon','fatturazione','pagamenti','cliente'],
+    steps: [
+      {
+        title: 'Rilevamento transito in Zona C',
+        desc: 'Il Sistema Movyon rileva il transito del veicolo in Zona C (Area C Milano) tramite lettura automatica della targa attraverso le telecamere posizionate agli accessi della zona a traffico limitato.',
+        flow: [['movyon','sistema','Rileva transito ZTL']]
+      },
+      {
+        title: 'Notifica transito al Sistema Enilive',
+        desc: 'Il Sistema Movyon notifica il transito al Sistema Enilive con i dati completi: targa del veicolo, data e ora del transito, varco di accesso e importo del costo ZTL da applicare.',
+        flow: [['movyon','sistema','Notifica transito+importo']]
+      },
+      {
+        title: 'Registrazione e accodamento',
+        desc: 'Il Sistema Enilive verifica che il veicolo appartenga a un cliente con Area C attiva, registra il transito e lo accoda alla fattura mensile del cliente. Il cliente vede immediatamente il transito in app.',
+        flow: [['sistema','cliente','Aggiorna movimenti']]
+      },
+      {
+        title: 'Aggregazione in fattura mensile',
+        desc: 'A fine mese il transito Area C compare nella fattura aggregata insieme ai transiti autostradali e alle quote dei servizi. Il Sistema Fatturazione genera la riga di dettaglio con data e importo.',
+        flow: [['sistema','fatturazione','Aggrega in fattura']]
+      },
+      {
+        title: 'Addebito e dettaglio cliente',
+        desc: 'Il Sistema Pagamenti addebita l\'importo complessivo mensile. Il cliente vede il dettaglio Area C nella fattura come voce separata, con la lista di tutti i transiti del mese con date e importi.',
+        flow: [['pagamenti','cliente','Addebita fattura']]
+      },
+    ]
+  },
+  {
+    id: 5,
+    group: 'Fatturazione Attiva',
+    title: 'Fatturazione Strisce Blu',
+    actors: ['cliente','app','sistema','pagamenti','fatturazione'],
+    steps: [
+      {
+        title: 'Avvio sosta dall\'app',
+        desc: 'Il cliente apre l\'app e accede alla sezione Strisce Blu. Seleziona la zona di sosta dalla mappa interattiva, sceglie il veicolo e imposta la durata desiderata o avvia una sosta a tempo libero.',
+        flow: [['cliente','app','Avvia sosta']]
+      },
+      {
+        title: 'Verifica disponibilità e calcolo prezzo',
+        desc: 'L\'App trasmette la richiesta al Sistema Enilive che verifica la disponibilità della zona (orari, festività, ecc.) e calcola il prezzo in base alla tariffa oraria e alla durata selezionata.',
+        flow: [['app','sistema','Verifica zona + prezzo']]
+      },
+      {
+        title: 'Conferma e processamento pagamento',
+        desc: 'Il cliente conferma il pagamento. Il Sistema Pagamenti processa la transazione in tempo reale tramite il metodo di pagamento registrato. Viene generato un token di sosta valido per la durata acquistata.',
+        flow: [['sistema','pagamenti','Processa pagamento']]
+      },
+      {
+        title: 'Registrazione sosta e storico',
+        desc: 'A sosta conclusa (o allo scadere del tempo acquistato), il Sistema Enilive registra il movimento con tutti i dettagli e lo aggiunge allo storico soste del cliente con data, ora, zona e importo.',
+        flow: [['sistema','cliente','Aggiorna storico']]
+      },
+      {
+        title: 'Emissione ricevuta immediata',
+        desc: 'Il Sistema Fatturazione emette una ricevuta immediata disponibile in app sotto "Movimenti". Il cliente può scaricare la ricevuta in PDF per la rendicontazione spese o il rimborso aziendale.',
+        flow: [['fatturazione','cliente','Emette ricevuta']]
+      },
+    ]
+  },
+
+  // ── FATTURAZIONE PASSIVA ──
+  {
+    id: 6,
+    group: 'Fatturazione Passiva',
+    title: 'Riconciliazione Movyon',
+    actors: ['movyon','sistema','fatturazione'],
+    steps: [
+      {
+        title: 'Generazione file di riconciliazione',
+        desc: 'A fine periodo (mensile) il Sistema Movyon genera il file di riconciliazione completo con tutti i transiti elaborati per conto di Enilive: transiti autostradali, transiti ZTL, letture targa per parcheggi convenzionati.',
+        flow: [['movyon','sistema','Genera file riconciliazione']]
+      },
+      {
+        title: 'Trasmissione sicura del file',
+        desc: 'Il file di riconciliazione viene trasmesso al Sistema Enilive tramite canale sicuro (SFTP cifrato). Il Sistema Enilive emette un\'ACK di ricezione e avvia il processo di validazione.',
+        flow: [['movyon','sistema','Trasmette file SFTP']]
+      },
+      {
+        title: 'Verifica corrispondenza transiti',
+        desc: 'Il Sistema Enilive confronta automaticamente i transiti ricevuti da Movyon con quelli registrati internamente. Verifica importi, timestamp e identificativi univoci di ciascuna transazione.',
+        flow: [['sistema','fatturazione','Verifica match transiti']]
+      },
+      {
+        title: 'Gestione discrepanze',
+        desc: 'In caso di discrepanze (transiti mancanti, importi difformi), il Sistema Enilive apre automaticamente una segnalazione verso Movyon con il dettaglio degli elementi contestati e richiede rettifica entro 5 giorni lavorativi.',
+        flow: [['sistema','movyon','Apre contestazione']]
+      },
+      {
+        title: 'Registrazione fattura passiva',
+        desc: 'Una volta validato il file (o dopo risoluzione delle discrepanze), il Sistema Fatturazione registra la fattura passiva Movyon, la accoda al ciclo di pagamento e aggiorna la contabilità interna.',
+        flow: [['sistema','fatturazione','Registra fattura passiva']]
+      },
+    ]
+  },
+  {
+    id: 7,
+    group: 'Fatturazione Passiva',
+    title: 'Riconciliazione RSA Partner',
+    actors: ['rsa','sistema','fatturazione'],
+    steps: [
+      {
+        title: 'Invio report interventi mensile',
+        desc: 'A fine mese il Sistema RSA Partner invia il report degli interventi effettuati per conto di Enilive. Il report contiene per ogni intervento: targa, tipo di intervento, data, ora e costo addebitato.',
+        flow: [['rsa','sistema','Invia report interventi']]
+      },
+      {
+        title: 'Verifica corrispondenza interventi',
+        desc: 'Il Sistema Enilive verifica che ogni intervento nel report del Partner corrisponda a una richiesta RSA registrata nell\'app. Incrocia il codice intervento univoco generato al momento della chiamata di soccorso.',
+        flow: [['sistema','rsa','Verifica interventi']]
+      },
+      {
+        title: 'Approvazione e contestazione',
+        desc: 'Gli interventi validati con corrispondenza vengono approvati automaticamente. Gli interventi senza corrispondenza o con importo non concordato vengono contestati formalmente al Partner con richiesta di documentazione.',
+        flow: [['sistema','fatturazione','Separa: approvati vs contestati']]
+      },
+      {
+        title: 'Registrazione fattura passiva RSA',
+        desc: 'Il Sistema Fatturazione registra la fattura passiva RSA per gli interventi approvati e la accoda al ciclo di pagamento mensile. Gli importi contestati vengono sospesi fino a risoluzione.',
+        flow: [['fatturazione','sistema','Conferma registrazione']]
+      },
+    ]
+  },
+
+  // ── OPERATIVITÀ ──
+  {
+    id: 8,
+    group: 'Operatività',
+    title: 'Chiamata RSA',
+    actors: ['cliente','app','sistema','rsa'],
+    steps: [
+      {
+        title: 'Accesso sezione RSA in app',
+        desc: 'Il cliente in difficoltà sulla strada apre l\'app Enilive e accede alla sezione RSA (Assistenza Stradale). Vede la tessera digitale con il proprio codice e il pulsante "Chiama soccorso".',
+        flow: [['cliente','app','Apre sezione RSA']]
+      },
+      {
+        title: 'Invio richiesta di soccorso',
+        desc: 'Il cliente avvia la richiesta di soccorso descrivendo il tipo di problema (guasto, incidente, foratura, ecc.). L\'App acquisisce la posizione GPS e trasmette targa, posizione e tipo di problema al Sistema Enilive.',
+        flow: [['app','sistema','Trasmette posizione + problema']]
+      },
+      {
+        title: 'Verifica contratto e inoltro al Partner',
+        desc: 'Il Sistema Enilive verifica che il cliente abbia un contratto RSA attivo e non abbia superato i limiti di utilizzo. Se tutto è valido, inoltra la richiesta al Sistema RSA Partner con tutti i dettagli.',
+        flow: [['sistema','rsa','Inoltra richiesta soccorso']]
+      },
+      {
+        title: 'Assegnazione soccorritore',
+        desc: 'Il Sistema RSA Partner elabora la richiesta, individua il soccorritore disponibile più vicino e assegna l\'intervento. Restituisce al Sistema Enilive il codice intervento univoco e l\'ETA stimata.',
+        flow: [['rsa','sistema','Assegna + codice intervento']]
+      },
+      {
+        title: 'Visualizzazione codice in app',
+        desc: 'Il codice intervento appare sulla tessera digitale nell\'app insieme all\'ETA del soccorritore. Il cliente mostra questo codice al soccorritore all\'arrivo come conferma dell\'intervento autorizzato.',
+        flow: [['sistema','cliente','Mostra codice + ETA']]
+      },
+      {
+        title: 'Chiusura intervento e aggiornamento storico',
+        desc: 'A intervento concluso, il soccorritore chiude il caso nel sistema del Partner. Il Sistema RSA Partner notifica la chiusura al Sistema Enilive che aggiorna lo storico interventi del cliente nell\'app.',
+        flow: [['rsa','sistema','Notifica chiusura'],['sistema','cliente','Aggiorna storico']]
+      },
+    ]
+  },
+  {
+    id: 9,
+    group: 'Operatività',
+    title: 'Scadenza e rinnovo contratto',
+    actors: ['sistema','app','cliente','pagamenti'],
+    steps: [
+      {
+        title: 'Preavviso rinnovo (30 giorni)',
+        desc: '30 giorni prima della scadenza del contratto, il Sistema Enilive genera automaticamente una comunicazione di preavviso rinnovo con il riepilogo del piano attivo, i servizi sottoscritti e il costo di rinnovo.',
+        flow: [['sistema','app','Genera preavviso']]
+      },
+      {
+        title: 'Notifica push al cliente',
+        desc: 'L\'App invia una notifica push al cliente con il riepilogo del piano e il link diretto alla schermata di gestione rinnovo dove può confermare, modificare il piano o disdire il contratto.',
+        flow: [['app','cliente','Notifica preavviso rinnovo']]
+      },
+      {
+        title: 'Gestione risposta cliente',
+        desc: 'Il cliente può: (a) confermare il rinnovo con un tap, (b) modificare il piano o i servizi opzionali, oppure (c) disdire il contratto. La risposta viene registrata immediatamente dal Sistema Enilive.',
+        flow: [['cliente','app','Risponde al preavviso']]
+      },
+      {
+        title: 'Secondo reminder (7 giorni prima)',
+        desc: 'Se il cliente non ha interagito entro 7 giorni dalla scadenza, il Sistema Enilive invia un secondo reminder via notifica push e via email. Il rinnovo automatico sarà eseguito salvo disdetta esplicita.',
+        flow: [['sistema','cliente','Invia secondo reminder']]
+      },
+      {
+        title: 'Processamento rinnovo automatico',
+        desc: 'Alla data di scadenza, se il cliente ha confermato (o non ha disdetto), il Sistema Pagamenti processa il rinnovo automaticamente addebitando il canone annuale/mensile sul metodo di pagamento registrato.',
+        flow: [['sistema','pagamenti','Processa rinnovo']]
+      },
+      {
+        title: 'Conferma continuità servizi',
+        desc: 'Il cliente riceve conferma del rinnovo avvenuto via notifica push e via email. Tutti i servizi rimangono attivi senza alcuna interruzione — la nuova scadenza è visibile in app nella sezione Account.',
+        flow: [['sistema','cliente','Conferma rinnovo']]
+      },
+    ]
+  },
+  {
+    id: 10,
+    group: 'Operatività',
+    title: 'Contestazione e rimborso',
+    actors: ['cliente','app','sistema','pagamenti','fatturazione'],
+    steps: [
+      {
+        title: 'Individuazione movimento errato',
+        desc: 'Il cliente naviga nella sezione Movimenti dell\'app e individua una transazione che ritiene errata (importo sbagliato, transito non effettuato, duplicato). Tocca il movimento e seleziona "Contesta".',
+        flow: [['cliente','app','Avvia contestazione']]
+      },
+      {
+        title: 'Invio contestazione al Sistema',
+        desc: 'L\'App trasmette la contestazione al Sistema Enilive con i dettagli completi del movimento contestato: ID transazione, importo, data, servizio e la motivazione indicata dal cliente.',
+        flow: [['app','sistema','Invia dettaglio contestazione']]
+      },
+      {
+        title: 'Analisi e approvazione automatica',
+        desc: 'Il Sistema Enilive analizza la contestazione. Per importi sotto la soglia automatica (€10), il rimborso viene approvato immediatamente senza verifica manuale. Il cliente riceve conferma entro pochi minuti.',
+        flow: [['sistema','pagamenti','Autorizza rimborso auto']]
+      },
+      {
+        title: 'Escalation customer care (sopra soglia)',
+        desc: 'Per contestazioni sopra soglia, il caso viene inoltrato al team customer care. Il Sistema Enilive aggiorna l\'app con lo stato della pratica — il cliente riceve aggiornamenti in tempo reale.',
+        flow: [['sistema','cliente','Aggiorna stato pratica']]
+      },
+      {
+        title: 'Accredito rimborso',
+        desc: 'Una volta approvato il rimborso (automaticamente o dopo verifica manuale), il Sistema Pagamenti accredita l\'importo sul metodo di pagamento del cliente. L\'accredito appare nei movimenti come voce positiva.',
+        flow: [['pagamenti','cliente','Accredita rimborso']]
+      },
+      {
+        title: 'Emissione nota di credito',
+        desc: 'Il Sistema Fatturazione emette la nota di credito corrispondente al rimborso. Il documento è disponibile in app nella sezione Documenti. Il cliente riceve notifica dell\'avvenuto rimborso con link al documento.',
+        flow: [['fatturazione','cliente','Emette nota di credito']]
+      },
+    ]
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+let currentFlowId = null;
+let currentStep = 0;
+let isAnimating = false;
+
+// ─────────────────────────────────────────────────────────────
+// SIDEBAR BUILD
+// ─────────────────────────────────────────────────────────────
+function buildSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const mobileSelect = document.getElementById('mobileSelect');
+  const groups = {};
+  FLOWS.forEach(f => {
+    if (!groups[f.group]) groups[f.group] = [];
+    groups[f.group].push(f);
+  });
+
+  Object.entries(groups).forEach(([groupName, flows]) => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'sidebar-group';
+    groupEl.dataset.group = groupName;
+
+    const header = document.createElement('div');
+    header.className = 'sidebar-group-header';
+    header.innerHTML = `<span>${groupName}</span><span class="chevron">▾</span>`;
+    header.addEventListener('click', () => toggleGroup(groupName));
+
+    const items = document.createElement('div');
+    items.className = 'sidebar-group-items';
+    items.id = `group-${groupName.replace(/\s+/g,'-')}`;
+
+    flows.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'sidebar-item';
+      item.dataset.flowId = f.id;
+      item.innerHTML = `<span class="item-num">${f.id}</span><span>${f.title}</span>`;
+      item.addEventListener('click', () => loadFlow(f.id));
+      items.appendChild(item);
+
+      // mobile select
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = `${f.id}. ${f.title}`;
+      const optgroup = mobileSelect.querySelector(`optgroup[label="${groupName}"]`) ||
+        (() => { const g = document.createElement('optgroup'); g.label = groupName; mobileSelect.appendChild(g); return g; })();
+      optgroup.appendChild(opt);
+    });
+
+    groupEl.appendChild(header);
+    groupEl.appendChild(items);
+    sidebar.appendChild(groupEl);
+  });
+
+  mobileSelect.addEventListener('change', e => {
+    if (e.target.value) loadFlow(parseInt(e.target.value));
+  });
+}
+
+function toggleGroup(groupName) {
+  const id = `group-${groupName.replace(/\s+/g,'-')}`;
+  const items = document.getElementById(id);
+  const header = items.previousElementSibling;
+  const isCollapsed = header.classList.contains('collapsed');
+  if (isCollapsed) {
+    items.style.maxHeight = items.scrollHeight + 'px';
+    setTimeout(() => { items.style.maxHeight = 'none'; }, 300);
+    header.classList.remove('collapsed');
+  } else {
+    items.style.maxHeight = items.scrollHeight + 'px';
+    requestAnimationFrame(() => { items.style.maxHeight = '0'; });
+    header.classList.add('collapsed');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FLOW RENDER
+// ─────────────────────────────────────────────────────────────
+function loadFlow(id) {
+  const flow = FLOWS.find(f => f.id === id);
+  if (!flow) return;
+  currentFlowId = id;
+  currentStep = 0;
+
+  // sidebar highlight
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.flowId) === id);
+  });
+  document.getElementById('mobileSelect').value = id;
+
+  renderFlowView(flow);
+  // scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderFlowView(flow) {
+  const container = document.getElementById('flow-view');
+
+  const groupMap = {};
+  FLOWS.forEach(f => { groupMap[f.id] = f.group; });
+
+  container.innerHTML = `
+    <div class="flow-header">
+      <div class="flow-title-block">
+        <div class="flow-group-tag">${flow.group}</div>
+        <div class="flow-title">${flow.title}</div>
+      </div>
+      <div class="step-counter-block">
+        <div class="step-counter-label" id="step-counter-label">Step 1 di ${flow.steps.length}</div>
+        <div class="step-progress-bar"><div class="step-progress-fill" id="step-progress-fill" style="width:${(1/flow.steps.length*100).toFixed(1)}%"></div></div>
+      </div>
+    </div>
+
+    <div class="actors-strip">
+      <div class="actors-row" id="actors-row">
+        ${flow.actors.map((aId, i) => {
+          const a = ALL_ACTORS[aId];
+          return `<div class="actor-box" id="actor-${aId}" data-actor="${aId}">
+            <div class="actor-icon">${a.icon}</div>
+            <div class="actor-name">${a.name}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="arrows-svg-container" id="arrows-container">
+        <svg id="arrows-svg" width="100%" height="48"></svg>
+      </div>
+    </div>
+
+    <div class="step-card-wrapper" id="step-card-wrapper">
+      <div class="step-card visible" id="step-card"></div>
+    </div>
+
+    <div class="step-nav">
+      <button class="step-nav-btn" id="btn-prev" onclick="navigate(-1)">← Precedente</button>
+      <div class="step-dots" id="step-dots"></div>
+      <button class="step-nav-btn primary" id="btn-next" onclick="navigate(1)">Avanti →</button>
+    </div>
+  `;
+
+  buildDots(flow);
+  renderStep(flow, 0);
+}
+
+function buildDots(flow) {
+  const dots = document.getElementById('step-dots');
+  dots.innerHTML = flow.steps.map((_, i) =>
+    `<div class="step-dot${i===0?' active':''}" id="dot-${i}"></div>`
+  ).join('');
+}
+
+function renderStep(flow, stepIdx, direction = 0) {
+  const step = flow.steps[stepIdx];
+  const card = document.getElementById('step-card');
+  const counter = document.getElementById('step-counter-label');
+  const fill = document.getElementById('step-progress-fill');
+
+  // Update counter and progress
+  counter.textContent = `Step ${stepIdx + 1} di ${flow.steps.length}`;
+  fill.style.width = ((stepIdx + 1) / flow.steps.length * 100).toFixed(1) + '%';
+
+  // Update dots
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === stepIdx);
+  });
+
+  // Update nav buttons
+  document.getElementById('btn-prev').disabled = stepIdx === 0;
+  document.getElementById('btn-next').disabled = stepIdx === flow.steps.length - 1;
+
+  // Animate card
+  if (direction !== 0) {
+    card.className = 'step-card leaving';
+    setTimeout(() => {
+      card.innerHTML = stepCardHTML(step, stepIdx);
+      card.className = 'step-card entering';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { card.className = 'step-card visible'; });
+      });
+    }, 160);
+  } else {
+    card.innerHTML = stepCardHTML(step, stepIdx);
+    card.className = 'step-card visible';
+  }
+
+  // Update actors & arrows
+  updateActors(flow, step);
+}
+
+function stepCardHTML(step, idx) {
+  return `
+    <div class="step-num-badge">${idx + 1}</div>
+    <div class="step-card-title">${step.title}</div>
+    <div class="step-card-desc">${step.desc}</div>
+  `;
+}
+
+function updateActors(flow, step) {
+  // Determine which actors are active in this step
+  const activeActors = new Set();
+  step.flow.forEach(([from, to]) => {
+    activeActors.add(from);
+    activeActors.add(to);
+  });
+
+  flow.actors.forEach(aId => {
+    const el = document.getElementById('actor-' + aId);
+    if (!el) return;
+    if (activeActors.has(aId)) {
+      el.className = 'actor-box active';
+    } else {
+      el.className = 'actor-box inactive';
+    }
+  });
+
+  drawArrows(flow, step);
+}
+
+function drawArrows(flow, step) {
+  const svg = document.getElementById('arrows-svg');
+  const row = document.getElementById('actors-row');
+  if (!svg || !row) return;
+  svg.innerHTML = '';
+
+  // Get positions of actor boxes relative to the row
+  const rowRect = row.getBoundingClientRect();
+  const actorPositions = {};
+  flow.actors.forEach(aId => {
+    const el = document.getElementById('actor-' + aId);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    actorPositions[aId] = {
+      cx: r.left - rowRect.left + r.width / 2,
+      top: r.top - rowRect.top,
+      bottom: r.top - rowRect.top + r.height,
+      width: r.width,
+    };
+  });
+
+  const svgContainer = document.getElementById('arrows-container');
+  const containerRect = svgContainer.getBoundingClientRect();
+
+  step.flow.forEach(([fromId, toId, label], idx) => {
+    const from = actorPositions[fromId];
+    const to = actorPositions[toId];
+    if (!from || !to) return;
+
+    // Offset from row rect to container rect
+    const offsetY = rowRect.bottom - containerRect.top;
+
+    const x1 = from.cx;
+    const x2 = to.cx;
+    const y = 20 + idx * 16;
+    const isRTL = x2 < x1;
+
+    // Draw line with arrowhead
+    const arrowId = `arrow-${idx}`;
+    const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+    const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    marker.setAttribute('id', arrowId);
+    marker.setAttribute('markerWidth', '8');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('refX', '7');
+    marker.setAttribute('refY', '3');
+    marker.setAttribute('orient', 'auto');
+    const polygon = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    polygon.setAttribute('points', '0 0, 8 3, 0 6');
+    polygon.setAttribute('fill', '#117299');
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', isRTL ? x2 + 4 : x2 - 4);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', '#117299');
+    line.setAttribute('stroke-width', '1.8');
+    line.setAttribute('marker-end', `url(#${arrowId})`);
+    line.style.strokeDasharray = '200';
+    line.style.strokeDashoffset = '200';
+    line.style.animation = `drawLine 0.4s ease forwards ${idx * 0.15}s`;
+    svg.appendChild(line);
+
+    if (label) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+      const mx = (x1 + x2) / 2;
+      text.setAttribute('x', mx);
+      text.setAttribute('y', y - 5);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('class', 'arrow-label');
+      text.setAttribute('font-size', '10');
+      text.setAttribute('fill', '#117299');
+      text.setAttribute('font-family', "'DM Sans', sans-serif");
+      text.setAttribute('font-weight', '600');
+      text.textContent = label;
+      svg.appendChild(text);
+    }
+  });
+
+  // Add keyframe if not present
+  if (!document.getElementById('arrowKeyframe')) {
+    const style = document.createElement('style');
+    style.id = 'arrowKeyframe';
+    style.textContent = `
+      @keyframes drawLine {
+        to { stroke-dashoffset: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────────
+function navigate(dir) {
+  if (isAnimating) return;
+  const flow = FLOWS.find(f => f.id === currentFlowId);
+  if (!flow) return;
+  const newStep = currentStep + dir;
+  if (newStep < 0 || newStep >= flow.steps.length) return;
+  isAnimating = true;
+  currentStep = newStep;
+  renderStep(flow, currentStep, dir);
+  setTimeout(() => { isAnimating = false; }, 350);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate(-1);
+});
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+buildSidebar();
+
+// Redraw arrows on resize
+window.addEventListener('resize', () => {
+  if (currentFlowId === null) return;
+  const flow = FLOWS.find(f => f.id === currentFlowId);
+  if (!flow) return;
+  updateActors(flow, flow.steps[currentStep]);
+});
+</script>
+</body>
+</html>

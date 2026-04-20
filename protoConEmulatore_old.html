@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emulatore + Strisce Blu</title>
+
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { margin:0; height:100vh; display:flex; background:#f4f4f4; }
+
+    /* LEFT PANEL */
+    .controls{
+      width: 340px;
+      padding: 18px;
+      background:#1e1e1e;
+      color:#fff;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .controls h2{ margin:0; font-size:18px; }
+    .controls button{
+      width:100%;
+      padding: 12px 12px;
+      border:0;
+      border-radius: 10px;
+      cursor:pointer;
+      background:#0078d4;
+      color:#fff;
+      font-size:14px;
+      font-weight:700;
+    }
+    .controls button:hover{ background:#005ea6; }
+    .controls .muted{ color:#bbb; font-size:12px; line-height:1.35; }
+
+    /* RIGHT PANEL */
+    .emulator-wrapper{
+      flex: 1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 24px;
+    }
+    .phone{
+      width: 390px;
+      height: 760px;
+      background:#111;
+      border-radius: 34px;
+      padding: 14px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.25);
+      position: relative;
+    }
+    .phone::before{
+      content:"";
+      position:absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 140px;
+      height: 22px;
+      background:#000;
+      border-radius: 0 0 16px 16px;
+      opacity:.6;
+      z-index:2;
+    }
+    .screen{
+      width:100%;
+      height:100%;
+      background:#fff;
+      border-radius: 26px;
+      overflow:hidden;
+      position: relative;
+    }
+    iframe{
+      width:100%;
+      height:100%;
+      border:0;
+      display:block;
+      background:#fff;
+    }
+
+    /* Shell Toast */
+    #shellToast{
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111;
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 999px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight: 700;
+      font-size: 13px;
+      display:none;
+      z-index: 99999;
+    }
+
+    .status{
+      position:absolute;
+      top: 14px;
+      left: 22px;
+      right: 22px;
+      height: 20px;
+      z-index: 3;
+      pointer-events:none;
+      display:flex;
+      justify-content:space-between;
+      color:#fff;
+      font-size:12px;
+      opacity:.9;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="shellToast"></div>
+
+  <!-- LEFT: SOLO UN BOTTONE -->
+  <aside class="controls">
+    <h2>Scenari</h2>
+    <button id="btnNotify">Notifica scadenza strisce blu</button>
+    <div class="muted">
+      Mostra: “Mancano 15 minuti alla scadenza”<br/>
+      + apre il timer Strisce Blu (15:00).
+    
+    
+    <button id="btnLockScreen">Blocca telefono</button>
+    <div class="muted">
+      Mostra la schermata di blocco con timer delle strisce blu.
+    </div>
+</div>
+  </aside>
+
+  <!-- RIGHT: EMULATORE -->
+  <main class="emulator-wrapper">
+    <div class="phone">
+      <div class="status"><span>09:41</span><span>▮▮▮ 5G 🔋</span></div>
+      <div class="screen">
+        <iframe id="appFrame" title="App Emulator"></iframe>
+      </div>
+    </div>
+  </main>
+
+  <!-- APP (SRC DOC) -->
+  <template id="protoSource">
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>EniLive Mobility+</title>
+
+  <!-- (come nel tuo proto) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    .app-container { max-width: 420px; margin: 0 auto; min-height: 100vh; position: relative; display: flex; flex-direction: column; }
+    .bg-eni-teal { background-color: #117299; }
+    .text-eni-teal { color: #117299; }
+    .hover\:bg-eni-teal-darker:hover { background-color: #0d4f6f; }
+    .bg-eni-teal-light { background-color: #e6f0f6; }
+    .text-eni-teal-light { color: #117299; opacity: 0.7; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 40; }
+    .modal-enter { animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes slideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+    .modal-exit { animation: slideDown 0.3s ease-out; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* --- Strisce Blu: Wheel-like picker + timer --- */
+    .wheel-wrap{
+      position: relative;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .wheel-wrap::before{
+      content:"";
+      position:absolute;
+      left:0; right:0;
+      top: 50%;
+      height: 44px;
+      transform: translateY(-50%);
+      border-top: 1px solid rgba(17,114,153,.25);
+      border-bottom: 1px solid rgba(17,114,153,.25);
+      background: rgba(17,114,153,.06);
+      pointer-events:none;
+    }
+    .wheel-select{
+      width: 100%;
+      border: 0;
+      outline: none;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: #111827;
+      background: transparent;
+    }
+    .wheel-select option{
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    .timer-card{
+      background: linear-gradient(135deg, #117299 0%, #0d4f6f 60%, #1e9fd8 100%);
+      color: white;
+      border-radius: 18px;
+      padding: 16px;
+    }
+    .timer-big{
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    /* in-app toast minimal (solo per demo, non obbligatorio) */
+    #demoToast{
+      position:fixed;
+      top:14px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#117299;
+      color:#fff;
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:13px;
+      z-index:9999;
+      display:none;
+      box-shadow:0 10px 25px rgba(0,0,0,.2);
+      font-weight:700;
+    }
+
+    /* Lock Screen Strisce Blu */
+    .lock-screen{
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #0d2b3d 0%, #117299 50%, #0d4f6f 100%);
+      z-index: 50000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      user-select: none;
+      animation: lockScreenFadeIn 0.4s ease-out;
+    }
+    @keyframes lockScreenFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    .lock-screen-content{
+      text-align: center;
+      padding: 20px;
+    }
+
+    .lock-screen-time{
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      margin: 40px 0 20px 0;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .lock-screen-plate{
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 30px;
+      letter-spacing: 3px;
+      background: rgba(255,255,255,0.15);
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: inline-block;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+
+    .lock-screen-label{
+      font-size: 14px;
+      opacity: 0.85;
+      margin-bottom: 5px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .lock-screen-remaining{
+      font-size: 36px;
+      font-weight: 700;
+      margin-top: 40px;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .lock-screen-remaining-label{
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .lock-screen-hint{
+      position: absolute;
+      bottom: 40px;
+      font-size: 13px;
+      opacity: 0.7;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+  <div id="demoToast"></div>
+
+  <div class="app-container bg-white shadow-lg"
+    x-data="{
+      currentPage: localStorage.getItem('currentPage') || 'home',
+      showServiceDetail: false,
+      selectedService: null,
+      showRefuelModal: false,
+      showBundleDetail: false,
+      selectedBundle: null,
+      selectedStation: null,
+      selectedFuel: 'benzina',
+      selectedAmount: 50,
+      messages: [
+        { type: 'bot', text: 'Ciao! Sono Eni Assistant. Come posso aiutarti oggi?' }
+      ],
+      messageInput: '',
+      
+      // Lock Screen
+      showLockScreen: false,
+      lockScreenCurrentTime: '00:00',
+      lockScreenInterval: null,
+      
+      init() {
+        this.$watch('currentPage', (val) => localStorage.setItem('currentPage', val));
+        window.APP = this; // espone l'istanza per il bridge
+      },
+
+      updateLockScreenTime(){
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2,'0');
+        const mm = String(now.getMinutes()).padStart(2,'0');
+        this.lockScreenCurrentTime = `${hh}:${mm}`;
+      },
+
+      toggleLockScreen(){
+        this.showLockScreen = !this.showLockScreen;
+        if(this.showLockScreen){
+          this.updateLockScreenTime();
+          if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+          this.lockScreenInterval = setInterval(() => this.updateLockScreenTime(), 1000);
+        } else {
+          if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+          this.lockScreenInterval = null;
+        }
+      },
+
+      /* =========================
+         STRISCE BLU (NUOVO FLUSSO)
+         ========================= */
+      showBlueModal: false,
+      sbStep: 'setup',               // 'setup' | 'timer'
+      sbPlate: '',
+      sbMode: 'wheel',               // 'wheel' | 'standard' | 'open'
+      sbMinutes: 60,
+      sbActive: false,
+      sbEndTs: null,
+      sbStartTs: null,
+      sbTimerText: '00:00:00',
+      sbMetaText: '',
+      sbInterval: null,
+
+      openBlue(){
+        this.showBlueModal = true;
+        this.sbStep = 'setup';
+        this.sbMode = 'wheel';
+        this.sbMinutes = 60;
+        this.sbPlate = this.sbPlate || '';
+        this.sbActive = false;
+        this.sbMetaText = '';
+      },
+
+      sbSetMode(mode){
+        this.sbMode = mode;
+        if(mode === 'standard'){
+          this.sbMinutes = 120;
+        }
+      },
+
+      sbStart(){
+        if(!this.sbPlate || this.sbPlate.trim().length < 5){
+          this.sbMetaText = 'Inserisci una targa valida (min 5 caratteri).';
+          return;
+        }
+        this.sbMetaText = '';
+        const now = Date.now();
+
+        if(this.sbMode === 'open'){
+          this.sbStartTs = now;
+          this.sbEndTs = null;
+        } else {
+          const mins = parseInt(this.sbMinutes || 0, 10);
+          this.sbEndTs = now + (mins * 60 * 1000);
+          this.sbStartTs = now;
+        }
+
+        this.sbActive = true;
+        this.sbStep = 'timer';
+        // NON mostrare il lock screen qui - solo nel modal timer
+        this.sbTick();
+
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = setInterval(() => this.sbTick(), 1000);
+      },
+
+      sbStop(){
+        this.sbActive = false;
+        this.showLockScreen = false;
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = null;
+        if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+        this.lockScreenInterval = null;
+        this.sbMetaText = '';
+        this.sbStep = 'setup';
+      },
+
+      sbTick(){
+        if(!this.sbActive) return;
+        const now = Date.now();
+
+        if(this.sbMode === 'open'){
+          const elapsed = Math.max(0, now - this.sbStartTs);
+          this.sbTimerText = this.formatMs(elapsed);
+        } else {
+          const remaining = Math.max(0, this.sbEndTs - now);
+          this.sbTimerText = this.formatMs(remaining);
+
+          if(remaining <= 0){
+            this.sbActive = false;
+            this.showLockScreen = false; // Chiudi il lock screen quando termina
+            if(this.sbInterval) clearInterval(this.sbInterval);
+            this.sbInterval = null;
+            this.sbMetaText = 'Sosta terminata (demo).';
+          }
+        }
+      },
+
+      formatMs(ms){
+        const total = Math.floor(ms/1000);
+        const hh = String(Math.floor(total/3600)).padStart(2,'0');
+        const mm = String(Math.floor((total%3600)/60)).padStart(2,'0');
+        const ss = String(total%60).padStart(2,'0');
+        return `${hh}:${mm}:${ss}`;
+      },
+
+      sbNotifyExpiry(minutes=15){
+        // apre direttamente timer countdown per X minuti (SOLO MODAL, senza lock screen)
+        this.showBlueModal = true;
+        this.sbStep = 'timer';
+        this.sbMode = 'wheel';
+        this.sbPlate = (this.sbPlate && this.sbPlate.trim().length >= 5) ? this.sbPlate : 'EZ123AB';
+        this.sbMinutes = minutes;
+        this.sbActive = true;
+
+        const now = Date.now();
+        this.sbStartTs = now;
+        this.sbEndTs = now + minutes*60*1000;
+
+        this.sbTick();
+        if(this.sbInterval) clearInterval(this.sbInterval);
+        this.sbInterval = setInterval(() => this.sbTick(), 1000);
+
+        // toast in-app (opzionale)
+        const t = document.getElementById('demoToast');
+        if(t){
+          t.textContent = `Mancano ${minutes} minuti alla scadenza`;
+          t.style.display = 'block';
+          clearTimeout(window.__inAppToastT);
+          window.__inAppToastT = setTimeout(() => t.style.display='none', 1800);
+        }
+      },
+
+      sbShowLockScreen(minutes=15){
+        // Mostra il lock screen con timer
+        // Se una sosta è già attiva, mantenerla; altrimenti avviane una nuova
+        
+        if(!this.sbActive){
+          // Nessuna sosta attiva: crea una nuova
+          this.sbPlate = this.sbPlate && this.sbPlate.trim().length >= 5 ? this.sbPlate : 'EZ123AB';
+          this.sbMode = 'wheel';
+          this.sbMinutes = minutes;
+          
+          const now = Date.now();
+          this.sbStartTs = now;
+          this.sbEndTs = now + minutes*60*1000;
+          
+          this.sbActive = true;
+          
+          if(this.sbInterval) clearInterval(this.sbInterval);
+          this.sbInterval = setInterval(() => this.sbTick(), 1000);
+        }
+        
+        // Mostra il lock screen e aggiorna l'orologio ogni secondo
+        this.showLockScreen = true;
+        this.updateLockScreenTime();
+        if(this.lockScreenInterval) clearInterval(this.lockScreenInterval);
+        this.lockScreenInterval = setInterval(() => this.updateLockScreenTime(), 1000);
+        
+        // Aggiorna il timer subito
+        this.sbTick();
+      }
+    }">
+
+    <!-- CONTENUTO PRINCIPALE -->
+    <main class="flex-grow overflow-y-auto pb-20">
+
+      <!-- HOME -->
+      <div x-show="currentPage === 'home'" x-transition.opacity>
+        <h1 class="text-2xl font-bold mb-6 text-eni-teal text-center mt-8">EniLive</h1>
+
+        <div class="px-4 py-4">
+          <div class="h-64 relative overflow-hidden rounded-xl shadow-md" style="background: linear-gradient(135deg, #f0e5d8 0%, #e8dcc8 50%, #d4e8d4 100%);">
+            <div class="absolute top-1/4 left-1/4 w-24 h-24 bg-green-300 opacity-60 rounded-full blur-md"></div>
+            <div class="absolute bottom-1/3 right-1/3 w-20 h-20 bg-green-400 opacity-50 rounded-full blur-sm"></div>
+
+            <div class="absolute top-0 left-1/4 w-1.5 h-full bg-gray-300"></div>
+            <div class="absolute top-1/2 left-0 w-full h-1.5 bg-gray-300"></div>
+
+            <div class="absolute top-0 right-1/3 w-1 h-full bg-gray-200 opacity-60"></div>
+            <div class="absolute top-1/3 left-0 w-full h-1 bg-gray-200 opacity-60"></div>
+            <div class="absolute bottom-1/4 left-0 w-full h-0.5 bg-gray-200 opacity-40"></div>
+
+            <div class="absolute top-1/4 left-1/3 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Centro
+              </div>
+            </div>
+
+            <div class="absolute top-1/3 right-1/4 transform translate-x-1/2 -translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Nord
+              </div>
+            </div>
+
+            <div class="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2 group cursor-pointer">
+              <div class="absolute inset-0 bg-eni-teal opacity-0 group-hover:opacity-20 rounded-full blur-lg transition-opacity w-12 h-12 -left-6 -top-6"></div>
+              <div class="bg-white rounded-full p-2.5 shadow-xl border-2 border-eni-teal relative z-10 group-hover:shadow-2xl transition-shadow">
+                <i class="fa fa-gas-pump text-eni-teal text-lg"></i>
+              </div>
+              <div class="absolute top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Milano Sud
+              </div>
+            </div>
+
+            <button class="absolute bottom-4 right-4 bg-eni-teal text-white p-3 rounded-full shadow-lg hover:bg-eni-teal-darker transition z-20">
+              <i class="fa fa-location-arrow"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4">
+          <div class="text-center my-4">
+            <button @click="showRefuelModal = true" class="w-full bg-eni-teal text-white font-bold py-4 rounded-xl shadow-lg hover:bg-eni-teal-darker transition text-lg">
+              <i class="fa fa-gas-pump mr-3"></i> Inizia Rifornimento
+            </button>
+          </div>
+
+          <h2 class="font-semibold mb-4 mt-6 text-gray-800">Ecosistema Servizi Mobilità</h2>
+
+          <div class="grid grid-cols-3 gap-3">
+            <template x-for="service in [
+              { id: 'telepedaggio', name: 'Telepedaggio', icon: 'fa-road' },
+              { id: 'lavaggio', name: 'Lavaggio', icon: 'fa-car-side' },
+              { id: 'strisce', name: 'Strisce Blu', icon: 'fa-square' },
+              { id: 'biglietti', name: 'Biglietti', icon: 'fa-ticket' },
+              { id: 'food', name: 'Food', icon: 'fa-utensils' },
+              { id: 'assicurazione', name: 'Assicurazione', icon: 'fa-shield-alt' }
+            ]" :key="service.id">
+
+              <!-- QUI: Strisce Blu apre il flow dedicato -->
+              <button
+                @click="
+                  if(service.id === 'strisce'){
+                    openBlue();
+                  } else {
+                    selectedService = service; showServiceDetail = true;
+                  }
+                "
+                class="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg shadow-sm hover:bg-eni-teal hover:text-white transition cursor-pointer duration-200">
+                <i :class="'fa ' + service.icon" class="text-2xl mb-2"></i>
+                <span class="text-xs text-center font-medium" x-text="service.name"></span>
+              </button>
+
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOYALTY -->
+      <div x-show="currentPage === 'loyalty'" x-transition.opacity class="p-6">
+        <h1 class="text-2xl font-bold mb-6 text-eni-teal">EniLive Loyalty Program</h1>
+
+        <div class="p-6 rounded-xl shadow-lg text-white mb-6 border-2 border-white/20" style="background: linear-gradient(135deg, #117299 0%, #0d4f6f 50%, #1e9fd8 100%);">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <p class="text-sm font-semibold mb-2">🎯 PROSSIMO OBIETTIVO</p>
+              <h2 class="text-3xl font-bold">Telepedaggio</h2>
+              <p class="text-sm font-semibold mt-2">Completamente Gratuito</p>
+            </div>
+            <i class="fa fa-road text-4xl opacity-30"></i>
+          </div>
+
+          <div class="mt-3 pt-3 border-t border-white/30">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold">700 / 1000 L</span>
+              <span class="text-lg font-bold">70%</span>
+            </div>
+            <div class="w-full bg-white/20 rounded-full h-5 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500" style="width: 70%; background: linear-gradient(90deg, #1e9fd8, #4db8e8, #7ed3f0);"></div>
+            </div>
+            <p class="text-xs mt-3 font-semibold">📍 Solo 300 litri mancanti!</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs text-gray-600 font-semibold mb-1">PUNTI LOYALTY</p>
+              <p class="text-4xl font-bold text-eni-teal">4,520</p>
+              <p class="text-xs text-gray-600 mt-2"><i class="fa fa-star text-yellow-400 mr-1"></i>Gold Member</p>
+            </div>
+            <div class="bg-eni-teal-light rounded-lg p-4">
+              <i class="fa fa-trophy text-2xl text-eni-teal"></i>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="font-semibold mb-3 text-gray-800 text-sm">✅ VANTAGGI ATTIVI</h2>
+        <ul class="space-y-2 mb-6">
+          <li class="flex items-center bg-green-50 p-3 rounded-lg shadow-sm border-l-4 border-green-500">
+            <i class="fa fa-check-circle text-green-500 mr-3"></i>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">10% Cashback</p>
+              <p class="text-xs text-gray-600">Su rifornimenti</p>
+            </div>
+          </li>
+          <li class="flex items-center bg-green-50 p-3 rounded-lg shadow-sm border-l-4 border-green-500">
+            <i class="fa fa-check-circle text-green-500 mr-3"></i>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">Parcheggio Gratuito</p>
+              <p class="text-xs text-gray-600">2 ore/mese</p>
+            </div>
+          </li>
+        </ul>
+
+        <h2 class="font-semibold mb-3 text-gray-800 text-sm">🔒 PROSSIMI PREMI</h2>
+        <div class="space-y-2">
+          <div class="bg-blue-50 p-3 rounded-lg shadow-sm border-l-4 border-blue-400">
+            <div class="flex items-start">
+              <i class="fa fa-unlock text-blue-500 mr-2 mt-0.5 text-sm"></i>
+              <div class="flex-1 text-sm">
+                <p class="font-semibold text-blue-900">Assistenza Stradale 24/7</p>
+                <p class="text-xs text-blue-700 mt-1">Mancano 500 L</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHATBOT -->
+      <div x-show="currentPage === 'chatbot'" x-transition.opacity class="flex flex-col h-[calc(100vh-120px)]">
+        <h1 class="text-xl font-bold p-4 shadow-sm text-eni-teal border-b">Enil<span style="color: #0d4f6f; font-weight: 700;">AI</span>ve concierge</h1>
+
+        <div class="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <template x-for="msg in messages" :key="msg">
+            <div :class="msg.type === 'bot' ? 'flex justify-start' : 'flex justify-end'">
+              <div :class="msg.type === 'bot' ? 'bg-blue-100 text-gray-800' : 'bg-eni-teal text-white'" class="p-3 rounded-lg max-w-xs text-sm">
+                <p x-text="msg.text"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="p-4 border-t bg-white">
+          <div class="flex items-center gap-2">
+            <input type="text"
+              x-model="messageInput"
+              @keyup.enter="messages.push({type: 'user', text: messageInput}); messageInput = ''; setTimeout(() => messages.push({type: 'bot', text: 'Grazie per il tuo messaggio!'}), 500)"
+              placeholder="Scrivi un messaggio..."
+              class="flex-grow border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-eni-teal">
+            <button
+              @click="messages.push({type: 'user', text: messageInput}); messageInput = ''; setTimeout(() => messages.push({type: 'bot', text: 'Grazie per il tuo messaggio!'}), 500)"
+              class="bg-eni-teal text-white p-3 rounded-full hover:bg-eni-teal-darker transition">
+              <i class="fa fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUNDLE -->
+      <div x-show="currentPage === 'bundle'" x-transition.opacity class="p-6">
+        <h1 class="text-2xl font-bold mb-2 text-eni-teal">Piani e Abbonamenti</h1>
+        <p class="text-gray-600 text-sm mb-6">Scegli il piano più adatto alle tue esigenze</p>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4 cursor-pointer hover:shadow-md transition" @click="selectedBundle = 'standard'; showBundleDetail = true">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-gray-800 text-lg">STANDARD</h3>
+              <span class="inline-block bg-eni-teal text-white text-xs font-bold px-2 py-1 rounded mt-1">NO FEE</span>
+            </div>
+            <p class="text-2xl font-bold text-gray-800">€0<span class="text-sm text-gray-600">/mese</span></p>
+          </div>
+          <ul class="text-sm text-gray-700 space-y-2 mb-4">
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Early Access ai servizi</li>
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Accesso a tutte le feature</li>
+            <li><i class="fa fa-times text-gray-400 mr-2"></i>Servizi premium limitati</li>
+          </ul>
+          <button class="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-300 transition">Attiva ora</button>
+        </div>
+
+        <div class="p-4 rounded-lg shadow-md mb-4 cursor-pointer hover:shadow-lg transition text-white relative overflow-hidden" style="background: linear-gradient(135deg, #117299 0%, #1e9fd8 100%); border: 2px solid #117299;" @click="selectedBundle = 'premium'; showBundleDetail = true">
+          <div class="absolute top-0 right-0 w-0 h-0" style="border-left: 40px solid transparent; border-top: 40px solid #FFD700;"></div>
+          <div class="absolute text-gray-800 font-bold" style="top: 5px; right: 6px; font-size: 9px; line-height: 1; letter-spacing: 0.5px;">TOP</div>
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-lg">PREMIUM</h3>
+              <p class="text-sm font-semibold">All Inclusive</p>
+            </div>
+            <p class="text-2xl font-bold">€1,99<span class="text-sm font-semibold">/mese</span></p>
+          </div>
+          <ul class="text-sm space-y-2 mb-4">
+            <li><i class="fa fa-check mr-2"></i>Telepedaggio Gratuito</li>
+            <li><i class="fa fa-check mr-2"></i>Strisce Blu Scontate</li>
+            <li><i class="fa fa-check mr-2"></i>Assistenza Stradale 24/7</li>
+          </ul>
+          <button class="w-full bg-white text-eni-teal font-semibold py-2 rounded-lg hover:bg-gray-100 transition">Attiva ora</button>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition" @click="selectedBundle = 'telepedaggio'; showBundleDetail = true">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-bold text-gray-800 text-lg">TELEPEDAGGIO</h3>
+              <span class="inline-block bg-eni-teal text-white text-xs font-bold px-2 py-1 rounded mt-1">ONLY TOOLLING</span>
+            </div>
+            <p class="text-2xl font-bold text-gray-800">€2,50<span class="text-sm text-gray-600">/mese</span></p>
+          </div>
+          <ul class="text-sm text-gray-700 space-y-2 mb-4">
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Premium</li>
+            <li><i class="fa fa-check text-green-500 mr-2"></i>Area C/B ilimitata</li>
+            <li><i class="fa fa-plus text-blue-500 mr-2"></i>Add-on: Strisce Blu (+€0,99)</li>
+          </ul>
+          <button class="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-300 transition">Attiva ora</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- MODAL SERVIZIO DETTAGLIO -->
+    <div x-show="showServiceDetail" class="modal-overlay" @click.self="showServiceDetail = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-eni-teal" x-text="selectedService?.name"></h2>
+          <button @click="showServiceDetail = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <template x-if="selectedService?.id === 'telepedaggio'">
+            <div>
+              <p class="text-gray-700 mb-4">Il Telepedaggio è un sistema di pagamento automatico per le tratte autostradali.</p>
+              <h3 class="font-semibold text-gray-800 mb-2">Vantaggi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Niente code ai caselli</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Sconti sulle tratte abituali</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Consulta estratti conto online</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg mt-6 hover:bg-eni-teal-darker transition">Attiva Telepedaggio</button>
+            </div>
+          </template>
+
+          <template x-if="selectedService?.id === 'lavaggio'">
+            <div>
+              <p class="text-gray-700 mb-4">Servizio di lavaggio auto professionale con prodotti eco-friendly.</p>
+              <h3 class="font-semibold text-gray-800 mb-2">Opzioni:</h3>
+              <ul class="text-sm space-y-2 text-gray-700">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Lavaggio Esterno - €8,90</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Lavaggio Completo - €14,90</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Abbonamento Mensile - €29,90</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg mt-6 hover:bg-eni-teal-darker transition">Prenota Lavaggio</button>
+            </div>
+          </template>
+
+          <template x-if="!['telepedaggio', 'lavaggio'].includes(selectedService?.id)">
+            <div>
+              <p class="text-gray-700 mb-4">Scopri di più su questo servizio e come iniziare.</p>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Continua</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL RIFORNIMENTO -->
+    <div x-show="showRefuelModal" class="modal-overlay" @click.self="showRefuelModal = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-eni-teal">Inizia Rifornimento</h2>
+          <button @click="showRefuelModal = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Stazione di Servizio</label>
+            <select x-model="selectedStation" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-eni-teal">
+              <option value="">Seleziona una stazione</option>
+              <option value="milan-centro">Stazione Milano Centro - 2 km</option>
+              <option value="milan-nord">Stazione Milano Nord - 5 km</option>
+              <option value="milan-sud">Stazione Milano Sud - 3 km</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Tipo di Carburante/Ricarica</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="selectedFuel = 'benzina'" :class="selectedFuel === 'benzina' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Benzina</button>
+              <button @click="selectedFuel = 'diesel'" :class="selectedFuel === 'diesel' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Diesel</button>
+              <button @click="selectedFuel = 'gpl'" :class="selectedFuel === 'gpl' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">GPL</button>
+              <button @click="selectedFuel = 'elettrico'" :class="selectedFuel === 'elettrico' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'" class="py-2 rounded-lg font-medium transition">Ricarica</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Quantità</label>
+            <div class="flex items-center gap-2">
+              <input type="range" x-model="selectedAmount" min="10" max="100" step="10" class="flex-grow" />
+              <span class="text-lg font-bold text-eni-teal w-16" x-text="selectedAmount + ' L'"></span>
+            </div>
+            <input type="number" x-model="selectedAmount" class="w-full border border-gray-300 rounded-lg p-2 mt-2 focus:outline-none focus:ring-2 focus:ring-eni-teal" placeholder="O inserisci manualmente" />
+          </div>
+
+          <div class="bg-eni-teal-light p-4 rounded-lg">
+            <p class="text-sm text-gray-700">Prezzo stimato</p>
+            <p class="text-3xl font-bold text-eni-teal" x-text="'€ ' + (selectedAmount * 1.50).toFixed(2)"></p>
+          </div>
+
+          <button class="w-full bg-eni-teal text-white font-bold py-4 rounded-lg hover:bg-eni-teal-darker transition text-lg">
+            <i class="fa fa-arrow-right mr-2"></i>Procedi al Pagamento
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL BUNDLE DETTAGLIO -->
+    <div x-show="showBundleDetail" class="modal-overlay" @click.self="showBundleDetail = false">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[80vh] overflow-y-auto z-50">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-eni-teal" x-text="selectedBundle === 'standard' ? 'STANDARD' : selectedBundle === 'premium' ? 'PREMIUM' : 'TELEPEDAGGIO'"></h2>
+          <button @click="showBundleDetail = false" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <template x-if="selectedBundle === 'standard'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€0/mese</p>
+              <p class="text-gray-700 mb-4">Piano gratuito con accesso a tutte le feature base.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Early Access ai servizi</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Accesso app mobile</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Supporto clienti</li>
+                <li><i class="fa fa-times text-gray-400 mr-2"></i>Servizi premium illimitati</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Standard</button>
+            </div>
+          </template>
+
+          <template x-if="selectedBundle === 'premium'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€1,99/mese</p>
+              <p class="text-gray-700 mb-4">Piano completo con tutti i servizi premium inclusi.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Gratuito</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Strisce Blu Scontate (50%)</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Assistenza Stradale 24/7</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Priorità Supporto</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Premium</button>
+            </div>
+          </template>
+
+          <template x-if="selectedBundle === 'telepedaggio'">
+            <div>
+              <p class="text-3xl font-bold text-eni-teal mb-2">€2,50/mese</p>
+              <p class="text-gray-700 mb-4">Piano dedicato alla mobilità urbana.</p>
+              <h3 class="font-semibold text-gray-800 mb-3">Servizi Inclusi:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Telepedaggio Premium</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Area C/B Illimitata</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>Consultazione Estratti Conto</li>
+              </ul>
+
+              <h3 class="font-semibold text-gray-800 mb-3">Add-on Disponibili:</h3>
+              <ul class="text-sm space-y-2 text-gray-700 mb-6">
+                <li><i class="fa fa-plus text-blue-500 mr-2"></i>Strisce Blu - +€0,99/mese</li>
+                <li><i class="fa fa-plus text-blue-500 mr-2"></i>Assistenza Stradale - +€4,99/mese</li>
+              </ul>
+              <button class="w-full bg-eni-teal text-white font-bold py-3 rounded-lg hover:bg-eni-teal-darker transition">Attiva Piano Telepedaggio</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL STRISCE BLU (NUOVO) -->
+    <div x-show="showBlueModal" class="modal-overlay" @click.self="showBlueModal = false; if(sbActive) showLockScreen = true;">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 max-h-[85vh] overflow-y-auto z-50">
+
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-eni-teal">Strisce Blu</h2>
+          <button @click="showBlueModal = false; if(sbActive) showLockScreen = true;" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <!-- STEP 1: SETUP -->
+        <div x-show="sbStep === 'setup'" class="space-y-4">
+          <p class="text-sm text-gray-600">Inserisci la targa e scegli quanto vuoi sostare.</p>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Targa</label>
+            <input
+              x-model="sbPlate"
+              placeholder="Es. EZ123AB"
+              class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-eni-teal uppercase"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Modalità</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                @click="sbSetMode('wheel')"
+                :class="sbMode==='wheel' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'"
+                class="py-2 rounded-lg font-medium transition"
+              >Rotella</button>
+
+              <button
+                @click="sbSetMode('standard')"
+                :class="sbMode==='standard' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'"
+                class="py-2 rounded-lg font-medium transition"
+              >Standard 2 ore</button>
+
+              <button
+                @click="sbSetMode('open')"
+                :class="sbMode==='open' ? 'bg-eni-teal text-white' : 'bg-gray-100 text-gray-800'"
+                class="py-2 rounded-lg font-medium transition"
+              >Stai quanto vuoi</button>
+            </div>
+          </div>
+
+          <div x-show="sbMode !== 'open'">
+            <label class="block text-sm font-semibold text-gray-800 mb-2">Durata</label>
+
+            <div class="wheel-wrap">
+              <select class="wheel-select" size="7" x-model="sbMinutes">
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">1 ora</option>
+                <option value="75">1h 15m</option>
+                <option value="90">1h 30m</option>
+                <option value="105">1h 45m</option>
+                <option value="120">2 ore</option>
+                <option value="150">2h 30m</option>
+                <option value="180">3 ore</option>
+                <option value="240">4 ore</option>
+                <option value="300">5 ore</option>
+                <option value="360">6 ore</option>
+              </select>
+            </div>
+
+            <p class="text-xs text-gray-500 mt-2">
+              Selezionato: <span class="font-semibold text-eni-teal" x-text="sbMinutes + ' min'"></span>
+            </p>
+          </div>
+
+          <div x-show="sbMetaText" class="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg" x-text="sbMetaText"></div>
+
+          <button
+            @click="sbStart()"
+            class="w-full bg-eni-teal text-white font-bold py-4 rounded-lg hover:bg-eni-teal-darker transition text-lg"
+          >
+            <i class="fa fa-play mr-2"></i>Avvia sosta
+          </button>
+
+          <p class="text-xs text-gray-500">
+            *Demo: pagamento e city selection non inclusi in questo mock.
+          </p>
+        </div>
+
+        <!-- STEP 2: TIMER -->
+        <div x-show="sbStep === 'timer'" class="space-y-4">
+
+          <div class="timer-card">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-sm opacity-90">Targa</p>
+                <p class="text-xl font-bold" x-text="sbPlate"></p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm opacity-90" x-text="sbMode==='open' ? 'Tempo trascorso' : 'Tempo rimanente'"></p>
+              </div>
+            </div>
+
+            <div class="mt-4 timer-big text-center" x-text="sbTimerText"></div>
+
+            <div class="mt-3 text-center text-sm opacity-90" x-show="sbMode!=='open'">
+              <span x-text="'Scade tra ' + sbTimerText"></span>
+            </div>
+            <div class="mt-3 text-center text-sm opacity-90" x-show="sbMode==='open'">
+              <span>Finisce quando premi “Stop”</span>
+            </div>
+          </div>
+
+          <button
+            x-show="sbMode==='open' || sbActive"
+            @click="sbStop()"
+            class="w-full bg-gray-900 text-white font-bold py-4 rounded-lg hover:bg-black transition text-lg"
+          >
+            <i class="fa fa-stop mr-2"></i>Stop sosta
+          </button>
+
+          <button
+            @click="sbStep='setup'"
+            class="w-full bg-gray-100 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-200 transition"
+          >
+            Modifica impostazioni
+          </button>
+
+          <div x-show="sbMetaText && !sbActive" class="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-3 rounded-lg">
+            <span x-text="sbMetaText"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- LOCK SCREEN STRISCE BLU -->
+    <div x-show="showLockScreen" @click="toggleLockScreen()" class="lock-screen">
+      <div class="lock-screen-content">
+        <p class="lock-screen-label">📍 STRISCE BLU</p>
+        <p class="lock-screen-time" x-text="lockScreenCurrentTime"></p>
+        
+        <div class="lock-screen-plate" x-text="sbPlate"></div>
+        
+        <div class="mt-16">
+          <p class="lock-screen-label" x-text="sbMode==='open' ? 'Tempo trascorso' : 'Tempo rimanente'"></p>
+          <div class="lock-screen-remaining" x-text="sbTimerText"></div>
+          <p class="lock-screen-remaining-label" x-text="sbMode==='open' ? 'Finisce quando premi Stop' : 'Scade fra ' + sbTimerText"></p>
+        </div>
+      </div>
+      <div class="lock-screen-hint">Tap per sbloccare</div>
+    </div>
+
+    <!-- NAV BOTTOM -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white shadow-top border-t border-gray-200 flex justify-around items-center h-20 px-4 z-30">
+      <button @click="currentPage = 'home'" :class="currentPage === 'home' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal">
+        <i class="fa fa-home text-2xl"></i>
+        <span class="text-xs mt-1 font-medium">Home</span>
+      </button>
+
+      <button @click="currentPage = 'loyalty'" :class="currentPage === 'loyalty' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal">
+        <i class="fa fa-star text-2xl"></i>
+        <span class="text-xs mt-1 font-medium">Loyalty</span>
+      </button>
+
+      <button @click="currentPage = 'chatbot'" :class="currentPage === 'chatbot' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal">
+        <i class="fa fa-comment-dots text-2xl"></i>
+        <span class="text-xs mt-1 font-medium">Chat</span>
+      </button>
+
+      <button @click="currentPage = 'bundle'" :class="currentPage === 'bundle' ? 'text-eni-teal' : 'text-gray-400'" class="transition flex flex-col items-center hover:text-eni-teal">
+        <i class="fa fa-box text-2xl"></i>
+        <span class="text-xs mt-1 font-medium">Bundle</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- BRIDGE API PER LA SHELL -->
+  <script>
+    (function(){
+      // API chiamabile dalla shell (iframe parent)
+      window.DEMO = {
+        blueExpiry(minutes){
+          try{
+            if(window.APP && typeof window.APP.sbNotifyExpiry === 'function'){
+              window.APP.sbNotifyExpiry(minutes || 15);
+              return true;
+            }
+          }catch(e){}
+          return false;
+        },
+        lockScreen(minutes){
+          try{
+            if(window.APP && typeof window.APP.sbShowLockScreen === 'function'){
+              window.APP.sbShowLockScreen(minutes || 15);
+              return true;
+            }
+          }catch(e){}
+          return false;
+        }
+      };
+    })();
+  </script>
+</body>
+</html>
+  </template>
+
+  <script>
+    const frame = document.getElementById('appFrame');
+    const tpl = document.getElementById('protoSource');
+    const toastEl = document.getElementById('shellToast');
+
+    function showShellToast(text){
+      toastEl.textContent = text;
+      toastEl.style.display = 'block';
+      clearTimeout(window.__shellToastT);
+      window.__shellToastT = setTimeout(() => toastEl.style.display='none', 2000);
+    }
+
+    function loadApp(){
+      frame.srcdoc = tpl.innerHTML.trim();
+    }
+
+    // helper: chiama API nell'iframe
+    function callInApp(fn, ...args){
+      const w = frame.contentWindow;
+      if(w && w.DEMO && typeof w.DEMO[fn] === 'function'){
+        return w.DEMO[fn](...args);
+      }
+      return false;
+    }
+
+    // SOLO UN BOTTONE: notifica scadenza
+    document.getElementById('btnNotify').addEventListener('click', () => {
+      showShellToast('Mancano 15 minuti alla scadenza');
+      callInApp('blueExpiry', 15);
+    });
+
+    // BLOCCA TELEFONO: mostra lock screen
+    document.getElementById('btnLockScreen').addEventListener('click', () => {
+      showShellToast('Schermo bloccato');
+      callInApp('lockScreen', 15);
+    });
+
+    // boot
+    loadApp();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Android Home</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 100%; height: 100vh;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 75%, #1a1a4e 100%);
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      color: #fff;
+      overflow: hidden;
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Overlay scuro per profondità */
+    body::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 20%, rgba(99,102,241,0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ── STATUS BAR ── */
+    .statusbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 18px 0;
+      font-size: 12px; font-weight: 500;
+      position: relative; z-index: 10;
+    }
+    .statusbar .icons { display: flex; gap: 6px; align-items: center; font-size: 11px; }
+
+    /* ── OROLOGIO ── */
+    .clock-wrap {
+      text-align: center;
+      margin-top: 32px;
+      position: relative; z-index: 10;
+    }
+    .clock-wrap .clock-time {
+      font-size: 72px; font-weight: 100; letter-spacing: -3px;
+      line-height: 1; text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+    .clock-wrap .clock-date {
+      font-size: 14px; opacity: 0.75; margin-top: 6px; font-weight: 400;
+    }
+
+    /* ── AREA NOTIFICHE ── */
+    .notif-area {
+      position: absolute;
+      top: 155px; left: 12px; right: 12px;
+      z-index: 20;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .notif-card {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: rgba(255,255,255,0.12);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 16px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s;
+      animation: slideIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    .notif-card:active { transform: scale(0.97); background: rgba(255,255,255,0.18); }
+
+    @keyframes slideIn {
+      from { transform: translateY(-16px) scale(0.96); opacity: 0; }
+      to   { transform: translateY(0) scale(1);  opacity: 1; }
+    }
+
+    .notif-icon-wrap {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: #25d366;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .notif-icon-wrap.enilive { background: #117299; }
+
+    .notif-body { flex: 1; min-width: 0; }
+    .notif-app-name { font-size: 11px; opacity: 0.65; margin-bottom: 2px; }
+    .notif-title { font-size: 13px; font-weight: 600; }
+    .notif-preview {
+      font-size: 12px; opacity: 0.8; margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .notif-time { font-size: 10px; opacity: 0.5; white-space: nowrap; align-self: flex-start; margin-top: 2px; }
+
+    .notif-dismiss {
+      position: absolute; top: 6px; right: 8px;
+      font-size: 14px; opacity: 0.4; cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+    .notif-dismiss:hover { opacity: 0.8; }
+    .notif-card { position: relative; }
+
+    /* ── ICONE APP (dock) ── */
+    .app-dock {
+      position: absolute;
+      bottom: 52px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 20px;
+    }
+    .app-icon {
+      width: 54px; text-align: center;
+    }
+    .app-icon-face {
+      width: 54px; height: 54px; border-radius: 16px;
+      background: rgba(255,255,255,0.13);
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 4px;
+    }
+    .app-icon-label { font-size: 11px; opacity: 0.75; }
+
+    /* ── HINT INFERIORE ── */
+    .bottom-hint {
+      position: absolute; bottom: 14px; left: 0; right: 0;
+      text-align: center; font-size: 11px; opacity: 0.45;
+    }
+    .pill-bar {
+      width: 56px; height: 4px;
+      background: rgba(255,255,255,0.35); border-radius: 2px;
+      margin: 6px auto 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Status bar -->
+<div class="statusbar">
+  <span id="statusTime">09:41</span>
+  <div class="icons">
+    <span>▮▮▮</span>
+    <span>5G</span>
+    <span>🔋</span>
+  </div>
+</div>
+
+<!-- Orologio -->
+<div class="clock-wrap">
+  <div class="clock-time" id="clockTime">09:41</div>
+  <div class="clock-date" id="clockDate">Lunedì, 13 aprile 2026</div>
+</div>
+
+<!-- Notifiche -->
+<div class="notif-area" id="notifArea"></div>
+
+<!-- App dock -->
+<div class="app-dock">
+  <div class="app-icon">
+    <div class="app-icon-face">📞</div>
+    <div class="app-icon-label">Telefono</div>
+  </div>
+  <div class="app-icon">
+    <div class="app-icon-face">💬</div>
+    <div class="app-icon-label">Messaggi</div>
+  </div>
+  <div class="app-icon" id="iconEnilive" style="cursor:pointer">
+    <div class="app-icon-face" style="background:rgba(17,114,153,0.4);border-color:rgba(17,114,153,0.6)">🛣️</div>
+    <div class="app-icon-label">Enilive</div>
+  </div>
+  <div class="app-icon">
+    <div class="app-icon-face">⚙️</div>
+    <div class="app-icon-label">Impost.</div>
+  </div>
+</div>
+
+<!-- Hint swipe -->
+<div class="bottom-hint">
+  Tocca per sbloccare
+  <div class="pill-bar"></div>
+</div>
+
+<script src="bus.js"></script>
+<script>
+  /* ── CLOCK ── */
+  const GIORNI = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const MESI   = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+
+  function updateClock() {
+    const now = new Date();
+    const hh  = String(now.getHours()).padStart(2,'0');
+    const mm  = String(now.getMinutes()).padStart(2,'0');
+    const t   = hh + ':' + mm;
+    document.getElementById('clockTime').textContent = t;
+    document.getElementById('statusTime').textContent = t;
+    document.getElementById('clockDate').textContent =
+      GIORNI[now.getDay()] + ', ' + now.getDate() + ' ' + MESI[now.getMonth()] + ' ' + now.getFullYear();
+  }
+  updateClock();
+  setInterval(updateClock, 10000);
+
+  /* ── NOTIFICHE ── */
+  function nowTime() {
+    const n = new Date();
+    return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  }
+
+  function addNotifica(p) {
+    const area = document.getElementById('notifArea');
+    const card = document.createElement('div');
+    card.className = 'notif-card';
+    card.dataset.smsId = p.id || '';
+    card.innerHTML = `
+      <div class="notif-icon-wrap enilive">✉️</div>
+      <div class="notif-body">
+        <div class="notif-app-name">Messaggi · Enilive</div>
+        <div class="notif-title">Nuovo messaggio</div>
+        <div class="notif-preview">${p.preview || 'Hai ricevuto un messaggio da Enilive'}</div>
+      </div>
+      <div class="notif-time">${nowTime()}</div>
+      <div class="notif-dismiss" title="Ignora">✕</div>
+    `;
+
+    // Tap sulla card → apre l'app
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('notif-dismiss')) return;
+      apriApp(p);
+    });
+
+    // Dismiss
+    card.querySelector('.notif-dismiss').addEventListener('click', (e) => {
+      e.stopPropagation();
+      card.style.transition = 'opacity 0.2s, transform 0.2s';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(60px)';
+      setTimeout(() => card.remove(), 200);
+    });
+
+    area.prepend(card);
+  }
+
+  function apriApp(smsPayload) {
+    // Chiede al parent (protoConEmulatore) di tornare a proto-app
+    try {
+      if (window.parent && typeof window.parent.tornaAllApp === 'function') {
+        window.parent.tornaAllApp(smsPayload);
+      }
+    } catch(_) {
+      // Fallback: naviga direttamente
+      window.location.href = 'proto-app.html';
+    }
+  }
+
+  // Tap sull'icona Enilive nel dock
+  document.getElementById('iconEnilive').addEventListener('click', () => {
+    apriApp(null);
+  });
+
+  /* ── BUS: ascolta SMS in arrivo ── */
+  if (typeof Bus !== 'undefined') {
+    Bus.on('sms:outbound', (p) => addNotifica(p));
+  }
+
+  /* ── SMS pendente passato via localStorage ── */
+  try {
+    const raw = localStorage.getItem('androidPendingSms');
+    if (raw) {
+      addNotifica(JSON.parse(raw));
+      localStorage.removeItem('androidPendingSms');
+    }
+  } catch(_) {}
+</script>
+</body>
+</html>

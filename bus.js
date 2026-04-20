@@ -1,0 +1,204 @@
+/**
+ * bus.js — Event Bus condiviso Enilive
+ * Comunicazione cross-tab tramite BroadcastChannel + fallback localStorage.
+ *
+ * API:
+ *   Bus.emit('evento:nome', payload)
+ *   Bus.on('evento:nome', handler)
+ *   Bus.off('evento:nome', handler)
+ *
+ * Utility:
+ *   syncVeicoli(record)          — mantiene veicoli[] in sync con dispositivi[]/serviziRsa[]
+ *   migrateClienteRecord(record) — migra old-schema → new-schema (idempotente)
+ *
+ * Catalogo eventi:
+ *   cliente:registrato    | tablet → app, crm  | { nome, cf, targhe[], dataRegistrazione }
+ *   servizio:attivato     | tablet, app → crm  | { servizio, targa, veicoloId, data }
+ *   servizio:disattivato  | app → crm          | { servizio, targa, veicoloId, data }
+ *   pagamento:confermato  | app → crm          | { servizio, importo, metodo, data }
+ *   sosta:avviata         | app → crm          | { zona, targa, durata }
+ *   sosta:terminata       | app → crm          | { zona, targa, importo }
+ *   rsa:chiamata          | app → crm          | { targa, posizione, tipo }
+ *   memo:scadenza         | app → crm          | { tipo, targa, data }
+ *   crm:aggiornato        | crm → app          | { campo, valore }
+ *   scenario:trigger      | emulatore → app    | { nome, params }
+ */
+
+/**
+ * syncVeicoli — assicura che ogni veicoloId referenziato in contratti[].dispositivi[]
+ * e serviziRsa[] abbia un corrispondente entry in veicoli[]. Mutates record in-place.
+ * @param {object} record — ClienteRecord (new-schema)
+ * @returns {object} record
+ */
+function syncVeicoli(record) {
+  const referencedIds = new Set([
+    ...(record.contratti || []).flatMap(c => (c.dispositivi || []).map(d => d.veicoloId).filter(Boolean)),
+    ...(record.serviziRsa || []).map(r => r.veicoloId).filter(Boolean),
+  ]);
+  const existingIds = new Set((record.veicoli || []).map(v => v.id));
+  referencedIds.forEach(id => {
+    if (!existingIds.has(id)) {
+      const targa = id.replace(/^v_/, '');
+      if (!record.veicoli) record.veicoli = [];
+      record.veicoli.push({ id, targa, tipo: 'Auto', marca: '', modello: '', scadenze: {} });
+    }
+  });
+  return record;
+}
+
+/** @deprecated — usa syncVeicoli */
+function syncTargheGlobali(record) { return syncVeicoli(record); }
+
+/**
+ * migrateClienteRecord — converte un ClienteRecord old-schema nel nuovo formato.
+ * Idempotente: se record.veicoli è già un array, restituisce il record invariato.
+ * @param {object} r — ClienteRecord (old o new schema)
+ * @returns {object} r migrato (same reference, mutato in-place)
+ */
+function migrateClienteRecord(r) {
+  if (!r || Array.isArray(r.veicoli)) return r;
+
+  // 1. Raccoglie targhe RSA PRIMA di mutare i contratti
+  const rsaTarghe = new Set([
+    ...(r.serviziAttivi?.rsa?.targhe || []).map(t => t.toUpperCase()),
+    ...(r.contratti || []).flatMap(c => (c.obu || []).filter(o => o.rsa).map(o => (o.targa || '').toUpperCase()).filter(Boolean)),
+    ...(r.contratti || []).flatMap(c => (c.rsaStandalone || []).map(s => (s.targa || '').toUpperCase()).filter(Boolean)),
+  ].filter(Boolean));
+
+  // 2. Costruisce veicoli[] da targhe[]
+  r.veicoli = (r.targhe || []).filter(Boolean).map(t => ({
+    id: 'v_' + t.toUpperCase(),
+    targa: t.toUpperCase(),
+    tipo: 'Auto', marca: '', modello: '', scadenze: {},
+  }));
+
+  // 3. Migra contratti: obu[] + rsaStandalone[] → dispositivi[]
+  (r.contratti || []).forEach(c => {
+    c.dispositivi = [
+      ...(c.obu || []).map(o => ({
+        tipo: 'obu',
+        codice: o.codice || '',
+        veicoloId: 'v_' + (o.targa || '').toUpperCase(),
+        furtoSmarrimento: !!o.furto,
+        stato: o.stato || 'attivo',
+      })),
+      ...(c.rsaStandalone || []).map(s => ({
+        tipo: 'rsa_standalone',
+        codice: '',
+        veicoloId: 'v_' + (s.targa || '').toUpperCase(),
+        furtoSmarrimento: false,
+        stato: 'attivo',
+      })),
+    ];
+    c.dataAttivazione = c.dataCreazione || r.dataRegistrazione || new Date().toISOString();
+    delete c.obu; delete c.rsaStandalone; delete c.dataCreazione;
+  });
+
+  // 4. Costruisce serviziRsa[]
+  let rsaIdx = 1;
+  r.serviziRsa = [...rsaTarghe].map(t => ({
+    id: 'rsa_' + String(rsaIdx++).padStart(3, '0'),
+    veicoloId: 'v_' + t,
+    tipo: 'assistenza_stradale',
+    stato: 'attivo',
+    costo: 2.00,
+  }));
+
+  // 5. Nidifica contatti e indirizzo
+  r.contatti = { telefono: r.telefono || '', email: r.email || '' };
+  const oldInd = r.indirizzo;
+  r.indirizzo = {
+    via:    (typeof oldInd === 'string' ? oldInd : '') || '',
+    civico: r.civico    || '',
+    comune: r.comune    || '',
+    prov:   r.provincia || '',
+    cap:    r.cap       || '',
+  };
+  delete r.telefono; delete r.email;
+  delete r.civico; delete r.comune; delete r.provincia; delete r.cap; delete r.stato;
+
+  // 6. Riduce serviziAttivi a { areac, parcheggi, strisceBlu, memo }
+  r.serviziAttivi = {
+    areac:      r.serviziAttivi?.areac      || { attivo: false },
+    parcheggi:  r.serviziAttivi?.parcheggi  || { attivo: false },
+    strisceBlu: r.serviziAttivi?.strisceBlu || { attivo: false },
+    memo:       r.serviziAttivi?.memo       || { attivo: false },
+  };
+
+  // 7. Aggiunge veicoloId ai movimenti (mantiene targa per display)
+  (r.movimenti || []).forEach(m => {
+    if (m.targa && !m.veicoloId) m.veicoloId = 'v_' + m.targa.toUpperCase();
+  });
+
+  // 8. Rimuove targhe[] (rimpiazzata da veicoli[])
+  delete r.targhe;
+
+  return r;
+}
+
+const Bus = (() => {
+    const CHANNEL_NAME = 'enilive-bus';
+    const LS_KEY = 'enilive-bus-last-event';
+
+    // Map<evento, Set<handler>>
+    const listeners = new Map();
+
+    // BroadcastChannel per comunicazione cross-tab
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+
+    // Ricevi messaggi dall'altro tab
+    channel.addEventListener('message', (e) => {
+        _dispatch(e.data.event, e.data.payload);
+    });
+
+    // Fallback: rileva eventi da localStorage (per browser senza BroadcastChannel)
+    window.addEventListener('storage', (e) => {
+        if (e.key !== LS_KEY || !e.newValue) return;
+        try {
+            const { event, payload } = JSON.parse(e.newValue);
+            _dispatch(event, payload);
+        } catch (_) {}
+    });
+
+    /** Notifica i listener locali di questo tab */
+    function _dispatch(event, payload) {
+        if (!listeners.has(event)) return;
+        listeners.get(event).forEach(fn => fn(payload));
+    }
+
+    return {
+        /**
+         * Pubblica un evento su tutti i tab (incluso quello corrente).
+         * @param {string} event
+         * @param {object} payload
+         */
+        emit(event, payload = {}) {
+            // Notifica altri tab
+            channel.postMessage({ event, payload });
+            // Fallback localStorage
+            localStorage.setItem(LS_KEY, JSON.stringify({ event, payload, _t: Date.now() }));
+            // Notifica tab corrente
+            _dispatch(event, payload);
+        },
+
+        /**
+         * Registra un handler per un evento.
+         * @param {string} event
+         * @param {function} handler
+         */
+        on(event, handler) {
+            if (!listeners.has(event)) listeners.set(event, new Set());
+            listeners.get(event).add(handler);
+        },
+
+        /**
+         * Rimuove un handler.
+         * @param {string} event
+         * @param {function} handler
+         */
+        off(event, handler) {
+            if (!listeners.has(event)) return;
+            listeners.get(event).delete(handler);
+        },
+    };
+})();
