@@ -915,76 +915,98 @@
               </div>
             </div>
 
-            <!-- Consensi marketing (visibili solo dopo OTP confermato) -->
+            <!-- Consensi facoltativi — pre-selezione + SMS firma (visibili dopo OTP confermato) -->
             <template x-if="otpSmsStatus === 'confirmed'">
               <div class="card p-5 border border-teal border-opacity-30">
-                <h4 class="font-semibold text-gray-700 mb-1 text-sm"><i class="fas fa-bullhorn mr-2 text-teal"></i>Consensi facoltativi — Marketing e Profilazione</h4>
-                <p class="text-xs text-gray-400 mb-4">Invia SMS al cliente per raccogliere la preferenza direttamente dal suo dispositivo.</p>
+                <h4 class="font-semibold text-gray-700 mb-1 text-sm"><i class="fas fa-user-shield mr-2 text-teal"></i>Consensi facoltativi</h4>
+                <p class="text-xs text-gray-400 mb-4">Pre-seleziona i consensi. Il cliente riceverà un SMS e firmerà con OTP.</p>
 
-                <!-- Stato: da inviare -->
+                <!-- Fase 1: pre-selezione + invio SMS -->
                 <template x-if="mktSmsStatus === null">
-                  <div class="space-y-2">
-                    <button class="btn-secondary text-sm w-full justify-center" @click="sendMktSms()">
-                      <i class="fas fa-sms mr-2"></i>Invia SMS consensi facoltativi
-                    </button>
-                    <button class="btn-ghost text-sm w-full justify-center text-gray-400 border border-gray-200"
-                      @click="mktSmsStatus = 'skipped'; showToastMsg('Consensi facoltativi saltati — entrambi rifiutati', 'info')">
-                      Salta — cliente rifiuta entrambi
-                    </button>
+                  <div>
+                    <div class="space-y-2 mb-4">
+                      <div class="flex items-start gap-3 cursor-pointer select-none p-3 rounded-xl border transition-colors"
+                        :class="consensiCrm.marketing ? 'border-teal bg-teal-light' : 'border-gray-200 bg-white'"
+                        @click="consensiCrm.marketing = !consensiCrm.marketing">
+                        <div class="w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors"
+                          :class="consensiCrm.marketing ? 'bg-teal border-teal' : 'bg-white border-gray-300'">
+                          <i class="fas fa-check text-white text-xs" x-show="consensiCrm.marketing"></i>
+                        </div>
+                        <div>
+                          <p class="text-sm font-medium text-gray-800">Marketing</p>
+                          <p class="text-xs text-gray-500">Comunicazioni promozionali Enilive</p>
+                        </div>
+                      </div>
+                      <div class="flex items-start gap-3 cursor-pointer select-none p-3 rounded-xl border transition-colors"
+                        :class="consensiCrm.profilazione ? 'border-teal bg-teal-light' : 'border-gray-200 bg-white'"
+                        @click="consensiCrm.profilazione = !consensiCrm.profilazione">
+                        <div class="w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors"
+                          :class="consensiCrm.profilazione ? 'bg-teal border-teal' : 'bg-white border-gray-300'">
+                          <i class="fas fa-check text-white text-xs" x-show="consensiCrm.profilazione"></i>
+                        </div>
+                        <div>
+                          <p class="text-sm font-medium text-gray-800">Profilazione</p>
+                          <p class="text-xs text-gray-500">Analisi abitudini d'uso per offerte personalizzate</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <button class="btn-secondary text-sm w-full justify-center" @click="sendMktSms()">
+                        <i class="fas fa-sms mr-2"></i>Invia SMS consensi
+                      </button>
+                      <button class="btn-ghost text-sm w-full justify-center text-gray-400 border border-gray-200"
+                        @click="mktSmsStatus = 'skipped'; showToastMsg('Consensi facoltativi saltati', 'info')">
+                        Salta
+                      </button>
+                    </div>
                   </div>
                 </template>
 
-                <!-- Stato: SMS inviato, attesa risposta -->
+                <!-- Fase 2: attesa firma cliente -->
                 <template x-if="mktSmsStatus === 'sent'">
                   <div class="space-y-3">
                     <div class="bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800">
-                      <i class="fas fa-clock mr-1"></i>SMS inviato. In attesa che il cliente selezioni i consensi sul proprio dispositivo.
+                      <i class="fas fa-clock mr-1"></i>SMS inviato. In attesa che il cliente firmi i consensi sul proprio dispositivo.
                     </div>
                     <template x-if="!mktSmsOtpFieldEnabled">
-                      <p class="text-xs text-gray-400 text-center py-2"><i class="fas fa-spinner fa-spin mr-1"></i>In attesa di risposta...</p>
+                      <p class="text-xs text-gray-400 text-center py-2"><i class="fas fa-spinner fa-spin mr-1"></i>In attesa di firma...</p>
                     </template>
                     <template x-if="mktSmsOtpFieldEnabled">
                       <div class="space-y-2">
-                        <p class="text-xs font-semibold text-green-700"><i class="fas fa-check-circle mr-1"></i>Cliente ha confermato — inserisci il codice OTP</p>
+                        <p class="text-xs font-semibold text-green-700"><i class="fas fa-check-circle mr-1"></i>Cliente ha firmato — inserisci OTP</p>
                         <div class="flex gap-2 items-center">
                           <input x-model="mktSmsOtpInput" type="text" class="form-input otp-input w-28 text-center text-xl tracking-widest" placeholder="0000" maxlength="4" />
                           <button class="btn-primary text-sm" @click="confirmMktOtp()">Conferma</button>
                           <button class="btn-ghost text-sm" @click="sendMktSms()" title="Reinvia SMS"><i class="fas fa-redo"></i></button>
                         </div>
-                        <p class="text-xs text-gray-400">Codice OTP mock: <strong>9012</strong></p>
+                        <p class="text-xs text-gray-400">OTP mock: <strong>9012</strong></p>
                       </div>
                     </template>
                   </div>
                 </template>
 
-                <!-- Stato: confermato o saltato — mostra risultato -->
+                <!-- Fase 3: completato -->
                 <template x-if="mktSmsStatus === 'confirmed' || mktSmsStatus === 'skipped'">
                   <div class="space-y-2">
                     <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                       <i :class="consensiCrm.marketing ? 'fa-check-circle text-green-600' : 'fa-times-circle text-gray-400'" class="fas text-base flex-shrink-0"></i>
-                      <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-800">Marketing</p>
-                        <p class="text-xs text-gray-400">Comunicazioni commerciali Enilive</p>
-                      </div>
+                      <p class="text-sm font-medium text-gray-800 flex-1">Marketing</p>
                       <span :class="consensiCrm.marketing ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                        class="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                        class="text-xs font-semibold px-2 py-0.5 rounded-full"
                         x-text="consensiCrm.marketing ? 'Accettato' : 'Rifiutato'"></span>
                     </div>
                     <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                       <i :class="consensiCrm.profilazione ? 'fa-check-circle text-green-600' : 'fa-times-circle text-gray-400'" class="fas text-base flex-shrink-0"></i>
-                      <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-800">Profilazione</p>
-                        <p class="text-xs text-gray-400">Analisi dati per offerte personalizzate</p>
-                      </div>
+                      <p class="text-sm font-medium text-gray-800 flex-1">Profilazione</p>
                       <span :class="consensiCrm.profilazione ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                        class="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                        class="text-xs font-semibold px-2 py-0.5 rounded-full"
                         x-text="consensiCrm.profilazione ? 'Accettata' : 'Rifiutata'"></span>
                     </div>
                   </div>
                 </template>
 
                 <div class="mt-3 bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
-                  <i class="fas fa-info-circle mr-1"></i>Il rifiuto non pregiudica l'accesso ai servizi. Modificabile in qualsiasi momento dall'app.
+                  <i class="fas fa-info-circle mr-1"></i>Il rifiuto non pregiudica l'accesso ai servizi. Modificabile dall'app in qualsiasi momento.
                 </div>
               </div>
             </template>
@@ -1163,7 +1185,7 @@
               <li class="flex items-center gap-2 text-gray-400"><i class="fas fa-minus w-3"></i> Senza OBU</li>
             </ul>
             <div class="mt-auto pt-2 border-t border-gray-100">
-              <span class="text-teal font-bold text-base">€2,00/mese</span>
+              <span class="text-teal font-bold text-base">€2,50/mese</span>
               <span class="ml-1 text-gray-400 text-xs">per veicolo</span>
             </div>
           </div>
@@ -1482,12 +1504,36 @@
 
             <!-- Totale contratto 1 -->
             <div class="card p-4 sticky bottom-4">
+              <!-- Toggle abbonamento annuale -->
+              <div class="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+                <div>
+                  <span class="font-semibold text-gray-700 text-sm">Abbonamento annuale</span>
+                  <span class="ml-2 text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">2 mesi omaggio</span>
+                </div>
+                <button
+                  type="button"
+                  @click="abbonamentoAnnuale = !abbonamentoAnnuale"
+                  :class="abbonamentoAnnuale ? 'bg-teal' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
+                  <span
+                    :class="abbonamentoAnnuale ? 'translate-x-5' : 'translate-x-1'"
+                    class="inline-block h-4 w-4 mt-1 rounded-full bg-white shadow transform transition duration-200 ease-in-out"></span>
+                </button>
+              </div>
               <div class="flex items-center justify-between">
                 <span class="font-bold text-gray-900">Totale mensile contratto</span>
-                <span class="text-2xl font-bold text-teal">
-                  €<span x-text="calcContratto1Total().toFixed(2)"></span>
-                  <span class="text-sm font-medium text-gray-500">/mese</span>
-                </span>
+                <div class="text-right">
+                  <template x-if="abbonamentoAnnuale">
+                    <div>
+                      <span class="text-gray-400 line-through text-base">€<span x-text="calcContratto1Total().toFixed(2)"></span>/mese</span>
+                      <div class="text-2xl font-bold text-teal">€<span x-text="(calcContratto1Total() * 10/12).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></div>
+                      <span class="text-xs text-green-600 font-medium">10 mesi al prezzo di 12</span>
+                    </div>
+                  </template>
+                  <template x-if="!abbonamentoAnnuale">
+                    <span class="text-2xl font-bold text-teal">€<span x-text="calcContratto1Total().toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -1654,6 +1700,12 @@
                           <button class="btn-ghost text-sm !px-3 text-red-400" @click="item._addNew=false;item._newVal=''"><i class="fas fa-times"></i></button>
                         </div>
                       </template>
+                      <template x-if="item.targa && _rsaGiaAttivaPerTarga(item.targa)">
+                        <div class="mt-1.5 flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-medium">
+                          <i class="fas fa-exclamation-triangle text-amber-500"></i>
+                          RSA già attiva per questa targa — Modulo di adesione aggiuntivo
+                        </div>
+                      </template>
                     </div>
                   </template>
                   <button class="btn-ghost text-sm py-1.5" @click="upsellRsaTarghe.push({targa:'',_addNew:false,_newVal:''})">
@@ -1674,6 +1726,76 @@
                     <i class="fas fa-check mr-1"></i>
                     <span x-text="'Aggiungi al contratto ' + (upsellRsaContrattoTarget + 1)"></span>
                   </button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Upsell: integrazione RSA aggiuntiva su targa già attiva -->
+            <template x-if="upsellRsaAggiuntivaMode">
+              <div class="card p-5 border-2 border-amber-200">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-file-contract text-amber-600"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-gray-800">Integrazione contratto esistente</h4>
+                    <p class="text-xs text-gray-500">
+                      RSA già attiva per:
+                      <template x-for="t in upsellRsaAggiuntivaTarghe" :key="t">
+                        <span class="font-mono font-bold text-gray-700 ml-1" x-text="t"></span>
+                      </template>
+                    </p>
+                  </div>
+                </div>
+                <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 text-sm text-amber-800 mb-4">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  Il cliente deve firmare il modulo di adesione aggiuntivo per l'estensione RSA.
+                </div>
+                <div class="space-y-3">
+                  <button
+                    class="w-full justify-center"
+                    :class="upsellRsaAggiuntivaSmsSent ? 'btn-ghost !border !border-gray-200 !text-gray-400 cursor-not-allowed' : 'btn-primary'"
+                    :disabled="upsellRsaAggiuntivaSmsSent"
+                    @click="sendRsaAggiuntivaSms()">
+                    <template x-if="!upsellRsaAggiuntivaSmsSent">
+                      <span><i class="fas fa-paper-plane mr-2"></i>Invia link documento via SMS</span>
+                    </template>
+                    <template x-if="upsellRsaAggiuntivaSmsSent">
+                      <span><i class="fas fa-check mr-2"></i>SMS inviato ✓</span>
+                    </template>
+                  </button>
+                  <template x-if="upsellRsaAggiuntivaSmsSent && !upsellRsaAggiuntivaOtpEnabled">
+                    <div class="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <div class="spinner !border-amber-400 !border-t-amber-200 !w-4 !h-4"></div>
+                      In attesa della firma del cliente...
+                    </div>
+                  </template>
+                  <template x-if="upsellRsaAggiuntivaOtpEnabled">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-2 text-sm text-green-700 flex items-center gap-2">
+                      <i class="fas fa-check-circle"></i> Firma ricevuta — inserisci il codice OTP di conferma
+                    </div>
+                  </template>
+                  <template x-if="!upsellRsaAggiuntivaOtpConfirmed">
+                    <div class="flex items-center gap-3">
+                      <input x-model="upsellRsaAggiuntivaOtpInput" type="text"
+                        class="form-input otp-input w-32 text-center text-xl tracking-widest"
+                        placeholder="5678" maxlength="4"
+                        :disabled="!upsellRsaAggiuntivaOtpEnabled" />
+                      <button class="btn-primary text-sm" :disabled="!upsellRsaAggiuntivaOtpEnabled" @click="confirmRsaAggiuntivaOtp()">
+                        Conferma OTP
+                      </button>
+                    </div>
+                  </template>
+                  <template x-if="upsellRsaAggiuntivaOtpConfirmed">
+                    <div class="space-y-2">
+                      <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i> Integrazione confermata
+                      </div>
+                      <button class="btn-ghost text-sm" @click="upsellRsaAggiuntivaMode = false">
+                        <i class="fas fa-times mr-1"></i> Chiudi
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </div>
             </template>
@@ -1848,12 +1970,36 @@
 
             <!-- Totale generale -->
             <div class="card p-4 bg-gray-50">
+              <!-- Toggle abbonamento annuale -->
+              <div class="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+                <div>
+                  <span class="font-semibold text-gray-700 text-sm">Abbonamento annuale</span>
+                  <span class="ml-2 text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">2 mesi omaggio</span>
+                </div>
+                <button
+                  type="button"
+                  @click="abbonamentoAnnuale = !abbonamentoAnnuale"
+                  :class="abbonamentoAnnuale ? 'bg-teal' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
+                  <span
+                    :class="abbonamentoAnnuale ? 'translate-x-5' : 'translate-x-1'"
+                    class="inline-block h-4 w-4 mt-1 rounded-full bg-white shadow transform transition duration-200 ease-in-out"></span>
+                </button>
+              </div>
               <div class="flex items-center justify-between">
                 <span class="font-bold text-gray-900">Totale generale mensile</span>
-                <span class="text-2xl font-bold text-teal">
-                  €<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>
-                  <span class="text-sm font-medium text-gray-500">/mese</span>
-                </span>
+                <div class="text-right">
+                  <template x-if="abbonamentoAnnuale">
+                    <div>
+                      <span class="text-gray-400 line-through text-base">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</span>
+                      <div class="text-2xl font-bold text-teal">€<span x-text="((calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)) * 10/12).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></div>
+                      <span class="text-xs text-green-600 font-medium">10 mesi al prezzo di 12</span>
+                    </div>
+                  </template>
+                  <template x-if="!abbonamentoAnnuale">
+                    <span class="text-2xl font-bold text-teal">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -1889,7 +2035,7 @@
                 </div>
                 <div class="flex justify-between py-1.5 border-b border-gray-100">
                   <span class="text-gray-500">Costo unitario</span>
-                  <span class="font-medium">€2,00/mese per veicolo</span>
+                  <span class="font-medium">€2,50/mese per veicolo</span>
                 </div>
                 <div class="flex justify-between py-1.5 border-b border-gray-100">
                   <span class="text-gray-500">Decorrenza</span>
@@ -1897,7 +2043,7 @@
                 </div>
                 <div class="flex justify-between py-2">
                   <span class="font-semibold text-gray-700">Totale mensile</span>
-                  <span class="text-lg font-bold text-teal" x-text="'€' + (rsaStandaloneTarghe.filter(t => t.targa.trim()).length * 2).toFixed(2) + '/mese'"></span>
+                  <span class="text-lg font-bold text-teal" x-text="'€' + (rsaStandaloneTarghe.filter(t => t.targa.trim()).length * 2.50).toFixed(2) + '/mese'"></span>
                 </div>
               </div>
             </div>
@@ -2288,7 +2434,15 @@
               <i class="fas fa-euro-sign w-5 text-center text-teal"></i>
               <div>
                 <p class="text-xs text-gray-400">Canone mensile totale</p>
-                <p class="font-semibold text-gray-800">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</p>
+                <template x-if="abbonamentoAnnuale">
+                  <div>
+                    <p class="font-semibold text-gray-800">€<span x-text="((calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)) * 10/12).toFixed(2)"></span>/mese</p>
+                    <p class="text-xs text-green-600 font-medium">Annuale — 10 mesi al prezzo di 12</p>
+                  </div>
+                </template>
+                <template x-if="!abbonamentoAnnuale">
+                  <p class="font-semibold text-gray-800">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</p>
+                </template>
               </div>
             </div>
           </div>
@@ -2363,7 +2517,16 @@
           <template x-if="assistStep === 'quick-obu'">
             <span class="text-sm font-semibold text-teal py-1.5 px-2" x-text="assistAzioneLabel(quickObuAction)"></span>
           </template>
-          <template x-if="assistStep !== 'ricerca' && assistStep !== 'quick-obu'">
+          <template x-if="assistStep === 'recupero-credenziali'">
+            <span class="text-sm font-semibold text-teal py-1.5 px-2">Recupero credenziali cliente</span>
+          </template>
+          <template x-if="assistStep === 'cambio-pagamento'">
+            <span class="text-sm font-semibold text-teal py-1.5 px-2">Cambio metodo di pagamento</span>
+          </template>
+          <template x-if="assistStep === 'aggiorna-scheda'">
+            <span class="text-sm font-semibold text-teal py-1.5 px-2">Aggiornamento dati obbligatori</span>
+          </template>
+          <template x-if="assistStep !== 'ricerca' && assistStep !== 'quick-obu' && assistStep !== 'recupero-credenziali' && assistStep !== 'cambio-pagamento' && assistStep !== 'aggiorna-scheda'">
             <button class="text-sm text-gray-600 hover:text-teal transition-colors py-1.5 px-2 rounded"
               @click="assistStep = 'ricerca'; assistCliente = null; assistAzione = null; resetAssistOp()">
               Ricerca cliente
@@ -2837,6 +3000,242 @@
           </div>
         </template>
 
+        <!-- ===== STEP: AGGIORNAMENTO DATI OBBLIGATORI ===== -->
+        <template x-if="assistStep === 'aggiorna-scheda'">
+          <div class="card p-8 max-w-2xl mx-auto">
+            <div class="flex items-center gap-3 mb-6">
+              <button class="btn-ghost text-sm py-1.5 px-3" @click="assistStep = 'ricerca'; assistCliente = null; quickObuAction = null; quickObuSearchStatus = null; missingFields = []; quickObuNextStep = null">
+                <i class="fas fa-arrow-left mr-1"></i> Torna
+              </button>
+              <div>
+                <h2 class="text-lg font-bold text-gray-900">Dati obbligatori mancanti</h2>
+                <p class="text-xs text-gray-500">Compila i campi richiesti prima di procedere</p>
+              </div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+              <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5"></i>
+              <div>
+                <p class="text-sm font-semibold text-amber-800">Scheda cliente incompleta</p>
+                <p class="text-xs text-amber-700 mt-0.5">Per procedere è necessario aggiornare i seguenti dati del cliente.</p>
+              </div>
+            </div>
+            <div class="space-y-4">
+              <div x-show="missingFields.includes('nome')">
+                <label class="form-label">Nome <span class="text-red-500">*</span></label>
+                <input x-model="aggiornaDatiForm.nome" type="text" class="form-input" placeholder="Nome" />
+              </div>
+              <div x-show="missingFields.includes('cognome')">
+                <label class="form-label">Cognome <span class="text-red-500">*</span></label>
+                <input x-model="aggiornaDatiForm.cognome" type="text" class="form-input" placeholder="Cognome" />
+              </div>
+              <div x-show="missingFields.includes('telefono')">
+                <label class="form-label">Cellulare <span class="text-red-500">*</span></label>
+                <input x-model="aggiornaDatiForm.telefono" type="tel" class="form-input" placeholder="+39 333 1234567" />
+              </div>
+              <div x-show="missingFields.includes('email')">
+                <label class="form-label">Email <span class="text-red-500">*</span></label>
+                <input x-model="aggiornaDatiForm.email" type="email" class="form-input" placeholder="email@esempio.it" />
+              </div>
+              <div x-show="missingFields.includes('privacy')" class="bg-gray-50 rounded-xl p-4">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" x-model="aggiornaDatiForm.privacy" class="accent-teal mt-1 flex-shrink-0" />
+                  <span class="text-sm text-gray-700">
+                    <span class="font-semibold">Consenso Privacy obbligatorio</span>
+                    <span class="text-red-500"> *</span><br>
+                    <span class="text-xs text-gray-500">Il cliente acconsente al trattamento dei dati personali ai sensi del GDPR</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+            <button class="btn-primary w-full justify-center mt-6" @click="salvaAggiornaDati()"
+              :disabled="(missingFields.includes('nome') && !aggiornaDatiForm.nome.trim())
+                      || (missingFields.includes('cognome') && !aggiornaDatiForm.cognome.trim())
+                      || (missingFields.includes('telefono') && !aggiornaDatiForm.telefono.trim())
+                      || (missingFields.includes('email') && !aggiornaDatiForm.email.trim())
+                      || (missingFields.includes('privacy') && !aggiornaDatiForm.privacy)">
+              <i class="fas fa-save mr-2"></i> Salva e procedi
+            </button>
+          </div>
+        </template>
+
+        <!-- ===== STEP: RECUPERO CREDENZIALI ===== -->
+        <template x-if="assistStep === 'recupero-credenziali'">
+          <div class="card p-8 max-w-2xl mx-auto">
+            <div class="flex items-center gap-3 mb-6">
+              <button class="btn-ghost text-sm py-1.5 px-3" @click="assistStep = 'ricerca'; recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false">
+                <i class="fas fa-arrow-left mr-1"></i> Torna
+              </button>
+              <h2 class="text-lg font-bold text-gray-900">Recupero credenziali cliente</h2>
+            </div>
+            <template x-if="recuperoSearchStatus !== 'found'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Codice Fiscale cliente</label>
+                  <div class="flex gap-2">
+                    <input x-model="recuperoSearchQuery" type="text" class="form-input flex-1 uppercase"
+                      placeholder="RSSMRC80A01H501Z" @keydown.enter="cercaClienteRecupero()" />
+                    <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteRecupero()"
+                      :disabled="!recuperoSearchQuery.trim()">
+                      <i class="fas fa-search"></i>
+                    </button>
+                  </div>
+                </div>
+                <template x-if="recuperoSearchStatus === 'notfound'">
+                  <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    <i class="fas fa-exclamation-circle mr-1"></i> Cliente non trovato
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="recuperoSearchStatus === 'found' && recuperoResult">
+              <div class="space-y-4">
+                <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-800">
+                  <i class="fas fa-shield-alt"></i>
+                  <span class="font-semibold">Visibile solo a operatore autorizzato</span>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-5 space-y-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <p class="text-xs text-gray-400 mb-0.5">Nome</p>
+                      <p class="font-semibold text-gray-900" x-text="recuperoResult.nome"></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-400 mb-0.5">Cognome</p>
+                      <p class="font-semibold text-gray-900" x-text="recuperoResult.cognome"></p>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-400 mb-1">Email</p>
+                    <template x-if="!recuperoEmailEditing">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="font-semibold text-gray-900 font-mono text-sm" x-text="recuperoResult.email || '—'"></p>
+                        <button class="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
+                          @click="recuperoEmailEditing = true; recuperoNewEmail = recuperoResult.email || ''">
+                          <i class="fas fa-edit mr-1"></i> Aggiorna email
+                        </button>
+                      </div>
+                    </template>
+                    <template x-if="recuperoEmailEditing">
+                      <div class="space-y-2">
+                        <input x-model="recuperoNewEmail" type="email" class="form-input" placeholder="nuova@email.it" />
+                        <div class="flex gap-2">
+                          <button class="btn-primary text-sm py-2 px-4" @click="salvaEmailRecupero()" :disabled="!recuperoNewEmail.trim()">
+                            <i class="fas fa-save mr-1"></i> Salva
+                          </button>
+                          <button class="btn-ghost text-sm" @click="recuperoEmailEditing = false">Annulla</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <button class="btn-ghost text-sm" @click="recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false">
+                  <i class="fas fa-search mr-1"></i> Cerca un altro cliente
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- ===== STEP: CAMBIO METODO DI PAGAMENTO ===== -->
+        <template x-if="assistStep === 'cambio-pagamento'">
+          <div class="card p-8 max-w-2xl mx-auto">
+            <div class="flex items-center gap-3 mb-6">
+              <button class="btn-ghost text-sm py-1.5 px-3" @click="assistStep = 'ricerca'; cambioPagSearchStatus = null; cambioPagContratti = []; cambioPagSearchQuery = ''">
+                <i class="fas fa-arrow-left mr-1"></i> Torna
+              </button>
+              <h2 class="text-lg font-bold text-gray-900">Cambio metodo di pagamento</h2>
+            </div>
+            <template x-if="cambioPagSearchStatus !== 'found'">
+              <div class="space-y-4">
+                <div>
+                  <label class="form-label">Codice Fiscale cliente</label>
+                  <div class="flex gap-2">
+                    <input x-model="cambioPagSearchQuery" type="text" class="form-input flex-1 uppercase"
+                      placeholder="RSSMRC80A01H501Z" @keydown.enter="cercaClienteCambioPag()" />
+                    <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteCambioPag()"
+                      :disabled="!cambioPagSearchQuery.trim()">
+                      <i class="fas fa-search"></i>
+                    </button>
+                  </div>
+                </div>
+                <template x-if="cambioPagSearchStatus === 'notfound'">
+                  <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    <i class="fas fa-exclamation-circle mr-1"></i> Cliente non trovato
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="cambioPagSearchStatus === 'found' && cambioPagContratti.length > 0">
+              <div class="space-y-4">
+                <template x-for="(c, idx) in cambioPagContratti" :key="c.id">
+                  <div class="border-2 border-gray-100 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center gap-3">
+                      <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                        :class="c.tipo === 'obu' ? 'bg-teal text-white' : 'bg-blue-500 text-white'">
+                        <i :class="c.tipo === 'obu' ? 'fas fa-broadcast-tower text-xs' : 'fas fa-ambulance text-xs'"></i>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-bold text-sm text-gray-900" x-text="c.id"></p>
+                        <p class="text-xs text-gray-500" x-text="c.tipo === 'obu' ? 'Telepedaggio OBU' : 'RSA Stand-Alone'"></p>
+                      </div>
+                      <span class="text-xs font-semibold px-2 py-1 rounded-full"
+                        :class="c.stato === 'attivo' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                        x-text="c.stato === 'attivo' ? 'Attivo' : (c.stato || 'N/D')"></span>
+                    </div>
+                    <div x-show="c.targhe && c.targhe.length > 0">
+                      <p class="text-xs text-gray-400 mb-1">Veicoli associati</p>
+                      <div class="flex flex-wrap gap-1">
+                        <template x-for="t in c.targhe" :key="t">
+                          <span class="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-0.5 font-mono" x-text="t"></span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                      <p class="text-xs text-gray-400 mb-0.5">IBAN attuale</p>
+                      <p class="font-mono font-semibold text-gray-800 text-sm" x-text="c.iban || '—'"></p>
+                    </div>
+                    <div>
+                      <label class="form-label">Nuovo IBAN</label>
+                      <div class="flex gap-2">
+                        <input x-model="c.ibanEdit" type="text" class="form-input flex-1 uppercase font-mono text-sm"
+                          placeholder="IT60 XXXX XXXX XXXX XXXX 1234" />
+                        <button class="btn-secondary px-4 flex-shrink-0 text-sm"
+                          @click="verificaIbanCambio(idx)"
+                          :disabled="!c.ibanEdit.trim() || c.ibanVerifyStatus === 'verifying'">
+                          <span x-show="c.ibanVerifyStatus === 'verifying'" class="spinner !w-4 !h-4"></span>
+                          <span x-show="c.ibanVerifyStatus !== 'verifying'">Verifica</span>
+                        </button>
+                      </div>
+                      <template x-if="c.ibanVerifyStatus === 'ok'">
+                        <p class="text-xs text-green-600 mt-1"><i class="fas fa-check-circle mr-1"></i>IBAN verificato</p>
+                      </template>
+                    </div>
+                    <button class="btn-primary w-full justify-center text-sm py-2.5"
+                      @click="salvaIbanCambio(idx)"
+                      :disabled="c.ibanVerifyStatus !== 'ok' || c.saving">
+                      <span x-show="c.saving" class="spinner !w-4 !h-4"></span>
+                      <span x-show="!c.saving"><i class="fas fa-save mr-1"></i> Salva IBAN</span>
+                    </button>
+                    <template x-if="c.savedOk">
+                      <div class="bg-green-50 border border-green-200 rounded-lg p-2 text-sm text-green-700 flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i> IBAN aggiornato con successo
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <button class="btn-ghost text-sm" @click="cambioPagSearchStatus = null; cambioPagContratti = []; cambioPagSearchQuery = ''">
+                  <i class="fas fa-search mr-1"></i> Cerca un altro cliente
+                </button>
+              </div>
+            </template>
+            <template x-if="cambioPagSearchStatus === 'found' && cambioPagContratti.length === 0">
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                <i class="fas fa-info-circle mr-1"></i> Nessun contratto trovato per questo cliente
+              </div>
+            </template>
+          </div>
+        </template>
+
         <!-- ===== STEP: SCHEDA CLIENTE ===== -->
         <template x-if="assistStep === 'scheda' && assistCliente">
           <div class="card p-8 max-w-2xl mx-auto">
@@ -3235,6 +3634,20 @@
                 <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
                   <i class="fas fa-info-circle mr-1"></i> Stock verificato: disponibile. Nessun costo aggiuntivo per sostituzione.
                 </div>
+                <template x-if="_obuRsaEntry()">
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+                    <p class="text-xs text-emerald-700 font-semibold uppercase tracking-wider">
+                      <i class="fas fa-ambulance mr-1"></i> RSA attiva su questo veicolo
+                    </p>
+                    <div>
+                      <label class="form-label text-xs">Codice polizza RSA</label>
+                      <input x-model="assistForm.codicePolizzaRsa" type="text"
+                        class="form-input text-sm font-mono tracking-wide"
+                        :placeholder="_obuRsaEntry()?.codicePolizza ? _obuRsaEntry().codicePolizza : 'Non assegnato — inserisci codice'" />
+                      <p class="text-xs text-gray-400 mt-1">Verrà aggiornato in anagrafica al salvataggio.</p>
+                    </div>
+                  </div>
+                </template>
                 <template x-if="!assistOtpSent">
                   <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.nuovoObu">
                     <i class="fas fa-sms mr-1"></i> Invia OTP al cliente
@@ -4091,6 +4504,19 @@ function tabletApp() {
     obuManualCode: '',
     obuManualSearchStatus: null, // null | 'notfound'
     quickPagamentoContrattoId: null,
+    missingFields: [],
+    quickObuNextStep: null,
+    aggiornaDatiForm: { nome: '', cognome: '', telefono: '', email: '', privacy: false },
+    recuperoSearchQuery: '',
+    recuperoSearchStatus: null,
+    recuperoRawCf: null,
+    recuperoResult: null,
+    recuperoEmailEditing: false,
+    recuperoNewEmail: '',
+    cambioPagSearchQuery: '',
+    cambioPagSearchStatus: null,
+    cambioPagRawCf: null,
+    cambioPagContratti: [],
 
     // === ASSISTENZA — OTP ===
     assistOtpSent: false,
@@ -4108,6 +4534,7 @@ function tabletApp() {
       email: '', cellulare: '',
       veicoli: [],
       obuSelezionato: '', nuovoObu: '', obuScanning: false,
+      codicePolizzaRsa: '', rsaVeicoloIdSostituzione: null,
       nuovaTarga: '', targaWarning: false,
       vuoleSostitutivo: '',
       obuRicevuto: false,
@@ -4205,6 +4632,12 @@ function tabletApp() {
     upsellMode: null,           // null | 'rsa-rapida' | 'nuovo-contratto'
     upsellRsaTarghe: [],        // [{targa:''}]
     upsellRsaContrattoTarget: 0, // 0=c1, 1..N=contrattiAggiuntivi[idx]
+    upsellRsaAggiuntivaMode: false,
+    upsellRsaAggiuntivaTarghe: [],
+    upsellRsaAggiuntivaSmsSent: false,
+    upsellRsaAggiuntivaOtpEnabled: false,
+    upsellRsaAggiuntivaOtpInput: '',
+    upsellRsaAggiuntivaOtpConfirmed: false,
     upsellEditingIdx: null,     // null=new, number=editing existing in contrattiAggiuntivi
     _upsellEditingBackup: null,
 
@@ -4233,6 +4666,8 @@ function tabletApp() {
     obuScanStatus2: null,
     obuAssociazioneConfermata2: false,
     targaSelezionata2: '',
+
+    abbonamentoAnnuale: false,
 
     // === STEP 6 ===
     contrattoSmsInviato: false,
@@ -4290,6 +4725,10 @@ function tabletApp() {
         }
         if (p.template === 'FIRMA_CONTRATTO') {
           this.firmaOtpFieldEnabled = true;
+          this.showToastMsg('Firma ricevuta — inserisci il codice OTP di conferma', 'success');
+        }
+        if (p.template === 'FIRMA_RSA_AGGIUNTIVA') {
+          this.upsellRsaAggiuntivaOtpEnabled = true;
           this.showToastMsg('Firma ricevuta — inserisci il codice OTP di conferma', 'success');
         }
         if (p.template === 'CONSENSI_MARKETING') {
@@ -4910,9 +5349,13 @@ function tabletApp() {
         id: 'sms_mkt_consensi',
         to: this.cliente.telefono,
         template: 'CONSENSI_MARKETING',
-        preview: 'Enilive: scegli i tuoi consensi marketing e profilazione',
+        preview: 'Enilive: conferma le tue preferenze di comunicazione',
+        consensiPrecompilati: {
+          marketing: !!this.consensiCrm.marketing,
+          profilazione: !!this.consensiCrm.profilazione,
+        },
       });
-      this.showToastMsg('SMS consensi marketing inviato al ' + this.cliente.telefono, 'info');
+      this.showToastMsg('SMS consensi inviato al ' + this.cliente.telefono, 'info');
     },
 
     confirmMktOtp() {
@@ -5019,17 +5462,70 @@ function tabletApp() {
     addUpsellRsa() {
       const daAggiungere = this.upsellRsaTarghe.filter(r => r.targa.trim())
         .map(r => ({targa: r.targa.trim().toUpperCase(), _addNew: false, _newVal: ''}));
-      if (this.upsellRsaContrattoTarget === 0) {
-        this.rsaStandalone.push(...daAggiungere);
-      } else {
-        const c = this.contrattiAggiuntivi[this.upsellRsaContrattoTarget - 1];
-        if (!c.rsaStandalone) c.rsaStandalone = [];
-        c.rsaStandalone.push(...daAggiungere);
+      const nuove = daAggiungere.filter(r => !this._rsaGiaAttivaPerTarga(r.targa));
+      const duplicate = daAggiungere.filter(r => this._rsaGiaAttivaPerTarga(r.targa));
+      if (nuove.length > 0) {
+        if (this.upsellRsaContrattoTarget === 0) {
+          this.rsaStandalone.push(...nuove);
+        } else {
+          const c = this.contrattiAggiuntivi[this.upsellRsaContrattoTarget - 1];
+          if (!c.rsaStandalone) c.rsaStandalone = [];
+          c.rsaStandalone.push(...nuove);
+        }
       }
       this.upsellMode = null;
       this.upsellRsaTarghe = [];
-      const nContratto = this.upsellRsaContrattoTarget + 1;
-      this.showToastMsg(`${daAggiungere.length} RSA aggiunt${daAggiungere.length === 1 ? 'a' : 'e'} al contratto ${nContratto}`, 'success');
+      if (duplicate.length > 0) {
+        this.upsellRsaAggiuntivaMode = true;
+        this.upsellRsaAggiuntivaTarghe = duplicate.map(r => r.targa);
+        this.upsellRsaAggiuntivaSmsSent = false;
+        this.upsellRsaAggiuntivaOtpEnabled = false;
+        this.upsellRsaAggiuntivaOtpInput = '';
+        this.upsellRsaAggiuntivaOtpConfirmed = false;
+        const msg = nuove.length > 0
+          ? `${nuove.length} RSA aggiunt${nuove.length === 1 ? 'a' : 'e'}. Richiesta integrazione per ${duplicate.length} già attiv${duplicate.length === 1 ? 'a' : 'e'}.`
+          : `RSA già attiv${duplicate.length === 1 ? 'a' : 'e'} — avvia integrazione contratto.`;
+        this.showToastMsg(msg, 'info', 4000);
+      } else {
+        const nContratto = this.upsellRsaContrattoTarget + 1;
+        this.showToastMsg(`${daAggiungere.length} RSA aggiunt${daAggiungere.length === 1 ? 'a' : 'e'} al contratto ${nContratto}`, 'success');
+      }
+    },
+
+    _rsaGiaAttivaPerTarga(targa) {
+      if (!targa || !this.cliente?.cf) return false;
+      try {
+        const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+        const rec = clienti[this.cliente.cf.toUpperCase()];
+        return (rec?.serviziRsa || []).some(r => r.veicoloId === 'v_' + targa.toUpperCase() && r.stato === 'attivo');
+      } catch(e) { return false; }
+    },
+
+    sendRsaAggiuntivaSms() {
+      this.upsellRsaAggiuntivaSmsSent = true;
+      this.upsellRsaAggiuntivaOtpEnabled = false;
+      Bus.emit('sms:outbound', {
+        id: 'sms_rsa_aggiuntiva',
+        to: this.cliente.telefono,
+        template: 'FIRMA_RSA_AGGIUNTIVA',
+        preview: 'Firma il modulo di adesione aggiuntivo RSA: [link mock]',
+        dati: {
+          nome: this.cliente.nome + ' ' + this.cliente.cognome,
+          cf: this.cliente.cf,
+          targhe: this.upsellRsaAggiuntivaTarghe.join(', '),
+        },
+      });
+      this.showToastMsg('Link documento inviato via SMS al cliente', 'info');
+    },
+
+    confirmRsaAggiuntivaOtp() {
+      const input = this.upsellRsaAggiuntivaOtpInput.trim();
+      if (!/^\d{4}$/.test(input)) {
+        this.showToastMsg('Codice OTP non valido — inserisci 4 cifre', 'error');
+        return;
+      }
+      this.upsellRsaAggiuntivaOtpConfirmed = true;
+      this.showToastMsg('Integrazione RSA confermata', 'success');
     },
 
     avviaNuovoContratto() {
@@ -5374,6 +5870,10 @@ function tabletApp() {
         telefono: this.cliente.telefono,
         targhe: allTarghe,
         dataRegistrazione: now,
+        consensiPrecompilati: {
+          marketing: !!(this.consensiCrm.marketing),
+          profilazione: !!(this.consensiCrm.profilazione),
+        },
       };
 
       // 3. Emette evento cliente:registrato SOLO DOPO aver scritto clientiDemo
@@ -5460,6 +5960,9 @@ function tabletApp() {
         rsaStandalone: [],
         iban: '', ibanVerifyStatus: null,
         upsellMode: null, upsellRsaTarghe: [], upsellRsaContrattoTarget: 0,
+        upsellRsaAggiuntivaMode: false, upsellRsaAggiuntivaTarghe: [],
+        upsellRsaAggiuntivaSmsSent: false, upsellRsaAggiuntivaOtpEnabled: false,
+        upsellRsaAggiuntivaOtpInput: '', upsellRsaAggiuntivaOtpConfirmed: false,
         contrattiAggiuntivi: [], upsellEditingIdx: null, _upsellEditingBackup: null,
         c2obu1Targa: '', c2obu1Rsa: true, c2obu1Furto: true,
         c2obu1AddNew: false, c2obu1NewVal: '',
@@ -5645,6 +6148,7 @@ function tabletApp() {
         domicilio: residenza,
         veicoli,
         contratti: r.contratti || [],
+        serviziRsa: r.serviziRsa || [],
         obu,
         serviziAttivi,
         metodoPagamento: primoContratto
@@ -5772,18 +6276,48 @@ function tabletApp() {
       return labels[azione] || azione;
     },
 
+    _obuRsaEntry() {
+      if (!this.assistCliente) return null;
+      const obu = (this.assistCliente.obu || []).find(o => o.codice === this.assistForm.obuSelezionato)
+        || (this.assistCliente.obu || [])[0];
+      if (!obu) return null;
+      return (this.assistCliente.serviziRsa || []).find(r => r.veicoloId === 'v_' + obu.targa && r.stato === 'attivo') || null;
+    },
+
     resetAssistOp() {
       this.assistOtpSent = false;
       this.assistOtpValue = '';
       this.assistOtpConfirmed = false;
       this.assistOpLoading = false;
       this.assistOpSuccess = false;
+      this.assistForm.codicePolizzaRsa = '';
+      this.assistForm.rsaVeicoloIdSostituzione = null;
     },
 
     // ============================================================
     // ASSISTENZA — AZIONI RAPIDE OBU
     // ============================================================
     avviaQuickObu(azione) {
+      if (azione === 'recupero-credenziali') {
+        this.recuperoSearchQuery = '';
+        this.recuperoSearchStatus = null;
+        this.recuperoResult = null;
+        this.recuperoRawCf = null;
+        this.recuperoEmailEditing = false;
+        this.recuperoNewEmail = '';
+        this.assistStep = 'recupero-credenziali';
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (azione === 'cambio-pagamento') {
+        this.cambioPagSearchQuery = '';
+        this.cambioPagSearchStatus = null;
+        this.cambioPagRawCf = null;
+        this.cambioPagContratti = [];
+        this.assistStep = 'cambio-pagamento';
+        window.scrollTo(0, 0);
+        return;
+      }
       this.quickObuAction = azione;
       this.quickObuSearchQuery = '';
       this.quickObuSearchStatus = null;
@@ -5882,12 +6416,50 @@ function tabletApp() {
       // Pre-imposta OBU per sostituisci-obu (identificato via scanner/codice manuale)
       if (this.quickObuAction === 'sostituisci-obu' && this.obuScannedCode) {
         this.assistForm.obuSelezionato = this.obuScannedCode;
+        const obuEntry = (this.assistCliente.obu || []).find(o => o.codice === this.obuScannedCode)
+          || (this.assistCliente.obu || [])[0];
+        if (obuEntry) {
+          const rsaEntry = (this.assistCliente.serviziRsa || []).find(r => r.veicoloId === 'v_' + obuEntry.targa && r.stato === 'attivo');
+          if (rsaEntry) {
+            this.assistForm.codicePolizzaRsa = rsaEntry.codicePolizza || '';
+            this.assistForm.rsaVeicoloIdSostituzione = rsaEntry.veicoloId;
+          }
+        }
       }
       // Pre-imposta contratto per cambio-pagamento
       if (this.quickObuAction === 'cambio-pagamento') {
         this.assistForm.contrattoSelezionato = this.quickPagamentoContrattoId;
         this.assistForm.iban = '';
       }
+
+      // Validazione campi obbligatori scheda cliente
+      const rawRecord = this._getClientiDemo()[c.cf?.toUpperCase()];
+      const missing = [];
+      if (!c.nome?.trim())      missing.push('nome');
+      if (!c.cognome?.trim())   missing.push('cognome');
+      if (!c.cellulare?.trim()) missing.push('telefono');
+      if (!c.email?.trim())     missing.push('email');
+      if (!rawRecord?.consensi?.privacy) missing.push('privacy');
+      if (missing.length > 0) {
+        this.missingFields = missing;
+        this.aggiornaDatiForm = {
+          nome:     c.nome || '',
+          cognome:  c.cognome || '',
+          telefono: c.cellulare || '',
+          email:    c.email || '',
+          privacy:  !!rawRecord?.consensi?.privacy,
+        };
+        this.quickObuNextStep = 'flusso';
+        this.assistAzione = this.quickObuAction;
+        this.quickObuAction = null;
+        this.quickObuSearchStatus = null;
+        this.quickPagamentoContrattoId = null;
+        this.assistStep = 'aggiorna-scheda';
+        window.scrollTo(0, 0);
+        this.showToastMsg('Dati obbligatori mancanti — compila il form per procedere', 'error', 4000);
+        return;
+      }
+
       this.assistAzione = this.quickObuAction;
       this.assistStep = 'flusso';
       this.quickObuAction = null;
@@ -5896,6 +6468,131 @@ function tabletApp() {
       this.resetAssistOp();
       window.scrollTo(0, 0);
       this.showToastMsg('Accesso rapido a: ' + this.assistAzioneLabel(this.assistAzione), 'info');
+    },
+
+    // ============================================================
+    // ASSISTENZA — STEP AGGIORNA-SCHEDA
+    // ============================================================
+    salvaAggiornaDati() {
+      const cf = this.assistCliente?.cf;
+      if (!cf) return;
+      const reg = this._getClientiDemo();
+      const r = reg[cf.toUpperCase()];
+      if (!r) return;
+      if (this.missingFields.includes('nome') && this.aggiornaDatiForm.nome.trim()) {
+        r.nome = this.aggiornaDatiForm.nome.trim();
+        this.assistCliente.nome = r.nome;
+      }
+      if (this.missingFields.includes('cognome') && this.aggiornaDatiForm.cognome.trim()) {
+        r.cognome = this.aggiornaDatiForm.cognome.trim();
+        this.assistCliente.cognome = r.cognome;
+      }
+      if (!r.contatti) r.contatti = {};
+      if (this.missingFields.includes('telefono') && this.aggiornaDatiForm.telefono.trim()) {
+        r.contatti.telefono = this.aggiornaDatiForm.telefono.trim();
+        this.assistCliente.cellulare = r.contatti.telefono;
+      }
+      if (this.missingFields.includes('email') && this.aggiornaDatiForm.email.trim()) {
+        r.contatti.email = this.aggiornaDatiForm.email.trim();
+        this.assistCliente.email = r.contatti.email;
+      }
+      if (this.missingFields.includes('privacy')) {
+        if (!r.consensi) r.consensi = {};
+        r.consensi.privacy = !!this.aggiornaDatiForm.privacy;
+      }
+      this._saveClienteDemo(r);
+      Bus.emit('cliente:profilo_aggiornato', r);
+      const nextStep = this.quickObuNextStep || 'flusso';
+      this.missingFields = [];
+      this.quickObuNextStep = null;
+      this.resetAssistOp();
+      this.assistStep = nextStep;
+      window.scrollTo(0, 0);
+      this.showToastMsg('Dati aggiornati — procedendo con l\'operazione', 'success');
+    },
+
+    // ============================================================
+    // ASSISTENZA — RECUPERO CREDENZIALI
+    // ============================================================
+    cercaClienteRecupero() {
+      if (!this.recuperoSearchQuery.trim()) return;
+      this.recuperoSearchStatus = null;
+      const raw = this._searchCfOTarga(this.recuperoSearchQuery);
+      if (!raw) {
+        this.recuperoSearchStatus = 'notfound';
+        return;
+      }
+      const fields = this._getAnagraficaFields(raw);
+      this.recuperoRawCf = raw.cf;
+      this.recuperoResult = { nome: fields.nome, cognome: fields.cognome, email: fields.email };
+      this.recuperoEmailEditing = false;
+      this.recuperoNewEmail = '';
+      this.recuperoSearchStatus = 'found';
+    },
+
+    salvaEmailRecupero() {
+      if (!this.recuperoNewEmail.trim() || !this.recuperoRawCf) return;
+      const reg = this._getClientiDemo();
+      const r = reg[this.recuperoRawCf.toUpperCase()];
+      if (!r) return;
+      if (!r.contatti) r.contatti = {};
+      r.contatti.email = this.recuperoNewEmail.trim();
+      this._saveClienteDemo(r);
+      this.recuperoResult.email = r.contatti.email;
+      this.recuperoEmailEditing = false;
+      this.showToastMsg('Email aggiornata', 'success');
+    },
+
+    // ============================================================
+    // ASSISTENZA — CAMBIO METODO DI PAGAMENTO
+    // ============================================================
+    cercaClienteCambioPag() {
+      if (!this.cambioPagSearchQuery.trim()) return;
+      this.cambioPagSearchStatus = null;
+      const raw = this._searchCfOTarga(this.cambioPagSearchQuery);
+      if (!raw) {
+        this.cambioPagSearchStatus = 'notfound';
+        return;
+      }
+      this.cambioPagRawCf = raw.cf;
+      const veicoli = raw.veicoli || [];
+      this.cambioPagContratti = (raw.contratti || []).map(c => {
+        const targhe = (c.dispositivi || [])
+          .filter(d => d.tipo === 'obu')
+          .map(d => veicoli.find(v => v.id === d.veicoloId)?.targa || d.veicoloId?.replace(/^v_/, '') || '—');
+        return { ...c, targhe, ibanEdit: '', ibanVerifyStatus: null, saving: false, savedOk: false };
+      });
+      this.cambioPagSearchStatus = 'found';
+    },
+
+    verificaIbanCambio(idx) {
+      this.cambioPagContratti[idx].ibanVerifyStatus = 'verifying';
+      setTimeout(() => {
+        this.cambioPagContratti[idx].ibanVerifyStatus = 'ok';
+      }, 2000);
+    },
+
+    salvaIbanCambio(idx) {
+      if (!this.cambioPagRawCf) return;
+      const c = this.cambioPagContratti[idx];
+      c.saving = true;
+      setTimeout(() => {
+        const reg = this._getClientiDemo();
+        const r = reg[this.cambioPagRawCf.toUpperCase()];
+        if (r && Array.isArray(r.contratti)) {
+          const ci = r.contratti.findIndex(x => x.id === c.id);
+          if (ci !== -1) {
+            r.contratti[ci].iban = c.ibanEdit.trim().toUpperCase();
+            this._saveClienteDemo(r);
+            c.iban = r.contratti[ci].iban;
+            c.ibanEdit = '';
+            c.ibanVerifyStatus = null;
+          }
+        }
+        c.savedOk = true;
+        c.saving = false;
+        this.showToastMsg('IBAN aggiornato per ' + c.id, 'success');
+      }, 400);
     },
 
     // ============================================================
@@ -5976,6 +6673,12 @@ function tabletApp() {
                     if (d.tipo === 'obu' && d.codice === obuVecchio) d.codice = obuNuovo;
                   });
                 });
+                const rsaVid = this.assistForm.rsaVeicoloIdSostituzione;
+                const codicePolizza = this.assistForm.codicePolizzaRsa.trim();
+                if (rsaVid && codicePolizza) {
+                  const rsaEntry = (rec.serviziRsa || []).find(r => r.veicoloId === rsaVid && r.stato === 'attivo');
+                  if (rsaEntry) rsaEntry.codicePolizza = codicePolizza;
+                }
                 localStorage.setItem('clientiDemo', JSON.stringify(clienti));
               }
             } catch(e) { console.error('sostituisci-obu write error', e); }

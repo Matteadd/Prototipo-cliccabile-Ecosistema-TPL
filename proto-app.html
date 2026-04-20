@@ -625,9 +625,14 @@
       showSmsNotification: false,
       smsCurrentNotif: null,
       smsOtpShown: null,
+      firmaContrattoCheckbox: { nc: false, mandato: false, clausole: false },
       _smsNotifTimer: null,
       mktMarketing: false,
       mktProfilazione: false,
+      showConsensiModal: false,
+      consensiOtpInput: '',
+      consensiOtpError: false,
+      consensiPendenti: {},
       rsaInterventi: [
         { id: 'rsa001', data: '2026-04-05T08:00:00', tipo: 'foratura', descrizione: 'Foratura pneumatico — A8 km 14', stato: 'chiuso', dataChiusura: '2026-04-05T09:45:00', targa: 'AB123CD' }
       ],
@@ -1051,6 +1056,19 @@
         } catch(_) {}
       },
 
+      confirmConsensiOtp() {
+        if (this.consensiOtpInput !== '1234') {
+          this.consensiOtpError = true;
+          return;
+        }
+        this._updateConsensi({ marketing: this.consensiPendenti.marketing, profilazione: this.consensiPendenti.profilazione });
+        if (this._clienteCf) localStorage.setItem('consensiConfermati_' + this._clienteCf, '1');
+        this.showConsensiModal = false;
+        this.consensiOtpInput = '';
+        this.consensiOtpError = false;
+        this.consensiPendenti = {};
+      },
+
       _updateConsensi(consensi) {
         if (!this._clienteCf) return;
         try {
@@ -1082,8 +1100,13 @@
       smsOpenWebview(payload) {
         this.smsCurrentDoc = payload || this.smsCurrentNotif;
         this.smsOtpShown = null;
+        this.firmaContrattoCheckbox = { nc: false, mandato: false, clausole: false };
         this.showSmsWebview = true;
         this.showSmsNotification = false;
+        if (this.smsCurrentDoc?.template === 'CONSENSI_MARKETING' && this.smsCurrentDoc?.consensiPrecompilati) {
+          this.mktMarketing = !!this.smsCurrentDoc.consensiPrecompilati.marketing;
+          this.mktProfilazione = !!this.smsCurrentDoc.consensiPrecompilati.profilazione;
+        }
       },
 
       smsCloseWebview() {
@@ -1311,7 +1334,28 @@
           </div>
 
           <div style="padding:16px;background:white;border-top:1px solid #e5e7eb;flex-shrink:0;">
-            <button style="width:100%;background:#117299;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;"
+            <!-- Dichiarazioni obbligatorie -->
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:12px;">
+              <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px;"><i class="fa fa-file-signature mr-1" style="color:#117299;"></i>Il cliente dichiara di aver letto e accettato:</p>
+              <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" x-model="firmaContrattoCheckbox.nc" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#117299;" />
+                <span style="font-size:12px;color:#374151;line-height:1.4;">Accettazione norme e condizioni e sottoscrizione servizi scelti nel modulo di adesione</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;cursor:pointer;">
+                <input type="checkbox" x-model="firmaContrattoCheckbox.mandato" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#117299;" />
+                <span style="font-size:12px;color:#374151;line-height:1.4;">Accettazione mandato per addebito con modalità di addebito ricorrente</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:0;cursor:pointer;">
+                <input type="checkbox" x-model="firmaContrattoCheckbox.clausole" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#117299;" />
+                <span style="font-size:12px;color:#374151;line-height:1.4;">Accettazione clausole del contratto (clausole vessatorie)</span>
+              </label>
+              <template x-if="!(firmaContrattoCheckbox.nc && firmaContrattoCheckbox.mandato && firmaContrattoCheckbox.clausole)">
+                <p style="font-size:11px;color:#d97706;margin-top:8px;"><i class="fa fa-exclamation-triangle mr-1"></i>Spunta tutte le voci per procedere con la firma</p>
+              </template>
+            </div>
+            <button
+              :style="'width:100%;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;' + (firmaContrattoCheckbox.nc && firmaContrattoCheckbox.mandato && firmaContrattoCheckbox.clausole ? 'background:#117299;color:white;' : 'background:#e5e7eb;color:#9ca3af;cursor:not-allowed;')"
+              :disabled="!(firmaContrattoCheckbox.nc && firmaContrattoCheckbox.mandato && firmaContrattoCheckbox.clausole)"
               @click="smsConfirmDoc('FIRMA_CONTRATTO')">
               <i class="fa fa-pen-nib mr-2"></i>Firma il contratto
             </button>
@@ -3483,6 +3527,78 @@
         <div class="flex gap-3">
           <button @click="showPaymentDeleteConfirm = false; paymentDeleteTarget = null" class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition">Annulla</button>
           <button @click="confirmPaymentDelete()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-lg hover:bg-red-600 transition">S&igrave;, rimuovi</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CONFERMA PREFERENZE (consensi pre-flaggati dall'operatore) -->
+    <div x-show="showConsensiModal" class="modal-overlay" style="z-index:300;">
+      <div class="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl modal-enter p-6 z-50">
+        <div class="flex items-center gap-3 mb-4">
+          <div style="width:40px;height:40px;background:linear-gradient(135deg,#117299,#1e9fd8);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fas fa-user-shield text-white"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-gray-800">Conferma preferenze</h2>
+            <p class="text-xs text-gray-500">L'operatore ha pre-selezionato i seguenti consensi</p>
+          </div>
+        </div>
+
+        <p class="text-sm text-gray-600 mb-5">Puoi modificare le selezioni prima di confermare. I consensi sono facoltativi e non influenzano l'accesso ai servizi.</p>
+
+        <div class="space-y-3 mb-6">
+          <template x-if="consensiPendenti.marketing !== undefined">
+            <label class="flex items-start gap-3 cursor-pointer select-none p-3 rounded-xl border transition-colors"
+              :class="consensiPendenti.marketing ? 'border-[#117299] bg-[#e6f0f6]' : 'border-gray-200 bg-white'"
+              @click="consensiPendenti = {...consensiPendenti, marketing: !consensiPendenti.marketing}">
+              <div class="w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors"
+                :class="consensiPendenti.marketing ? 'bg-[#117299] border-[#117299]' : 'bg-white border-gray-300'">
+                <i class="fas fa-check text-white text-xs" x-show="consensiPendenti.marketing"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-800">Consenso marketing</p>
+                <p class="text-xs text-gray-500">Comunicazioni promozionali su prodotti e servizi Enilive</p>
+              </div>
+            </label>
+          </template>
+          <template x-if="consensiPendenti.profilazione !== undefined">
+            <label class="flex items-start gap-3 cursor-pointer select-none p-3 rounded-xl border transition-colors"
+              :class="consensiPendenti.profilazione ? 'border-[#117299] bg-[#e6f0f6]' : 'border-gray-200 bg-white'"
+              @click="consensiPendenti = {...consensiPendenti, profilazione: !consensiPendenti.profilazione}">
+              <div class="w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors"
+                :class="consensiPendenti.profilazione ? 'bg-[#117299] border-[#117299]' : 'bg-white border-gray-300'">
+                <i class="fas fa-check text-white text-xs" x-show="consensiPendenti.profilazione"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-800">Consenso profilazione</p>
+                <p class="text-xs text-gray-500">Analisi abitudini d'uso per offerte personalizzate</p>
+              </div>
+            </label>
+          </template>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Codice OTP</label>
+          <p class="text-xs text-gray-500 mb-2">Inserisci il codice ricevuto via SMS per confermare.</p>
+          <input type="tel" maxlength="4" x-model="consensiOtpInput"
+            @input="consensiOtpError = false"
+            @keyup.enter="confirmConsensiOtp()"
+            class="w-full text-center text-2xl font-mono tracking-widest border-2 rounded-xl py-3 outline-none transition-colors"
+            :class="consensiOtpError ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-[#117299]'"
+            placeholder="· · · ·" />
+          <p x-show="consensiOtpError" class="text-xs text-red-500 mt-1 text-center">Codice non valido. Riprova.</p>
+        </div>
+
+        <div class="flex gap-3">
+          <button @click="showConsensiModal = false; consensiOtpInput = ''; consensiOtpError = false;"
+            class="flex-1 bg-gray-200 text-gray-800 font-semibold py-3 rounded-xl hover:bg-gray-300 transition">
+            Salta
+          </button>
+          <button @click="confirmConsensiOtp()"
+            class="flex-1 text-white font-bold py-3 rounded-xl transition"
+            style="background:#117299;">
+            <i class="fas fa-lock mr-1"></i>Conferma con OTP
+          </button>
         </div>
       </div>
     </div>
