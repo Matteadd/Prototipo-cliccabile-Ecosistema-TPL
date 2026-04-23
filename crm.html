@@ -101,6 +101,20 @@
     .field-row:last-child { border-bottom: none; }
     .field-label { color: var(--color-text-muted); font-size: 12px; flex-shrink: 0; }
     .field-value { font-weight: 500; text-align: right; }
+    .badge-verified {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #10b981;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 999px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .badge-verified i { font-size: 9px; }
 
     /* ─── Service cards ───────────────────────────────────────── */
     .service-card {
@@ -312,8 +326,6 @@
       return {
         tc_telepedaggio:      { label: 'T&C Telepedaggio',      accettato: true,  data: '2024-11-15T10:32:00' },
         tc_strisce_blu:       { label: 'T&C Strisce Blu',       accettato: true,  data: '2025-01-08T14:21:00' },
-        tc_rsa:               { label: 'T&C RSA',               accettato: true,  data: '2024-11-15T10:33:00' },
-        tc_areac:             { label: 'T&C Area C',            accettato: false, data: null },
         tc_memo:              { label: 'T&C Memo',              accettato: true,  data: '2024-11-15T10:33:00' },
         privacy_marketing:    { label: 'Consenso Marketing',    accettato: false, data: null },
         privacy_profilazione: { label: 'Consenso Profilazione', accettato: true,  data: '2024-11-15T10:32:00' },
@@ -326,8 +338,6 @@
       return {
         tc_telepedaggio:      { label: 'T&C Telepedaggio',      accettato: false, data: null },
         tc_strisce_blu:       { label: 'T&C Strisce Blu',       accettato: false, data: null },
-        tc_rsa:               { label: 'T&C RSA',               accettato: false, data: null },
-        tc_areac:             { label: 'T&C Area C',            accettato: false, data: null },
         tc_memo:              { label: 'T&C Memo',              accettato: false, data: null },
         privacy_marketing:    { label: 'Consenso Marketing',    accettato: false, data: null },
         privacy_profilazione: { label: 'Consenso Profilazione', accettato: false, data: null },
@@ -362,8 +372,10 @@
               cf: 'BNCMRC85M10F205Z',
               email: 'marco.bianchi@email.it',
               telefono: '+39 339 1234567',
+              telefonoVerificato: { verificato: true, numero: '+39 339 1234567', data: '2024-11-15T10:32:00' },
               dataIscrizione: '2024-11-15',
-              canale: 'stazione'
+              canale: 'stazione',
+              cervedStatus: 'ok_full'
             },
             veicoli: [
               { targa: 'AB123CD', tipo: 'auto', marca: 'Volkswagen', modello: 'Golf', servizi: ['telepedaggio','memo','rsa'] },
@@ -389,6 +401,13 @@
         // Filtri movimenti (per cliente attivo)
         movFiltroServizio: '',
         movFiltroStato: '',
+        movFiltroTarga: '',
+
+        // Ricerca rapida per targa
+        targaAssistenza: '',
+        contrattoFocusId: null,
+        targaSearchInput: '',
+        targaSearchNotFound: false,
 
         // Form nuovo caso
         showNuovoCaso: false,
@@ -417,6 +436,8 @@
 
           const events = [
             'cliente:registrato', 'cliente:cambiato', 'cliente:profilo_aggiornato',
+            'cliente:telefono_verificato',
+            'cliente:cerved_aggiornato',
             'servizio:attivato', 'servizio:disattivato',
             'pagamento:confermato', 'pagamento:errore',
             'sosta:avviata', 'sosta:terminata',
@@ -474,11 +495,16 @@
             const obuDisp = (d.contratti || []).flatMap(c => (c.dispositivi || []).filter(dd => dd.tipo === 'obu'));
             si.telepedaggio.attivo = obuDisp.some(dd => dd.stato === 'attivo');
             si.telepedaggio.obu    = obuDisp[0]?.codice || '';
-            si.rsa.attivo          = (d.serviziRsa || []).some(r => r.stato === 'attivo');
-            si.rsa.dataAttivazione = (d.serviziRsa || [])[0]?.dataAttivazione || null;
-            // areac, parcheggi, strisceBlu, memo — da serviziAttivi
+            si.rsa.attivo          = (d.contratti || []).some(c => (c.serviziRsa || []).some(r => r.stato === 'attivo'));
+            si.rsa.dataAttivazione = null;
+            // areac, parcheggi — da dispositivi[].serviziAbilitati
+            si.areac.attivo = (d.contratti || []).some(c =>
+              (c.dispositivi || []).some(dd => dd.serviziAbilitati?.areac?.attivo));
+            si.parcheggi.attivo = (d.contratti || []).some(c =>
+              (c.dispositivi || []).some(dd => dd.serviziAbilitati?.parcheggi?.attivo));
+            // strisceBlu, memo — da serviziAttivi
             if (d.serviziAttivi) {
-              ['areac', 'parcheggi', 'strisceBlu', 'memo'].forEach(key => {
+              ['strisceBlu', 'memo'].forEach(key => {
                 if (!si[key] || !d.serviziAttivi[key]) return;
                 si[key].attivo = d.serviziAttivi[key].attivo || false;
                 if (d.serviziAttivi[key].dataAttivazione) si[key].dataAttivazione = d.serviziAttivi[key].dataAttivazione;
@@ -496,21 +522,24 @@
               tc.informativa_precontrattuale.data      = d.consensi.informativaPrecontrattuale ? d.consensi.dataFirma : null;
               tc.privacy.accettato                     = !!d.consensi.privacy;
               tc.privacy.data                          = d.consensi.privacy ? d.consensi.dataFirma : null;
+              // T&C Memo: derivato dal flag terminiECondizioni (settato dal primo OTP)
+              tc.tc_memo.accettato                     = !!d.consensi.terminiECondizioni;
+              tc.tc_memo.data                          = d.consensi.terminiECondizioni ? d.consensi.dataFirma : null;
+              // T&C Telepedaggio: settato dal secondo OTP (firma contratto)
+              tc.tc_telepedaggio.accettato             = !!d.consensi.terminiTelepedaggio;
+              tc.tc_telepedaggio.data                  = d.consensi.terminiTelepedaggio ? d.consensi.dataFirma : null;
             }
-            if (si.telepedaggio.attivo) {
+            if (si.telepedaggio.attivo && !tc.tc_telepedaggio.accettato) {
+              // fallback retrocompatibile: se OBU attivo ma consenso mancante, usa dataAttivazione contratto
               tc.tc_telepedaggio.accettato = true;
               tc.tc_telepedaggio.data = (d.contratti || [])[0]?.dataAttivazione || null;
-            }
-            if (si.rsa.attivo) {
-              tc.tc_rsa.accettato = true;
-              tc.tc_rsa.data = si.rsa.dataAttivazione || null;
             }
 
             // veicoli: da d.veicoli[], con servizi derivati per targa
             const veicoli = (d.veicoli || []).filter(Boolean).map(v => {
               const vid = v.id;
               const hasObu = obuDisp.some(dd => dd.veicoloId === vid && dd.stato === 'attivo');
-              const hasRsa = (d.serviziRsa || []).some(r => r.veicoloId === vid && r.stato === 'attivo');
+              const hasRsa = (d.contratti || []).some(c => (c.serviziRsa || []).some(r => r.veicoloId === vid && r.stato === 'attivo'));
               const servizi = [
                 ...(hasObu ? ['telepedaggio'] : []),
                 ...(hasRsa ? ['rsa'] : []),
@@ -538,10 +567,12 @@
                 cf,
                 email:          d.contatti?.email    || d.email    || '',
                 telefono:       d.contatti?.telefono || d.telefono || '',
+                telefonoVerificato: d.telefonoVerificato || { verificato: false, numero: null, data: null },
                 indirizzo:      indirizzoStr,
                 dataNascita:    d.dataNascita || '',
                 dataIscrizione: (d.dataRegistrazione || '').split('T')[0] || new Date().toISOString().split('T')[0],
                 canale:         d.canale    || 'stazione',
+                cervedStatus:   d.cervedStatus || null,
               },
               veicoli,
               serviziInfo: si,
@@ -549,6 +580,7 @@
               movimenti,
               // casiAssistenza: da clientiDemo (source of truth)
               casiAssistenza: Array.isArray(d.casiAssistenza) ? d.casiAssistenza : [],
+              contratti: d.contratti || [],
             });
           });
 
@@ -586,14 +618,22 @@
 
         _updateServizioAttivoDemo(cf, servizio, update) {
           if (!cf) return;
-          // rsa e telepedaggio sono derivati — non in serviziAttivi
           if (servizio === 'rsa' || servizio === 'telepedaggio') return;
           try {
             const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
             const record = reg[cf.toUpperCase()];
             if (!record) return;
-            if (!record.serviziAttivi) record.serviziAttivi = {};
-            record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+            if (servizio === 'areac' || servizio === 'parcheggi') {
+              (record.contratti || []).forEach(c =>
+                (c.dispositivi || []).forEach(d => {
+                  if (!d.serviziAbilitati) d.serviziAbilitati = { areac: { attivo: false }, parcheggi: { attivo: false } };
+                  d.serviziAbilitati[servizio] = { ...(d.serviziAbilitati[servizio] || {}), ...update };
+                })
+              );
+            } else {
+              if (!record.serviziAttivi) record.serviziAttivi = {};
+              record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+            }
             localStorage.setItem('clientiDemo', JSON.stringify(reg));
           } catch(_) {}
         },
@@ -627,6 +667,11 @@
           this.showRoster = false;
           this.movFiltroServizio = '';
           this.movFiltroStato = '';
+          this.movFiltroTarga = '';
+          this.targaAssistenza = '';
+          this.contrattoFocusId = null;
+          this.targaSearchInput = '';
+          this.targaSearchNotFound = false;
           this.showNuovoCaso = false;
         },
 
@@ -838,6 +883,33 @@
           }
         },
 
+        on_cliente_telefono_verificato(p) {
+          if (!p || !p.cf) return;
+          const cf = p.cf.toUpperCase();
+          const cliente = this.clienti.find(c => (c.anagrafica?.cf || '').toUpperCase() === cf);
+          if (!cliente) return;
+          cliente.anagrafica.telefonoVerificato = { verificato: true, numero: p.numero || cliente.anagrafica.telefono, data: p.data || new Date().toISOString() };
+          // Il primo OTP flagga anche privacy, precontrattuale e T&C Memo: aggiorniamo la card Consensi in live
+          const now = p.data || new Date().toISOString();
+          ['privacy', 'informativa_precontrattuale', 'tc_memo'].forEach(k => {
+            if (cliente.tcFlags[k]) { cliente.tcFlags[k].accettato = true; cliente.tcFlags[k].data = now; }
+          });
+        },
+
+        on_cliente_cerved_aggiornato(p) {
+          if (!p || !p.cf) return;
+          const cf = p.cf.toUpperCase();
+          const cliente = this.clienti.find(c => (c.anagrafica?.cf || '').toUpperCase() === cf);
+          if (cliente) {
+            cliente.anagrafica.cervedStatus = p.cervedStatus || null;
+          }
+          // Aggiorna anche clientiDemo (write-back)
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            if (reg[cf]) { reg[cf].cervedStatus = p.cervedStatus; localStorage.setItem('clientiDemo', JSON.stringify(reg)); }
+          } catch(_) {}
+        },
+
         on_gestore_interazione(p) {
           const c = this._clienteByTarga(p.targa);
           c.casiAssistenza.unshift({
@@ -950,6 +1022,24 @@
           this._addLog('crm:servizio_riattivato', { servizio: key });
         },
 
+        // ── Ricerca targa ────────────────────────────────────────────
+        cercaPerTarga() {
+          const t = this.targaSearchInput.trim().toUpperCase();
+          if (!t) return;
+          const found = this.clienti.find(c => c.veicoli.some(v => v.targa === t));
+          if (!found) { this.targaSearchNotFound = true; return; }
+          this.selezionaCliente(found.id);
+          this.targaAssistenza     = t;
+          this.movFiltroTarga      = t;
+          this.nuovoCasoForm.targa = t;
+          const ct = (found.contratti || []).find(c =>
+            (c.dispositivi || []).some(d => d.veicoloId === 'v_' + t) ||
+            (c.serviziRsa  || []).some(r => r.veicoloId === 'v_' + t)
+          );
+          this.contrattoFocusId    = ct?.id || null;
+          this.targaSearchNotFound = false;
+        },
+
         // ── Computed ────────────────────────────────────────────────
         serviziList() {
           return Object.entries(this.serviziInfo).map(([key, val]) => ({ key, ...val }));
@@ -963,6 +1053,7 @@
           return this.movimenti.filter(m => {
             if (this.movFiltroServizio && m.servizio !== this.movFiltroServizio) return false;
             if (this.movFiltroStato   && m.stato    !== this.movFiltroStato)    return false;
+            if (this.movFiltroTarga   && m.targa    !== this.movFiltroTarga)    return false;
             return true;
           });
         },
@@ -1054,8 +1145,27 @@
       <span class="text-white/70 text-sm font-medium">CRM Simulato</span>
     </div>
 
-    <!-- Destra: log pause + switcher clienti -->
+    <!-- Destra: ricerca targa + log pause + switcher clienti -->
     <div class="flex items-center gap-3">
+      <!-- Ricerca rapida per targa -->
+      <div class="flex items-center gap-1.5">
+        <input x-model="targaSearchInput" type="text" placeholder="Targa..." maxlength="7"
+          class="font-mono uppercase text-xs px-3 py-1.5 rounded-full border border-white/20
+                 bg-white/10 text-white placeholder-white/40 focus:outline-none focus:bg-white/20 w-28"
+          @keydown.enter="cercaPerTarga()" />
+        <button @click="cercaPerTarga()"
+          class="bg-white/10 hover:bg-white/20 rounded-full p-1.5 text-white/70 hover:text-white transition">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+        </button>
+        <span x-show="targaSearchNotFound" class="text-red-400 text-xs">Non trovata</span>
+        <button x-show="targaAssistenza"
+          @click="targaAssistenza=''; contrattoFocusId=null; movFiltroTarga=''; targaSearchInput=''; nuovoCasoForm.targa=''"
+          class="flex items-center gap-1 bg-blue-500/20 text-blue-200 text-xs rounded-full px-2 py-0.5 hover:bg-blue-500/30 transition">
+          <span x-text="targaAssistenza"></span>
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
       <!-- Pausa log indicator -->
       <div x-show="logPaused" class="flex items-center gap-1.5 bg-yellow-500/20 rounded-full px-3 py-1">
         <i class="fa-solid fa-pause text-yellow-400 text-xs"></i>
@@ -1167,11 +1277,41 @@
           </div>
           <div class="field-row">
             <span class="field-label">Telefono</span>
-            <span class="field-value" x-text="cliente.telefono"></span>
+            <span class="field-value" style="display:inline-flex;align-items:center;gap:6px;">
+              <span x-text="cliente.telefono"></span>
+              <span x-show="cliente.telefonoVerificato && cliente.telefonoVerificato.verificato"
+                    class="badge-verified"
+                    :title="'Numero certificato il ' + (cliente.telefonoVerificato && cliente.telefonoVerificato.data ? formatDate(cliente.telefonoVerificato.data) : '')">
+                <i class="fa-solid fa-circle-check"></i> Verificato
+              </span>
+            </span>
           </div>
           <div class="field-row">
             <span class="field-label">Iscritto dal</span>
             <span class="field-value" x-text="formatDate(cliente.dataIscrizione)"></span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Cerved</span>
+            <span class="field-value">
+              <template x-if="!cliente.cervedStatus">
+                <span class="text-xs text-gray-400 italic">Non verificato</span>
+              </template>
+              <template x-if="cliente.cervedStatus === 'ok_full'">
+                <span class="badge" style="background:#dcfce7;color:#166534;font-size:11px;">
+                  <i class="fa-solid fa-circle-check mr-1"></i>OK — accesso completo
+                </span>
+              </template>
+              <template x-if="cliente.cervedStatus === 'ok_rsa_only'">
+                <span class="badge" style="background:#fef9c3;color:#854d0e;font-size:11px;">
+                  <i class="fa-solid fa-triangle-exclamation mr-1"></i>OK — solo RSA
+                </span>
+              </template>
+              <template x-if="cliente.cervedStatus === 'ko'">
+                <span class="badge" style="background:#fee2e2;color:#991b1b;font-size:11px;">
+                  <i class="fa-solid fa-circle-xmark mr-1"></i>KO
+                </span>
+              </template>
+            </span>
           </div>
         </div>
       </div>
@@ -1204,6 +1344,67 @@
           <div x-show="veicoli.length === 0" class="text-xs text-gray-400 italic text-center py-3">
             Nessun veicolo registrato
           </div>
+        </div>
+      </div>
+
+      <!-- Contratti ──────────────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-file-signature mr-1.5"></i>Contratti</span>
+          <span class="text-xs text-gray-400"
+                x-text="(ac().contratti||[]).length + ' contratt'+((ac().contratti||[]).length===1?'o':'i')"></span>
+        </div>
+        <div class="card-body" style="padding-top:8px;padding-bottom:8px;">
+          <template x-for="c in (ac().contratti || [])" :key="c.id">
+            <div class="rounded-lg mb-2 last:mb-0 overflow-hidden cursor-pointer transition"
+                 :class="contrattoFocusId === c.id
+                   ? 'ring-2 ring-offset-1 ring-blue-400'
+                   : 'hover:border-blue-200'"
+                 style="border:1px solid #e5e7eb"
+                 @click="contrattoFocusId = (contrattoFocusId === c.id ? null : c.id)">
+              <!-- header -->
+              <div class="flex items-center gap-2 px-3 py-2 bg-gray-50">
+                <span class="badge" :class="c.tipo==='obu'?'bg-blue-100 text-blue-700':'bg-orange-100 text-orange-700'"
+                      x-text="c.tipo==='obu'?'OBU':'RSA SA'"></span>
+                <span class="text-xs font-mono text-gray-400 flex-1 truncate" x-text="c.id"></span>
+                <span class="badge" :class="c.stato==='attivo'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'"
+                      x-text="c.stato"></span>
+              </div>
+              <!-- dispositivi + RSA -->
+              <div class="px-3 py-2 space-y-1.5">
+                <template x-for="d in (c.dispositivi||[])" :key="d.veicoloId">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <i class="fa-solid fa-broadcast-tower text-blue-400" style="font-size:10px;"></i>
+                    <span class="font-mono text-xs font-bold text-gray-700" x-text="d.veicoloId?.replace('v_','')"></span>
+                    <span class="text-xs text-gray-400 font-mono" x-text="d.codice"></span>
+                    <span x-show="d.serviziAbilitati?.areac?.attivo"
+                          class="badge bg-purple-100 text-purple-700" style="font-size:10px;">Area C</span>
+                    <span x-show="d.serviziAbilitati?.parcheggi?.attivo"
+                          class="badge bg-teal-100 text-teal-700" style="font-size:10px;">Park</span>
+                  </div>
+                </template>
+                <template x-for="r in (c.serviziRsa||[])" :key="r.id">
+                  <div class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-truck-medical text-orange-400" style="font-size:10px;"></i>
+                    <span class="font-mono text-xs text-gray-600" x-text="r.veicoloId?.replace('v_','')"></span>
+                    <span class="badge bg-orange-100 text-orange-700" style="font-size:10px;">RSA</span>
+                    <span class="badge" style="font-size:10px;"
+                          :class="r.stato==='attivo'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'"
+                          x-text="r.stato"></span>
+                  </div>
+                </template>
+              </div>
+              <!-- IBAN + totale -->
+              <div class="flex items-center justify-between px-3 py-1.5 border-t border-gray-100">
+                <span class="text-xs text-gray-400 font-mono"
+                      x-text="c.iban ? '···'+c.iban.slice(-4) : '—'"></span>
+                <span class="text-xs font-bold text-blue-700"
+                      x-text="'€ '+(c.totale||0).toFixed(2)+'/mese'"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="!(ac().contratti||[]).length"
+               class="text-xs text-gray-400 italic text-center py-2">Nessun contratto</div>
         </div>
       </div>
 
@@ -1341,6 +1542,13 @@
               <option value="pagato">Pagato</option>
               <option value="in corso">In corso</option>
               <option value="errore">Errore</option>
+            </select>
+            <select x-model="movFiltroTarga"
+              class="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-600 bg-white focus:outline-none focus:border-blue-300">
+              <option value="">Tutte le targhe</option>
+              <template x-for="v in veicoli" :key="v.targa">
+                <option :value="v.targa" x-text="v.targa"></option>
+              </template>
             </select>
           </div>
         </div>

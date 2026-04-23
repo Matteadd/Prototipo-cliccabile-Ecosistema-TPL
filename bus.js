@@ -32,8 +32,10 @@
  */
 function syncVeicoli(record) {
   const referencedIds = new Set([
-    ...(record.contratti || []).flatMap(c => (c.dispositivi || []).map(d => d.veicoloId).filter(Boolean)),
-    ...(record.serviziRsa || []).map(r => r.veicoloId).filter(Boolean),
+    ...(record.contratti || []).flatMap(c => [
+      ...(c.dispositivi || []).map(d => d.veicoloId),
+      ...(c.serviziRsa  || []).map(r => r.veicoloId),
+    ].filter(Boolean)),
   ]);
   const existingIds = new Set((record.veicoli || []).map(v => v.id));
   referencedIds.forEach(id => {
@@ -56,82 +58,126 @@ function syncTargheGlobali(record) { return syncVeicoli(record); }
  * @returns {object} r migrato (same reference, mutato in-place)
  */
 function migrateClienteRecord(r) {
-  if (!r || Array.isArray(r.veicoli)) return r;
+  if (!r) return r;
 
-  // 1. Raccoglie targhe RSA PRIMA di mutare i contratti
-  const rsaTarghe = new Set([
-    ...(r.serviziAttivi?.rsa?.targhe || []).map(t => t.toUpperCase()),
-    ...(r.contratti || []).flatMap(c => (c.obu || []).filter(o => o.rsa).map(o => (o.targa || '').toUpperCase()).filter(Boolean)),
-    ...(r.contratti || []).flatMap(c => (c.rsaStandalone || []).map(s => (s.targa || '').toUpperCase()).filter(Boolean)),
-  ].filter(Boolean));
+  // v1→v2: solo se veicoli non è ancora un array
+  if (!Array.isArray(r.veicoli)) {
+    // 1. Raccoglie targhe RSA PRIMA di mutare i contratti
+    const rsaTarghe = new Set([
+      ...(r.serviziAttivi?.rsa?.targhe || []).map(t => t.toUpperCase()),
+      ...(r.contratti || []).flatMap(c => (c.obu || []).filter(o => o.rsa).map(o => (o.targa || '').toUpperCase()).filter(Boolean)),
+      ...(r.contratti || []).flatMap(c => (c.rsaStandalone || []).map(s => (s.targa || '').toUpperCase()).filter(Boolean)),
+    ].filter(Boolean));
 
-  // 2. Costruisce veicoli[] da targhe[]
-  r.veicoli = (r.targhe || []).filter(Boolean).map(t => ({
-    id: 'v_' + t.toUpperCase(),
-    targa: t.toUpperCase(),
-    tipo: 'Auto', marca: '', modello: '', scadenze: {},
-  }));
+    // 2. Costruisce veicoli[] da targhe[]
+    r.veicoli = (r.targhe || []).filter(Boolean).map(t => ({
+      id: 'v_' + t.toUpperCase(),
+      targa: t.toUpperCase(),
+      tipo: 'Auto', marca: '', modello: '', scadenze: {},
+    }));
 
-  // 3. Migra contratti: obu[] + rsaStandalone[] → dispositivi[]
-  (r.contratti || []).forEach(c => {
-    c.dispositivi = [
-      ...(c.obu || []).map(o => ({
-        tipo: 'obu',
-        codice: o.codice || '',
-        veicoloId: 'v_' + (o.targa || '').toUpperCase(),
-        furtoSmarrimento: !!o.furto,
-        stato: o.stato || 'attivo',
-      })),
-      ...(c.rsaStandalone || []).map(s => ({
-        tipo: 'rsa_standalone',
-        codice: '',
-        veicoloId: 'v_' + (s.targa || '').toUpperCase(),
-        furtoSmarrimento: false,
-        stato: 'attivo',
-      })),
-    ];
-    c.dataAttivazione = c.dataCreazione || r.dataRegistrazione || new Date().toISOString();
-    delete c.obu; delete c.rsaStandalone; delete c.dataCreazione;
-  });
+    // 3. Migra contratti: obu[] + rsaStandalone[] → dispositivi[]
+    (r.contratti || []).forEach(c => {
+      c.dispositivi = [
+        ...(c.obu || []).map(o => ({
+          tipo: 'obu',
+          codice: o.codice || '',
+          veicoloId: 'v_' + (o.targa || '').toUpperCase(),
+          furtoSmarrimento: !!o.furto,
+          stato: o.stato || 'attivo',
+        })),
+        ...(c.rsaStandalone || []).map(s => ({
+          tipo: 'rsa_standalone',
+          codice: '',
+          veicoloId: 'v_' + (s.targa || '').toUpperCase(),
+          furtoSmarrimento: false,
+          stato: 'attivo',
+        })),
+      ];
+      c.dataAttivazione = c.dataCreazione || r.dataRegistrazione || new Date().toISOString();
+      delete c.obu; delete c.rsaStandalone; delete c.dataCreazione;
+    });
 
-  // 4. Costruisce serviziRsa[]
-  let rsaIdx = 1;
-  r.serviziRsa = [...rsaTarghe].map(t => ({
-    id: 'rsa_' + String(rsaIdx++).padStart(3, '0'),
-    veicoloId: 'v_' + t,
-    tipo: 'assistenza_stradale',
-    stato: 'attivo',
-    costo: 2.00,
-  }));
+    // 4. Costruisce serviziRsa[] temporaneo (verrà spostato in contratti da v2→v3 subito sotto)
+    let rsaIdx = 1;
+    r.serviziRsa = [...rsaTarghe].map(t => ({
+      id: 'rsa_' + String(rsaIdx++).padStart(3, '0'),
+      veicoloId: 'v_' + t,
+      tipo: 'assistenza_stradale',
+      stato: 'attivo',
+      costo: 2.00,
+    }));
 
-  // 5. Nidifica contatti e indirizzo
-  r.contatti = { telefono: r.telefono || '', email: r.email || '' };
-  const oldInd = r.indirizzo;
-  r.indirizzo = {
-    via:    (typeof oldInd === 'string' ? oldInd : '') || '',
-    civico: r.civico    || '',
-    comune: r.comune    || '',
-    prov:   r.provincia || '',
-    cap:    r.cap       || '',
-  };
-  delete r.telefono; delete r.email;
-  delete r.civico; delete r.comune; delete r.provincia; delete r.cap; delete r.stato;
+    // 5. Nidifica contatti e indirizzo
+    r.contatti = { telefono: r.telefono || '', email: r.email || '' };
+    const oldInd = r.indirizzo;
+    r.indirizzo = {
+      via:    (typeof oldInd === 'string' ? oldInd : '') || '',
+      civico: r.civico    || '',
+      comune: r.comune    || '',
+      prov:   r.provincia || '',
+      cap:    r.cap       || '',
+    };
+    delete r.telefono; delete r.email;
+    delete r.civico; delete r.comune; delete r.provincia; delete r.cap; delete r.stato;
 
-  // 6. Riduce serviziAttivi a { areac, parcheggi, strisceBlu, memo }
-  r.serviziAttivi = {
-    areac:      r.serviziAttivi?.areac      || { attivo: false },
-    parcheggi:  r.serviziAttivi?.parcheggi  || { attivo: false },
-    strisceBlu: r.serviziAttivi?.strisceBlu || { attivo: false },
-    memo:       r.serviziAttivi?.memo       || { attivo: false },
-  };
+    // 6. Riduce serviziAttivi (areac/parcheggi rimossi da v2→v3 subito sotto)
+    r.serviziAttivi = {
+      areac:      r.serviziAttivi?.areac      || { attivo: false },
+      parcheggi:  r.serviziAttivi?.parcheggi  || { attivo: false },
+      strisceBlu: r.serviziAttivi?.strisceBlu || { attivo: false },
+      memo:       r.serviziAttivi?.memo       || { attivo: false },
+    };
 
-  // 7. Aggiunge veicoloId ai movimenti (mantiene targa per display)
-  (r.movimenti || []).forEach(m => {
-    if (m.targa && !m.veicoloId) m.veicoloId = 'v_' + m.targa.toUpperCase();
-  });
+    // 7. Aggiunge veicoloId ai movimenti (mantiene targa per display)
+    (r.movimenti || []).forEach(m => {
+      if (m.targa && !m.veicoloId) m.veicoloId = 'v_' + m.targa.toUpperCase();
+    });
 
-  // 8. Rimuove targhe[] (rimpiazzata da veicoli[])
-  delete r.targhe;
+    // 8. Rimuove targhe[] (rimpiazzata da veicoli[])
+    delete r.targhe;
+  }
+
+  // v2→v3: sposta serviziRsa[] root → contratti[].serviziRsa[], areac/parcheggi → dispositivi[].serviziAbilitati
+  if (!r._v3migrated) {
+    const rsaRoot = r.serviziRsa || [];
+    (r.contratti || []).forEach(c => {
+      if (!c.serviziRsa) c.serviziRsa = [];
+      rsaRoot.forEach(rsa => {
+        const inObu    = (c.dispositivi || []).some(d => d.veicoloId === rsa.veicoloId);
+        const inRsaDev = (c.dispositivi || []).some(d => d.tipo === 'rsa_standalone' && d.veicoloId === rsa.veicoloId);
+        if (inObu || inRsaDev) {
+          c.serviziRsa.push({ id: rsa.id, veicoloId: rsa.veicoloId, stato: rsa.stato, costo: rsa.costo });
+        }
+      });
+      const rsaDev = (c.dispositivi || []).filter(d => d.tipo === 'rsa_standalone');
+      rsaDev.forEach(d => {
+        const alreadyPresent = c.serviziRsa.some(rs => rs.veicoloId === d.veicoloId);
+        if (!alreadyPresent) {
+          c.serviziRsa.push({ id: 'rsa_mig_' + d.veicoloId, veicoloId: d.veicoloId, stato: d.stato || 'attivo', costo: 2.00 });
+        }
+      });
+      c.dispositivi = (c.dispositivi || []).filter(d => d.tipo !== 'rsa_standalone');
+      const acVal = r.serviziAttivi?.areac?.attivo     || false;
+      const pgVal = r.serviziAttivi?.parcheggi?.attivo || false;
+      (c.dispositivi || []).forEach(d => {
+        if (!d.serviziAbilitati) {
+          d.serviziAbilitati = { areac: { attivo: acVal }, parcheggi: { attivo: pgVal } };
+        }
+      });
+    });
+    delete r.serviziRsa;
+    if (r.serviziAttivi) {
+      delete r.serviziAttivi.areac;
+      delete r.serviziAttivi.parcheggi;
+    }
+    r._v3migrated = true;
+  }
+
+  // Default telefonoVerificato per record esistenti (idempotente)
+  if (!r.telefonoVerificato || typeof r.telefonoVerificato !== 'object') {
+    r.telefonoVerificato = { verificato: false, numero: null, data: null };
+  }
 
   return r;
 }

@@ -630,6 +630,10 @@
                   <p class="text-sm text-amber-600">Dati precompilati da anagrafica Cliente Unico</p>
                   <div class="mt-2 text-xs text-amber-700 space-y-0.5">
                     <span class="inline-flex items-center gap-1 mr-3">
+                      <i :class="telefonoCertificato ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas"></i>
+                      Numero certificato
+                    </span>
+                    <span class="inline-flex items-center gap-1 mr-3">
                       <i :class="consensiCrm.privacy ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas"></i>
                       Privacy
                     </span>
@@ -639,16 +643,14 @@
                     </span>
                     <span class="inline-flex items-center gap-1 mr-3">
                       <i :class="consensiCrm.nAndCMemo ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas"></i>
-                      N&amp;C Memo
+                      T&amp;C Memo
                     </span>
-                    <span class="inline-flex items-center gap-1 mr-3 opacity-60">
-                      <i :class="consensiCrm.marketing ? 'fa-check-circle text-green-600' : 'fa-minus-circle text-gray-400'" class="fas"></i>
-                      Marketing (facoltativo)
-                    </span>
-                    <span class="inline-flex items-center gap-1 opacity-60">
-                      <i :class="consensiCrm.profilazione ? 'fa-check-circle text-green-600' : 'fa-minus-circle text-gray-400'" class="fas"></i>
-                      Profilazione (facoltativo)
-                    </span>
+                    <template x-if="creditCheckStatus">
+                      <span class="inline-flex items-center gap-1 mr-3">
+                        <i :class="creditCheckStatus === 'ok_full' || creditCheckStatus === 'ok_rsa_only' ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas"></i>
+                        Cerved: <span x-text="creditCheckStatus === 'ok_full' ? 'OK' : creditCheckStatus === 'ok_rsa_only' ? 'OK (solo RSA)' : 'KO'"></span>
+                      </span>
+                    </template>
                   </div>
                 </div>
                 <button x-show="clienteReadonly" class="btn-secondary text-xs py-1.5 px-3 flex-shrink-0" @click="clienteReadonly = false">
@@ -657,6 +659,19 @@
                 <span x-show="!clienteReadonly" class="text-xs text-amber-600 font-medium flex-shrink-0">
                   <i class="fas fa-unlock mr-1"></i>In modifica
                 </span>
+              </div>
+            </template>
+
+            <!-- Banner campi anagrafici mancanti (solo clienti esistenti) -->
+            <template x-if="cfAlreadyExists && (!cliente.nome || !cliente.cognome || !cliente.dataNascita || !cliente.indirizzo || !cliente.comune || !cliente.telefono)">
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3">
+                <i class="fas fa-circle-exclamation text-red-500 flex-shrink-0 mt-0.5"></i>
+                <div>
+                  <p class="font-semibold text-red-800 text-sm">Dati anagrafici incompleti nel CRM</p>
+                  <p class="text-xs text-red-600 mt-1">Clicca <strong>Modifica</strong> per completare i campi mancanti:
+                    <span x-text="[!cliente.nome ? 'Nome' : '', !cliente.cognome ? 'Cognome' : '', !cliente.dataNascita ? 'Data di nascita' : '', !cliente.indirizzo ? 'Indirizzo' : '', !cliente.comune ? 'Comune' : '', !cliente.telefono ? 'Telefono' : ''].filter(Boolean).join(', ')"></span>
+                  </p>
+                </div>
               </div>
             </template>
 
@@ -811,6 +826,33 @@
           <div class="space-y-4">
             <div class="card p-6">
               <h3 class="font-semibold text-gray-700 mb-5"><i class="fas fa-shield-alt mr-2 text-teal"></i>Verifica contatti</h3>
+
+              <!-- Riepilogo cosa manca (solo per clienti esistenti) -->
+              <template x-if="cfAlreadyExists">
+                <div class="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p class="text-sm font-semibold text-amber-800 mb-2">
+                    <i class="fas fa-exclamation-triangle mr-1.5"></i>Da completare per il cliente esistente
+                  </p>
+                  <ul class="space-y-1.5">
+                    <li class="flex items-center gap-2 text-sm">
+                      <i :class="telefonoCertificato ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas w-4 flex-shrink-0"></i>
+                      <span :class="telefonoCertificato ? 'text-green-800 line-through' : 'text-amber-800'">Numero di cellulare certificato</span>
+                    </li>
+                    <li class="flex items-center gap-2 text-sm">
+                      <i :class="consensiCrm.informativaPrecontrattuale ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas w-4 flex-shrink-0"></i>
+                      <span :class="consensiCrm.informativaPrecontrattuale ? 'text-green-800 line-through' : 'text-amber-800'">Informativa pre-contrattuale</span>
+                    </li>
+                    <li class="flex items-center gap-2 text-sm">
+                      <i :class="consensiCrm.privacy ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas w-4 flex-shrink-0"></i>
+                      <span :class="consensiCrm.privacy ? 'text-green-800 line-through' : 'text-amber-800'">Privacy</span>
+                    </li>
+                    <li class="flex items-center gap-2 text-sm">
+                      <i :class="consensiCrm.nAndCMemo ? 'fa-check-circle text-green-600' : 'fa-times-circle text-red-500'" class="fas w-4 flex-shrink-0"></i>
+                      <span :class="consensiCrm.nAndCMemo ? 'text-green-800 line-through' : 'text-amber-800'">T&amp;C Servizio Memo</span>
+                    </li>
+                  </ul>
+                </div>
+              </template>
 
               <!-- OTP SMS / Consensi -->
               <div class="mb-6">
@@ -3312,29 +3354,32 @@
                     <!-- Contenuto contratto -->
                     <div class="px-4 py-3 space-y-2">
                       <!-- OBU devices -->
-                      <template x-for="o in c.obu" :key="o.codice">
-                        <div class="flex items-center gap-2 text-sm">
+                      <template x-for="d in (c.dispositivi||[]).filter(d=>d.tipo==='obu')" :key="d.veicoloId">
+                        <div class="flex items-center gap-2 text-sm flex-wrap">
                           <i class="fas fa-broadcast-tower text-teal w-4 text-center flex-shrink-0"></i>
-                          <span class="font-mono font-semibold text-gray-800" x-text="o.codice"></span>
-                          <span class="targa-tag text-xs px-1.5 py-0.5 bg-gray-100 rounded font-mono" x-text="o.targa"></span>
-                          <template x-if="o.rsa">
+                          <span class="font-mono font-semibold text-gray-800" x-text="d.codice"></span>
+                          <span class="targa-tag text-xs px-1.5 py-0.5 bg-gray-100 rounded font-mono" x-text="d.veicoloId?.replace('v_','')"></span>
+                          <template x-if="(c.serviziRsa||[]).some(rs=>rs.veicoloId===d.veicoloId&&rs.stato==='attivo')">
                             <span class="text-xs bg-teal-light text-teal px-1.5 py-0.5 rounded font-semibold">+RSA</span>
                           </template>
-                          <template x-if="o.furto">
+                          <template x-if="d.furtoSmarrimento">
                             <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-semibold">+Furto</span>
                           </template>
                           <span class="text-xs ml-auto px-1.5 py-0.5 rounded-full"
-                            :class="o.stato === 'attivo' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'"
-                            x-text="o.stato">
+                            :class="d.stato === 'attivo' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'"
+                            x-text="d.stato">
                           </span>
                         </div>
                       </template>
-                      <!-- RSA standalone -->
-                      <template x-for="r in c.rsaStandalone" :key="r.targa">
+                      <!-- RSA per targhe extra (non su OBU) -->
+                      <template x-for="rs in (c.serviziRsa||[]).filter(rs=>!(c.dispositivi||[]).some(d=>d.veicoloId===rs.veicoloId))" :key="rs.id">
                         <div class="flex items-center gap-2 text-sm">
                           <i class="fas fa-ambulance text-blue-500 w-4 text-center flex-shrink-0"></i>
                           <span class="text-gray-700">RSA Stand-Alone</span>
-                          <span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded font-mono" x-text="r.targa"></span>
+                          <span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded font-mono" x-text="rs.veicoloId?.replace('v_','')"></span>
+                          <span class="text-xs px-1.5 py-0.5 rounded-full"
+                            :class="rs.stato==='attivo'?'bg-green-100 text-green-600':'bg-gray-100 text-gray-500'"
+                            x-text="rs.stato"></span>
                         </div>
                       </template>
                       <!-- IBAN + Totale -->
@@ -4590,6 +4635,7 @@ function tabletApp() {
       profilazione: false,
     },
     consensiSmsOpzionale: false,
+    telefonoCertificato: false,   // true se il numero è già certificato nel record CRM
     targhe: [''],
     otpSmsValue: '', otpSmsStatus: null,
     otpEmailValue: '', otpEmailStatus: null,
@@ -4867,6 +4913,13 @@ function tabletApp() {
         // Salva cliente parziale prima di passare alla verifica Cerved (step 2 → 3)
         if (this.currentStep === 2) {
           this._salvaClienteParziale();
+          // Cliente esistente con verifica Cerved già registrata: salta step 3
+          if (this.cfAlreadyExists && (this.creditCheckStatus === 'ok_full' || this.creditCheckStatus === 'ok_rsa_only')) {
+            this.currentStep = 4;
+            window.scrollTo(0, 0);
+            this.showToastMsg('Verifica Cerved già registrata — procedo alla selezione servizio', 'info');
+            return;
+          }
         }
         this.currentStep++;
         if (this.currentStep === 2) this.step2Sub = 'doc';
@@ -4992,17 +5045,15 @@ function tabletApp() {
             dataAttivazione: '2024-01-15T09:00:00.000Z',
             iban: 'IT60X0542811101000000123456',
             totale: 4.50,
-            dispositivi: [{ tipo: 'obu', codice: 'OBU-000001', veicoloId: 'v_AB123CD', furtoSmarrimento: false, stato: 'attivo' }],
+            dispositivi: [{ tipo: 'obu', codice: 'OBU-000001', veicoloId: 'v_AB123CD', furtoSmarrimento: false, stato: 'attivo',
+              serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } }],
+            serviziRsa: [{ id: 'rsa_001', veicoloId: 'v_AB123CD', stato: 'attivo', costo: 2.00 }],
           }],
-          serviziRsa: [
-            { id: 'rsa_001', veicoloId: 'v_AB123CD', tipo: 'assistenza_stradale', stato: 'attivo', costo: 2.00 },
-          ],
           serviziAttivi: {
-            areac:      { attivo: false },
-            parcheggi:  { attivo: false },
             strisceBlu: { attivo: false },
             memo:       { attivo: false },
           },
+          _v3migrated: true,
           movimenti: [],
         };
         localStorage.setItem('clientiDemo', JSON.stringify(reg));
@@ -5061,13 +5112,11 @@ function tabletApp() {
         veicoli,
         consensi,
         contratti: [],
-        serviziRsa: [],
         serviziAttivi: {
-          areac: { attivo: false },
-          parcheggi: { attivo: false },
           strisceBlu: { attivo: false },
           memo: { attivo: false },
         },
+        _v3migrated: true,
         movimenti: [],
       };
       this._saveClienteDemo(record);
@@ -5131,6 +5180,8 @@ function tabletApp() {
           this.cfVerifyStatus = 'ok';
           this.cfAlreadyExists = true;
           this.clienteReadonly = true;
+          this.telefonoCertificato = !!(dati.telefonoVerificato?.verificato);
+          this.creditCheckStatus = dati.cervedStatus || null;
           this.scanStatus = 'done';
           this.showToastMsg('Cliente già censito — dati precompilati in sola lettura', 'warning');
           setTimeout(() => { this.step2Sub = 'anagrafica'; }, 1200);
@@ -5207,6 +5258,16 @@ function tabletApp() {
       this.cfVerifyStatus = 'ok';
       this.cfAlreadyExists = true;
       this.clienteReadonly = true;
+      // Popola consensiCrm dai consensi del record
+      if (dati.consensi) {
+        this.consensiCrm.privacy = !!dati.consensi.privacy;
+        this.consensiCrm.informativaPrecontrattuale = !!dati.consensi.informativaPrecontrattuale;
+        this.consensiCrm.nAndCMemo = !!dati.consensi.terminiECondizioni;
+        this.consensiCrm.marketing = !!dati.consensi.marketing;
+        this.consensiCrm.profilazione = !!dati.consensi.profilazione;
+      }
+      this.telefonoCertificato = !!(dati.telefonoVerificato?.verificato);
+      this.creditCheckStatus = dati.cervedStatus || null;
       this.step2Sub = 'anagrafica';
     },
 
@@ -5255,6 +5316,8 @@ function tabletApp() {
             this.consensiCrm.marketing = !!stored.consensi.marketing;
             this.consensiCrm.profilazione = !!stored.consensi.profilazione;
           }
+          this.telefonoCertificato = !!(stored.telefonoVerificato?.verificato);
+          this.creditCheckStatus = stored.cervedStatus || null;
           this.showToastMsg('Cliente già censito nel registry demo — dati precompilati', 'warning');
           return;
         }
@@ -5307,13 +5370,17 @@ function tabletApp() {
         return;
       }
       if (this.cfAlreadyExists) {
-        const s = this.consensiStatus();
-        if (s === 'completo') {
+        // Per clienti esistenti: verifica i 3 consensi obbligatori + certificazione telefono
+        const mandatoryConsentsOk = this.consensiCrm.privacy &&
+          this.consensiCrm.informativaPrecontrattuale &&
+          this.consensiCrm.nAndCMemo;
+        if (mandatoryConsentsOk && this.telefonoCertificato) {
           this.nextStep();
-          this.showToastMsg('Consensi già presenti — verifica contatti saltata', 'success');
+          this.showToastMsg('Consensi e numero certificato verificati — procedo con la valutazione creditizia', 'success');
           return;
         }
-        this.consensiSmsOpzionale = (s === 'optional_only');
+        // Manca qualcosa: vai a OTP (SMS dinamico costruito in sendOtpSms)
+        this.consensiSmsOpzionale = false;
       }
       this.step2Sub = 'otp';
     },
@@ -5321,20 +5388,70 @@ function tabletApp() {
     sendOtpSms() {
       this.otpSmsStatus = 'sent';
       this.otpSmsFieldEnabled = false;
+
+      // Costruisci dinamicamente la lista documenti da includere nell'SMS
+      // Per clienti esistenti: solo quelli mancanti; per nuovi: tutti e tre
+      const documentiMancanti = [];
+      if (!this.consensiCrm.informativaPrecontrattuale) documentiMancanti.push('informativa_precontrattuale');
+      if (!this.consensiCrm.privacy) documentiMancanti.push('privacy');
+      if (!this.consensiCrm.nAndCMemo) documentiMancanti.push('norme_memo');
+      const documenti = this.cfAlreadyExists
+        ? documentiMancanti
+        : ['informativa_precontrattuale', 'privacy', 'norme_memo'];
+
+      // Preview dinamica in base a cosa manca
+      const phonePending = this.cfAlreadyExists && !this.telefonoCertificato;
+      let preview;
+      if (phonePending && documentiMancanti.length > 0) {
+        preview = 'Enilive: certifica il numero e accetta i documenti richiesti: [link mock]';
+      } else if (phonePending) {
+        preview = 'Enilive: certifica il tuo numero di telefono tramite OTP: [link mock]';
+      } else if (documentiMancanti.length > 0) {
+        preview = 'Enilive: accetta i documenti mancanti per completare la registrazione: [link mock]';
+      } else {
+        preview = 'Conferma i tuoi dati e accetta i documenti Enilive: [link mock]';
+      }
+
       Bus.emit('sms:outbound', {
         id: 'sms_consensi',
         to: this.cliente.telefono,
         template: 'OTP_CONSENSI',
-        preview: 'Conferma i tuoi dati e accetta i documenti Enilive: [link mock]',
-        documenti: ['informativa_precontrattuale', 'norme_memo', 'privacy'],
+        preview,
+        documenti: documenti.length > 0 ? documenti : ['informativa_precontrattuale', 'privacy', 'norme_memo'],
+        ...(phonePending ? { certificaTelefono: true } : {}),
       });
-      this.showToastMsg('SMS con link documenti inviato al ' + this.cliente.telefono, 'info');
+      this.showToastMsg('SMS inviato al ' + this.cliente.telefono, 'info');
     },
 
     confirmOtpSms() {
       const input = this.otpSmsInput.trim();
       if (/^\d{4}$/.test(input)) {
         this.otpSmsStatus = 'confirmed';
+        // Primo OTP: certifica numero di telefono e flagga consensi obbligatori
+        // (informativa precontrattuale, privacy, T&C Memo) in clientiDemo.
+        // Se il cliente non è ancora stato salvato (cf non presente) si limita a
+        // settare lo stato locale: il flag verrà persistito da completaOnboarding.
+        try {
+          const cf = (this.cliente.cf || '').toUpperCase();
+          if (cf) {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cf];
+            if (record) {
+              const now = new Date().toISOString();
+              const numero = record.contatti?.telefono || this.cliente.telefono || null;
+              record.telefonoVerificato = { verificato: true, numero, data: now };
+              record.consensi = {
+                ...(record.consensi || {}),
+                informativaPrecontrattuale: true,
+                privacy: true,
+                terminiECondizioni: true,
+                dataFirma: now,
+              };
+              localStorage.setItem('clientiDemo', JSON.stringify(reg));
+              Bus.emit('cliente:telefono_verificato', { cf, numero, data: now });
+            }
+          }
+        } catch(_) {}
         this.showToastMsg('Numero certificato', 'success');
       } else {
         this.showToastMsg('OTP non valido — riprova', 'error');
@@ -5417,6 +5534,16 @@ function tabletApp() {
         } else {
           this.creditCheckStatus = 'ok_full';
         }
+        // Persiste cervedStatus in clientiDemo e notifica il CRM via bus
+        try {
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const record = reg[cf];
+          if (record) {
+            record.cervedStatus = this.creditCheckStatus;
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+            Bus.emit('cliente:cerved_aggiornato', { cf, cervedStatus: this.creditCheckStatus });
+          }
+        } catch(_) {}
       }, 2000);
     },
 
@@ -5742,9 +5869,11 @@ function tabletApp() {
 
       const veicoli = allTarghe.map(t => ({ id: 'v_' + t, targa: t, tipo: 'Auto', marca: '', modello: '', scadenze: {} }));
 
-      // 2. Costruisce contratti con dispositivi[] (nessun campo rsa in dispositivi)
+      // 2. Costruisce contratti v3: dispositivi[] OBU con serviziAbilitati, serviziRsa[] nel contratto
       const obu1Targa = (this.obu1Targa || this.targaSelezionata || '').toUpperCase();
       const obu2Targa = (this.obu2Targa || this.targaSelezionata2 || '').toUpperCase();
+      let rsaIdx = 1;
+      const mkRsa = vid => ({ id: 'rsa_' + String(rsaIdx++).padStart(3, '0'), veicoloId: vid, stato: 'attivo', costo: 2.00 });
       const contratti = [
         {
           id: 'c1_' + cf.substring(0, 8),
@@ -5753,20 +5882,23 @@ function tabletApp() {
           dataAttivazione: now,
           iban: this.iban,
           totale: this.calcContratto1Total(),
-          dispositivi: isRsaOnly
-            ? this.rsaStandaloneTarghe.filter(t => t.targa.trim()).map(t => ({
-                tipo: 'rsa_standalone', codice: '', veicoloId: 'v_' + t.targa.toUpperCase(), furtoSmarrimento: false, stato: 'attivo',
-              }))
-            : [
-                { tipo: 'obu', codice: this.obuCode, veicoloId: 'v_' + obu1Targa, furtoSmarrimento: this.obu1Furto, stato: 'attivo' },
-                ...(this.hasObu2 && obu2Targa ? [{ tipo: 'obu', codice: this.obuCode2, veicoloId: 'v_' + obu2Targa, furtoSmarrimento: this.obu2Furto, stato: 'attivo' }] : []),
-                ...this.rsaStandalone.filter(r => r.targa.trim()).map(r => ({
-                  tipo: 'rsa_standalone', codice: '', veicoloId: 'v_' + r.targa.toUpperCase(), furtoSmarrimento: false, stato: 'attivo',
-                })),
-                ...(this.creditCheckStatus === 'ok_rsa_only' && this.targhe[0] ? [{
-                  tipo: 'rsa_standalone', codice: '', veicoloId: 'v_' + this.targhe[0].toUpperCase(), furtoSmarrimento: false, stato: 'attivo',
-                }] : []),
-              ],
+          dispositivi: isRsaOnly ? [] : [
+            { tipo: 'obu', codice: this.obuCode, veicoloId: 'v_' + obu1Targa, furtoSmarrimento: this.obu1Furto, stato: 'attivo',
+              serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } },
+            ...(this.hasObu2 && obu2Targa ? [{ tipo: 'obu', codice: this.obuCode2, veicoloId: 'v_' + obu2Targa, furtoSmarrimento: this.obu2Furto, stato: 'attivo',
+              serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } }] : []),
+          ],
+          serviziRsa: [
+            ...(!isRsaOnly && this.obu1Rsa && obu1Targa ? [mkRsa('v_' + obu1Targa)] : []),
+            ...(!isRsaOnly && this.hasObu2 && this.obu2Rsa && obu2Targa ? [mkRsa('v_' + obu2Targa)] : []),
+            ...(!isRsaOnly ? this.rsaStandalone.filter(r => r.targa.trim()).map(r => mkRsa('v_' + r.targa.toUpperCase())) : []),
+            ...(isRsaOnly && this.tabletServizioSelezionato === 'rsa_standalone'
+              ? this.rsaStandaloneTarghe.filter(t => t.targa.trim()).map(t => mkRsa('v_' + t.targa.toUpperCase()))
+              : []),
+            ...(isRsaOnly && this.creditCheckStatus === 'ok_rsa_only' && this.targhe[0]
+              ? [mkRsa('v_' + this.targhe[0].toUpperCase())]
+              : []),
+          ],
         },
         ...this.contrattiAggiuntivi.map((c, i) => ({
           id: 'c' + (i + 2) + '_' + cf.substring(0, 8),
@@ -5776,35 +5908,20 @@ function tabletApp() {
           iban: c.iban,
           totale: this.calcContrattoAggiuntoTotal(c),
           dispositivi: [
-            { tipo: 'obu', codice: '', veicoloId: 'v_' + c.obu1Targa.toUpperCase(), furtoSmarrimento: c.obu1Furto, stato: 'attivo' },
-            ...(c.hasObu2 && c.obu2Targa ? [{ tipo: 'obu', codice: '', veicoloId: 'v_' + c.obu2Targa.toUpperCase(), furtoSmarrimento: c.obu2Furto, stato: 'attivo' }] : []),
-            ...(c.rsaStandalone || []).filter(r => r.targa && r.targa.trim()).map(r => ({
-              tipo: 'rsa_standalone', codice: '', veicoloId: 'v_' + r.targa.toUpperCase(), furtoSmarrimento: false, stato: 'attivo',
-            })),
+            { tipo: 'obu', codice: '', veicoloId: 'v_' + c.obu1Targa.toUpperCase(), furtoSmarrimento: c.obu1Furto, stato: 'attivo',
+              serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } },
+            ...(c.hasObu2 && c.obu2Targa ? [{ tipo: 'obu', codice: '', veicoloId: 'v_' + c.obu2Targa.toUpperCase(), furtoSmarrimento: c.obu2Furto, stato: 'attivo',
+              serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } }] : []),
+          ],
+          serviziRsa: [
+            ...(c.obu1Rsa && c.obu1Targa ? [mkRsa('v_' + c.obu1Targa.toUpperCase())] : []),
+            ...(c.hasObu2 && c.obu2Rsa && c.obu2Targa ? [mkRsa('v_' + c.obu2Targa.toUpperCase())] : []),
+            ...(c.rsaStandalone || []).filter(r => r.targa && r.targa.trim()).map(r => mkRsa('v_' + r.targa.toUpperCase())),
           ],
         })),
       ];
 
-      // 3. Costruisce serviziRsa[] — da toggle RSA su ogni slot OBU + standalone
-      let rsaIdx = 1;
-      const serviziRsa = [];
-      const addRsa = vid => serviziRsa.push({ id: 'rsa_' + String(rsaIdx++).padStart(3, '0'), veicoloId: vid, tipo: 'assistenza_stradale', stato: 'attivo', costo: 2.00 });
-      if (!isRsaOnly) {
-        if (this.obu1Rsa && obu1Targa) addRsa('v_' + obu1Targa);
-        if (this.hasObu2 && this.obu2Rsa && obu2Targa) addRsa('v_' + obu2Targa);
-        this.rsaStandalone.filter(r => r.targa.trim()).forEach(r => addRsa('v_' + r.targa.toUpperCase()));
-      } else if (this.tabletServizioSelezionato === 'rsa_standalone') {
-        this.rsaStandaloneTarghe.filter(t => t.targa.trim()).forEach(t => addRsa('v_' + t.targa.toUpperCase()));
-      } else if (this.creditCheckStatus === 'ok_rsa_only' && this.targhe[0]) {
-        addRsa('v_' + this.targhe[0].toUpperCase());
-      }
-      this.contrattiAggiuntivi.forEach(c => {
-        if (c.obu1Rsa && c.obu1Targa) addRsa('v_' + c.obu1Targa.toUpperCase());
-        if (c.hasObu2 && c.obu2Rsa && c.obu2Targa) addRsa('v_' + c.obu2Targa.toUpperCase());
-        (c.rsaStandalone || []).filter(r => r.targa && r.targa.trim()).forEach(r => addRsa('v_' + r.targa.toUpperCase()));
-      });
-
-      // 4. Costruisce ClienteRecord aggiornando record esistente o creandone uno nuovo
+      // 3. Costruisce ClienteRecord aggiornando record esistente o creandone uno nuovo
       const baseRecord = existing || {
         cf,
         nome: this.cliente.nome,
@@ -5825,13 +5942,11 @@ function tabletApp() {
           dataFirma: null,
         },
         contratti: [],
-        serviziRsa: [],
         serviziAttivi: {
-          areac:      { attivo: false },
-          parcheggi:  { attivo: false },
           strisceBlu: { attivo: false },
           memo:       { attivo: false },
         },
+        _v3migrated: true,
         movimenti: [],
       };
       // Merge veicoli: unisci quelli nuovi con esistenti (deduplica per id)
@@ -5844,19 +5959,36 @@ function tabletApp() {
         mandatoSdd: true,
         dataFirma: now,
       };
-      // Se sono stati accettati ora, aggiorna anche privacy e informativaPrecontrattuale
-      if (this.consensiCrm.privacy) mergedConsensi.privacy = true;
-      if (this.consensiCrm.informativaPrecontrattuale) mergedConsensi.informativaPrecontrattuale = true;
-      if (this.consensiCrm.nAndCMemo) mergedConsensi.terminiECondizioni = true;
+      // Primo OTP confermato → flag obbligatori (precontrattuale, privacy, T&C Memo) certificati in blocco
+      const otpConfirmed = this.otpSmsStatus === 'confirmed';
+      if (otpConfirmed) {
+        mergedConsensi.informativaPrecontrattuale = true;
+        mergedConsensi.privacy = true;
+        mergedConsensi.terminiECondizioni = true;
+      } else {
+        // Fallback per vecchi flussi (mock/demo senza OTP): rispetta checkbox manuali
+        if (this.consensiCrm.privacy) mergedConsensi.privacy = true;
+        if (this.consensiCrm.informativaPrecontrattuale) mergedConsensi.informativaPrecontrattuale = true;
+        if (this.consensiCrm.nAndCMemo) mergedConsensi.terminiECondizioni = true;
+      }
+      // Secondo OTP (firma contratto) confermato → accetta T&C Telepedaggio
+      if (this.firmaStatus === 'signed') {
+        mergedConsensi.terminiTelepedaggio = true;
+      }
       if (this.consensiCrm.marketing) mergedConsensi.marketing = true;
       if (this.consensiCrm.profilazione) mergedConsensi.profilazione = true;
+      // telefonoVerificato: se OTP confermato, oggetto pieno; altrimenti mantiene quello esistente o default
+      const telefonoVerificato = otpConfirmed
+        ? { verificato: true, numero: this.cliente.telefono || null, data: now }
+        : (baseRecord.telefonoVerificato || { verificato: false, numero: null, data: null });
       const clienteRecord = {
         ...baseRecord,
         veicoli: mergedVeicoli,
         consensi: mergedConsensi,
+        telefonoVerificato,
         contratti,
-        serviziRsa,
-        // serviziAttivi rimangono invariati (sono già false)
+        _v3migrated: true,
+        // serviziAttivi rimangono invariati (solo strisceBlu e memo)
       };
 
       // 1. Salva come source of truth in clientiDemo (PRIMA di emettere eventi)
@@ -5883,9 +6015,10 @@ function tabletApp() {
       localStorage.setItem('clienteAttivo', this.cliente.cf);
 
       // Attiva ogni RSA con delay progressivo (emette veicoloId + targa)
-      for (let i = 0; i < serviziRsa.length; i++) {
+      const allServiziRsa = contratti.flatMap(c => c.serviziRsa || []);
+      for (let i = 0; i < allServiziRsa.length; i++) {
         await new Promise(r => setTimeout(r, 200 * (i + 1)));
-        const rsa = serviziRsa[i];
+        const rsa = allServiziRsa[i];
         Bus.emit('servizio:attivato', {
           servizio: 'rsa',
           veicoloId: rsa.veicoloId,
@@ -6019,8 +6152,8 @@ function tabletApp() {
         veicoli: targa ? [{ id: 'v_' + targa, targa, tipo: 'Auto', marca: '', modello: '', scadenze: {} }] : [],
         consensi: { privacy: false, informativaPrecontrattuale: false, terminiECondizioni: false, marketing: false, profilazione: false, mandatoSdd: false, dataFirma: null },
         contratti: [],
-        serviziRsa: [],
-        serviziAttivi: { areac: { attivo: false }, parcheggi: { attivo: false }, strisceBlu: { attivo: false }, memo: { attivo: false } },
+        serviziAttivi: { strisceBlu: { attivo: false }, memo: { attivo: false } },
+        _v3migrated: true,
         movimenti: [],
       };
       this._saveClienteDemo(record);
@@ -6126,15 +6259,21 @@ function tabletApp() {
         Array.isArray(c.dispositivi)
           ? c.dispositivi.filter(d => d.tipo === 'obu').map(d => {
               const targa = (r.veicoli || []).find(v => v.id === d.veicoloId)?.targa || d.veicoloId?.replace(/^v_/, '') || '';
-              const hasRsa = (r.serviziRsa || []).some(rs => rs.veicoloId === d.veicoloId && rs.stato === 'attivo');
-              return { codice: d.codice, targa, rsa: hasRsa, furto: !!d.furtoSmarrimento, stato: d.stato || 'attivo' };
+              const hasRsa = (c.serviziRsa || []).some(rs => rs.veicoloId === d.veicoloId && rs.stato === 'attivo');
+              return { codice: d.codice, targa, rsa: hasRsa, furto: !!d.furtoSmarrimento, stato: d.stato || 'attivo',
+                       serviziAbilitati: d.serviziAbilitati };
             })
           : (c.obu || []).map(o => ({ codice: o.codice, targa: o.targa, rsa: !!o.rsa, furto: !!o.furto, stato: o.stato || 'attivo' }))
       );
       const sa = r.serviziAttivi || {};
+      const hasAnyRsa       = (r.contratti || []).some(c => (c.serviziRsa || []).some(rs => rs.stato === 'attivo'));
+      const hasAnyAreaC     = (r.contratti || []).some(c => (c.dispositivi || []).some(d => d.serviziAbilitati?.areac?.attivo));
+      const hasAnyParcheggi = (r.contratti || []).some(c => (c.dispositivi || []).some(d => d.serviziAbilitati?.parcheggi?.attivo));
       const serviziAttivi = [
         ...(obu.some(o => o.stato === 'attivo') ? ['telepedaggio'] : []),
-        ...((r.serviziRsa || []).some(rs => rs.stato === 'attivo') ? ['rsa'] : []),
+        ...(hasAnyRsa       ? ['rsa']      : []),
+        ...(hasAnyAreaC     ? ['areac']    : []),
+        ...(hasAnyParcheggi ? ['parcheggi']: []),
         ...Object.keys(sa).filter(k => sa[k]?.attivo),
       ];
       const primoContratto = (r.contratti || [])[0];
@@ -6148,7 +6287,6 @@ function tabletApp() {
         domicilio: residenza,
         veicoli,
         contratti: r.contratti || [],
-        serviziRsa: r.serviziRsa || [],
         obu,
         serviziAttivi,
         metodoPagamento: primoContratto

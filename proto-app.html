@@ -981,8 +981,8 @@
         this.tpSospeso = false;
         this.tpSaldo   = this.tpActive ? 5.00 : 0;
 
-        // --- RSA (derivato da serviziRsa[]) ---
-        this.rsaAttiva = (p.serviziRsa || []).some(r => r.stato === 'attivo');
+        // --- RSA (derivato da contratti[].serviziRsa[]) ---
+        this.rsaAttiva = (p.contratti || []).some(c => (c.serviziRsa || []).some(r => r.stato === 'attivo'));
         if (this.rsaAttiva) {
           const seed = parseInt((this._clienteCf).replace(/\D/g,'').slice(0, 5) || '00000', 10);
           this.rsaCodiceTessera = 'RSA-' + new Date().getFullYear() + '-' + String(seed).padStart(5,'0');
@@ -990,9 +990,12 @@
           this.rsaCodiceTessera = '';
         }
 
-        // --- Area C ---
-        this.acAttiva         = p.serviziAttivi?.areac?.attivo || false;
+        // --- Area C (derivato da contratti[].dispositivi[].serviziAbilitati) ---
         this.acTargaAbilitata = this.garageVehicles[0]?.targa || '';
+        const _acVid = 'v_' + this.acTargaAbilitata.toUpperCase();
+        this.acAttiva = (p.contratti || []).some(c =>
+          (c.dispositivi || []).some(d => d.veicoloId === _acVid && d.serviziAbilitati?.areac?.attivo)
+        );
 
         // --- Metodi di pagamento ---
         const iban = p.contratti?.[0]?.iban || '';
@@ -1044,14 +1047,26 @@
 
       _updateServizioAttivo(servizio, update) {
         if (!this._clienteCf) return;
-        // rsa e telepedaggio sono derivati da serviziRsa[] e contratti[] — non in serviziAttivi
         if (servizio === 'rsa' || servizio === 'telepedaggio') return;
         try {
           const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
           const record = reg[this._clienteCf];
           if (!record) return;
-          if (!record.serviziAttivi) record.serviziAttivi = {};
-          record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+          if (servizio === 'areac' || servizio === 'parcheggi') {
+            const vid = 'v_' + (this.acTargaAbilitata || '').toUpperCase();
+            (record.contratti || []).forEach(c =>
+              (c.dispositivi || []).forEach(d => {
+                if (d.veicoloId === vid) {
+                  if (!d.serviziAbilitati) d.serviziAbilitati = { areac: { attivo: false }, parcheggi: { attivo: false } };
+                  d.serviziAbilitati[servizio] = { ...(d.serviziAbilitati[servizio] || {}), ...update };
+                }
+              })
+            );
+          } else {
+            if (!record.serviziAttivi) record.serviziAttivi = {};
+            record.serviziAttivi[servizio] = { ...(record.serviziAttivi[servizio] || {}), ...update };
+          }
+          reg[record.cf.toUpperCase()] = record;
           localStorage.setItem('clientiDemo', JSON.stringify(reg));
         } catch(_) {}
       },
@@ -1069,7 +1084,7 @@
         this.consensiPendenti = {};
       },
 
-      _updateConsensi(consensi) {
+      _updateConsensi(consensi, rootExtras) {
         if (!this._clienteCf) return;
         try {
           const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
@@ -1078,6 +1093,10 @@
           if (!record.consensi) record.consensi = {};
           // Merge con eventuali consensi esistenti
           record.consensi = { ...record.consensi, ...consensi, dataFirma: new Date().toISOString() };
+          // Campi root (es. telefonoVerificato) — merge shallow
+          if (rootExtras && typeof rootExtras === 'object') {
+            Object.assign(record, rootExtras);
+          }
           localStorage.setItem('clientiDemo', JSON.stringify(reg));
         } catch(_) {}
       },
@@ -1118,11 +1137,23 @@
       smsConfirmDoc(template) {
         if (template === 'OTP_CONSENSI') {
           this.smsOtpShown = '1234';
-          // Salva consensi obbligatori (informativa precontrattuale e privacy) in clientiDemo
-          this._updateConsensi({ informativaPrecontrattuale: true, privacy: true });
-          if (typeof Bus !== 'undefined') Bus.emit('documento:firmato', { template: 'OTP_CONSENSI' });
+          // Primo OTP: certifica numero di telefono e flagga in blocco
+          // informativa precontrattuale, privacy, T&C Memo (terminiECondizioni)
+          const now = new Date().toISOString();
+          const reg = (() => { try { return JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) { return {}; } })();
+          const numero = reg?.[this._clienteCf]?.contatti?.telefono || null;
+          this._updateConsensi(
+            { informativaPrecontrattuale: true, privacy: true, terminiECondizioni: true },
+            { telefonoVerificato: { verificato: true, numero, data: now } }
+          );
+          if (typeof Bus !== 'undefined') {
+            Bus.emit('documento:firmato', { template: 'OTP_CONSENSI' });
+            Bus.emit('cliente:telefono_verificato', { cf: this._clienteCf, numero, data: now });
+          }
         } else if (template === 'FIRMA_CONTRATTO') {
           this.smsOtpShown = '5678';
+          // Secondo OTP: firma contratto → accetta T&C Telepedaggio
+          this._updateConsensi({ terminiTelepedaggio: true });
           if (typeof Bus !== 'undefined') Bus.emit('documento:firmato', { template: 'FIRMA_CONTRATTO' });
         } else if (template === 'CONSENSI_MARKETING') {
           this.smsOtpShown = '9012';
