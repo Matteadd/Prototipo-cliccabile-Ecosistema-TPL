@@ -6419,7 +6419,41 @@ function tabletApp() {
     // ============================================================
     // ASSISTENZA — NAVIGAZIONE GRIGLIA
     // ============================================================
+    _checkAnagraficaPreAzione(azione) {
+      const c = this.assistCliente;
+      if (!c) return true;
+      const rawRecord = this._getClientiDemo()[c.cf?.toUpperCase()];
+      const missing = [];
+      if (!c.nome?.trim())      missing.push('nome');
+      if (!c.cognome?.trim())   missing.push('cognome');
+      if (!c.cellulare?.trim()) missing.push('telefono');
+      if (!c.email?.trim())     missing.push('email');
+      if (!rawRecord?.consensi?.privacy) missing.push('privacy');
+      if (!rawRecord?.consensi?.mandatoSdd) missing.push('mandatoSdd');
+      if (['cambio-pagamento'].includes(azione)) {
+        const primoContratto = (rawRecord?.contratti || [])[0];
+        if (!primoContratto?.iban?.trim()) missing.push('iban');
+      }
+      if (missing.length === 0) return true;
+      this.missingFields = missing;
+      this.aggiornaDatiForm = {
+        nome:       c.nome || '',
+        cognome:    c.cognome || '',
+        telefono:   c.cellulare || '',
+        email:      c.email || '',
+        privacy:    !!rawRecord?.consensi?.privacy,
+        mandatoSdd: !!rawRecord?.consensi?.mandatoSdd,
+      };
+      this.quickObuNextStep = 'flusso';
+      this.assistAzione = azione;
+      this.assistStep = 'aggiorna-scheda';
+      window.scrollTo(0, 0);
+      this.showToastMsg('Dati obbligatori mancanti — compila il form per procedere', 'error', 4000);
+      return false;
+    },
+
     avviaAzione(azione) {
+      if (!this._checkAnagraficaPreAzione(azione)) return;
       this.assistAzione = azione;
       this.assistStep = 'flusso';
       this.resetAssistOp();
@@ -6579,7 +6613,6 @@ function tabletApp() {
     },
 
     confermaProcediQuickObu() {
-      // Carica il cliente trovato come assistCliente e salta direttamente al flusso
       this.assistCliente = this.quickObuSearchResult;
       const c = this.assistCliente;
       Object.assign(this.assistForm, {
@@ -6587,57 +6620,32 @@ function tabletApp() {
         resCitta: c.residenza.citta, resProvincia: c.residenza.provincia,
         domVia: c.domicilio.via,   domCap: c.domicilio.cap,
         domCitta: c.domicilio.citta, domProvincia: c.domicilio.provincia,
-        email: c.email,
-        cellulare: c.cellulare,
+        email: c.email, cellulare: c.cellulare,
         veicoli: JSON.parse(JSON.stringify(c.veicoli)),
       });
-      // Pre-imposta OBU per sostituisci-obu (identificato via scanner/codice manuale)
       if (this.quickObuAction === 'sostituisci-obu' && this.obuScannedCode) {
         this.assistForm.obuSelezionato = this.obuScannedCode;
-        const obuEntry = (this.assistCliente.obu || []).find(o => o.codice === this.obuScannedCode)
-          || (this.assistCliente.obu || [])[0];
+        const obuEntry = (c.obu || []).find(o => o.codice === this.obuScannedCode) || (c.obu || [])[0];
         if (obuEntry) {
-          const rsaEntry = (this.assistCliente.serviziRsa || []).find(r => r.veicoloId === 'v_' + obuEntry.targa && r.stato === 'attivo');
+          const raws = this._getClientiDemo()[c.cf?.toUpperCase()];
+          const rsaEntry = (raws?.contratti || []).flatMap(ct => ct.serviziRsa || [])
+            .find(r => r.veicoloId === 'v_' + obuEntry.targa && r.stato === 'attivo');
           if (rsaEntry) {
             this.assistForm.codicePolizzaRsa = rsaEntry.codicePolizza || '';
             this.assistForm.rsaVeicoloIdSostituzione = rsaEntry.veicoloId;
           }
         }
       }
-      // Pre-imposta contratto per cambio-pagamento
       if (this.quickObuAction === 'cambio-pagamento') {
         this.assistForm.contrattoSelezionato = this.quickPagamentoContrattoId;
         this.assistForm.iban = '';
       }
-
-      // Validazione campi obbligatori scheda cliente
-      const rawRecord = this._getClientiDemo()[c.cf?.toUpperCase()];
-      const missing = [];
-      if (!c.nome?.trim())      missing.push('nome');
-      if (!c.cognome?.trim())   missing.push('cognome');
-      if (!c.cellulare?.trim()) missing.push('telefono');
-      if (!c.email?.trim())     missing.push('email');
-      if (!rawRecord?.consensi?.privacy) missing.push('privacy');
-      if (missing.length > 0) {
-        this.missingFields = missing;
-        this.aggiornaDatiForm = {
-          nome:     c.nome || '',
-          cognome:  c.cognome || '',
-          telefono: c.cellulare || '',
-          email:    c.email || '',
-          privacy:  !!rawRecord?.consensi?.privacy,
-        };
-        this.quickObuNextStep = 'flusso';
-        this.assistAzione = this.quickObuAction;
+      if (!this._checkAnagraficaPreAzione(this.quickObuAction)) {
         this.quickObuAction = null;
         this.quickObuSearchStatus = null;
         this.quickPagamentoContrattoId = null;
-        this.assistStep = 'aggiorna-scheda';
-        window.scrollTo(0, 0);
-        this.showToastMsg('Dati obbligatori mancanti — compila il form per procedere', 'error', 4000);
         return;
       }
-
       this.assistAzione = this.quickObuAction;
       this.assistStep = 'flusso';
       this.quickObuAction = null;
