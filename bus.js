@@ -22,6 +22,7 @@
  *   memo:scadenza         | app → crm          | { tipo, targa, data }
  *   crm:aggiornato        | crm → app          | { campo, valore }
  *   scenario:trigger      | emulatore → app    | { nome, params }
+ *   email:outbound        | tablet → (mock)    | { id, to, template, subject, otpCode, nome, preview }
  */
 
 /**
@@ -177,6 +178,11 @@ function migrateClienteRecord(r) {
   // Default telefonoVerificato per record esistenti (idempotente)
   if (!r.telefonoVerificato || typeof r.telefonoVerificato !== 'object') {
     r.telefonoVerificato = { verificato: false, numero: null, data: null };
+  }
+
+  // Default emailVerificata per record esistenti (idempotente)
+  if (!r.emailVerificata || typeof r.emailVerificata !== 'object') {
+    r.emailVerificata = { verificata: false, email: null, data: null };
   }
 
   return r;

@@ -944,14 +944,19 @@
 
                 <template x-if="otpEmailStatus === 'sent'">
                   <div class="space-y-3">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                      <i class="fas fa-info-circle mr-1.5"></i>
+                      Email inviata a <span x-text="cliente.email"></span>. Il cliente riceve il codice OTP nella propria casella.
+                    </div>
                     <div class="flex items-center gap-3">
                       <input x-model="otpEmailInput" type="text" class="form-input otp-input w-32 text-center text-xl tracking-widest"
-                        placeholder="1234" maxlength="4" />
+                        placeholder="3456" maxlength="4" />
                       <button class="btn-primary text-sm" @click="confirmOtpEmail()">Conferma</button>
                       <button class="btn-ghost text-sm" @click="sendOtpEmail()">
                         <i class="fas fa-redo text-xs"></i> Rigenera
                       </button>
                     </div>
+                    <p class="text-xs text-gray-400">OTP demo: <strong>3456</strong></p>
                   </div>
                 </template>
               </div>
@@ -4501,6 +4506,9 @@
         <button class="demo-btn" @click="demoFillOtp('consensi')" title="Incolla OTP 1234 nel campo verifica contatti">
           <i class="fas fa-key mr-1 text-yellow-400"></i> OTP Consensi (1234)
         </button>
+        <button class="demo-btn" @click="demoFillOtp('email')" title="Incolla OTP 3456 nel campo verifica email">
+          <i class="fas fa-envelope mr-1 text-blue-400"></i> OTP Email (3456)
+        </button>
         <button class="demo-btn" @click="demoFillOtp('marketing')" title="Incolla OTP 9012 nel campo consensi marketing">
           <i class="fas fa-key mr-1 text-pink-400"></i> OTP Marketing (9012)
         </button>
@@ -4641,6 +4649,7 @@ function tabletApp() {
     otpEmailValue: '', otpEmailStatus: null,
     otpSmsInput: '', otpEmailInput: '',
     otpSmsFieldEnabled: false,
+    emailVerificata: false,
     mktSmsStatus: null,
     mktSmsOtpInput: '',
     mktSmsOtpFieldEnabled: false,
@@ -4913,6 +4922,16 @@ function tabletApp() {
         // Salva cliente parziale prima di passare alla verifica Cerved (step 2 → 3)
         if (this.currentStep === 2) {
           this._salvaClienteParziale();
+          if (this.cliente.email?.trim()) {
+            Bus.emit('email:outbound', {
+              template: 'ONBOARDING',
+              to: this.cliente.email,
+              subject: 'Benvenuto in Enilive — le tue credenziali di accesso',
+              preview: 'Ciao ' + this.cliente.nome + ', benvenuto nel mondo Enilive!',
+              nome: this.cliente.nome,
+              username: this.cliente.email,
+            });
+          }
           // Cliente esistente con verifica Cerved già registrata: salta step 3
           if (this.cfAlreadyExists && (this.creditCheckStatus === 'ok_full' || this.creditCheckStatus === 'ok_rsa_only')) {
             this.currentStep = 4;
@@ -5082,24 +5101,29 @@ function tabletApp() {
         modello: '',
         scadenze: {},
       }));
-      // Consensi: se già presenti in CRM (cliente esistente) o default false
-      const consensi = this.cfAlreadyExists ? {
+      // Consensi: usa sempre lo state corrente di consensiCrm
+      const obbligatoriConfermati = this.otpSmsStatus === 'confirmed';
+      const consensi = {
         privacy: this.consensiCrm.privacy,
         informativaPrecontrattuale: this.consensiCrm.informativaPrecontrattuale,
         terminiECondizioni: this.consensiCrm.nAndCMemo,
         marketing: this.consensiCrm.marketing,
         profilazione: this.consensiCrm.profilazione,
-        mandatoSdd: false, // ancora non firmato
-        dataFirma: null,
-      } : {
-        privacy: false,
-        informativaPrecontrattuale: false,
-        terminiECondizioni: false,
-        marketing: false,
-        profilazione: false,
         mandatoSdd: false,
-        dataFirma: null,
+        dataFirma: obbligatoriConfermati ? now : null,
       };
+      const telefonoVerificato = {
+        verificato: this.telefonoCertificato,
+        numero: this.telefonoCertificato ? (this.cliente.telefono || null) : null,
+        data: this.telefonoCertificato ? now : null,
+      };
+      const emailVerificata = {
+        verificata: this.emailVerificata,
+        email: this.emailVerificata ? (this.cliente.email || null) : null,
+        data: this.emailVerificata ? now : null,
+      };
+      // Preserva contratti e movimenti se cliente già esistente
+      const esistente = this._lookupClienteDemo(cf);
       const record = {
         cf,
         nome: this.cliente.nome,
@@ -5107,17 +5131,19 @@ function tabletApp() {
         dataNascita: this.cliente.dataNascita,
         contatti: { telefono: this.cliente.telefono, email: this.cliente.email },
         indirizzo: { via: this.cliente.indirizzo, civico: this.cliente.civico, comune: this.cliente.comune, prov: this.cliente.provincia, cap: this.cliente.cap },
-        dataRegistrazione: now,
+        dataRegistrazione: esistente?.dataRegistrazione || now,
         canale: 'stazione',
         veicoli,
         consensi,
-        contratti: [],
-        serviziAttivi: {
+        telefonoVerificato,
+        emailVerificata,
+        contratti: esistente?.contratti || [],
+        serviziAttivi: esistente?.serviziAttivi || {
           strisceBlu: { attivo: false },
           memo: { attivo: false },
         },
         _v3migrated: true,
-        movimenti: [],
+        movimenti: esistente?.movimenti || [],
       };
       this._saveClienteDemo(record);
       // Emetti evento cliente:registrato? No, perché ancora non ha contratti.
@@ -5427,10 +5453,11 @@ function tabletApp() {
       const input = this.otpSmsInput.trim();
       if (/^\d{4}$/.test(input)) {
         this.otpSmsStatus = 'confirmed';
-        // Primo OTP: certifica numero di telefono e flagga consensi obbligatori
-        // (informativa precontrattuale, privacy, T&C Memo) in clientiDemo.
-        // Se il cliente non è ancora stato salvato (cf non presente) si limita a
-        // settare lo stato locale: il flag verrà persistito da completaOnboarding.
+        this.telefonoCertificato = true;
+        this.consensiCrm.informativaPrecontrattuale = true;
+        this.consensiCrm.privacy = true;
+        this.consensiCrm.nAndCMemo = true;
+        // Persisti in localStorage se il record esiste già (cliente esistente)
         try {
           const cf = (this.cliente.cf || '').toUpperCase();
           if (cf) {
@@ -5488,24 +5515,29 @@ function tabletApp() {
     },
 
     sendOtpEmail() {
-      if (!this.cliente.email.trim()) {
+      if (!this.cliente.email?.trim()) {
         this.otpEmailStatus = 'skipped';
         this.showToastMsg('Email non fornita — step saltato (facoltativo)', 'info');
         return;
       }
       this.otpEmailStatus = 'sent';
       Bus.emit('email:outbound', {
+        id: 'email_otp_' + Date.now(),
         to: this.cliente.email,
-        subject: 'Verifica indirizzo email',
-        preview: 'Clicca qui per verificare il tuo indirizzo email...',
+        template: 'OTP_EMAIL',
+        subject: 'Verifica il tuo indirizzo email — Enilive',
+        otpCode: '3456',
+        nome: this.cliente.nome,
+        preview: 'Ciao ' + this.cliente.nome + ', usa il codice 3456 per verificare il tuo indirizzo email',
       });
       this.showToastMsg('Email di verifica inviata a ' + this.cliente.email, 'info');
     },
 
     confirmOtpEmail() {
       const input = this.otpEmailInput.trim();
-      if (/^\d{4}$/.test(input)) {
+      if (input === '3456') {
         this.otpEmailStatus = 'confirmed';
+        this.emailVerificata = true;
         this.showToastMsg('Email verificata', 'success');
       } else {
         this.showToastMsg('OTP non valido — riprova', 'error');
@@ -6040,8 +6072,10 @@ function tabletApp() {
         this.showWelcomeModal = true;
         Bus.emit('email:outbound', {
           to: this.cliente.email,
+          template: 'BENVENUTO',
           subject: 'Benvenuto in Enilive Mobility+ — copia contratto',
           preview: 'Benvenuto! In allegato la tua copia del contratto e le istruzioni di attivazione...',
+          nome: this.cliente.nome,
         });
         this.showToastMsg('Email di benvenuto inviata a ' + (this.cliente.email || 'cliente'), 'success');
       }, 1500);
@@ -6110,6 +6144,7 @@ function tabletApp() {
         consensiCrm: { privacy: true, informativaPrecontrattuale: false, nAndCMemo: false, marketing: false, profilazione: false },
         consensiSmsOpzionale: false,
         otpSmsFieldEnabled: false,
+        emailVerificata: false,
         mktSmsStatus: null, mktSmsOtpInput: '', mktSmsOtpFieldEnabled: false,
         mktCustomerMarketing: false, mktCustomerProfilazione: false,
       });
@@ -6168,6 +6203,9 @@ function tabletApp() {
       if (tipo === 'consensi') {
         this.otpSmsInput = '1234';
         this.confirmOtpSms();
+      } else if (tipo === 'email') {
+        this.otpEmailInput = '3456';
+        this.confirmOtpEmail();
       } else if (tipo === 'marketing') {
         this.mktSmsOtpInput = '9012';
         this.confirmMktOtp();

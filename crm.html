@@ -488,16 +488,6 @@
 
             // serviziInfo: telepedaggio derivato da contratti[].dispositivi[], rsa da serviziRsa[]
             const si = _emptyServiziInfo();
-            const obuDisp = (d.contratti || []).flatMap(c => (c.dispositivi || []).filter(dd => dd.tipo === 'obu'));
-            si.telepedaggio.attivo = obuDisp.some(dd => dd.stato === 'attivo');
-            si.telepedaggio.obu    = obuDisp[0]?.codice || '';
-            si.rsa.attivo          = (d.contratti || []).some(c => (c.serviziRsa || []).some(r => r.stato === 'attivo'));
-            si.rsa.dataAttivazione = null;
-            // areac, parcheggi — da dispositivi[].serviziAbilitati
-            si.areac.attivo = (d.contratti || []).some(c =>
-              (c.dispositivi || []).some(dd => dd.serviziAbilitati?.areac?.attivo));
-            si.parcheggi.attivo = (d.contratti || []).some(c =>
-              (c.dispositivi || []).some(dd => dd.serviziAbilitati?.parcheggi?.attivo));
             // strisceBlu, memo — da serviziAttivi
             if (d.serviziAttivi) {
               const KEY_MAP = { strisceBlu: 'strisce_blu', memo: 'memo' };
@@ -527,13 +517,14 @@
               tc.tc_telepedaggio.accettato             = !!d.consensi.terminiTelepedaggio;
               tc.tc_telepedaggio.data                  = d.consensi.terminiTelepedaggio ? d.consensi.dataFirma : null;
             }
-            if (si.telepedaggio.attivo && !tc.tc_telepedaggio.accettato) {
+            if (si.telepedaggio?.attivo && !tc.tc_telepedaggio.accettato) {
               // fallback retrocompatibile: se OBU attivo ma consenso mancante, usa dataAttivazione contratto
               tc.tc_telepedaggio.accettato = true;
               tc.tc_telepedaggio.data = (d.contratti || [])[0]?.dataAttivazione || null;
             }
 
             // veicoli: da d.veicoli[], con servizi derivati per targa
+            const obuDisp = (d.contratti || []).flatMap(c => c.dispositivi || []);
             const veicoli = (d.veicoli || []).filter(Boolean).map(v => {
               const vid = v.id;
               const hasObu = obuDisp.some(dd => dd.veicoloId === vid && dd.stato === 'attivo');

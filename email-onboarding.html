@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benvenuto in Enilive</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: 'DM Sans', sans-serif;
+      color: #111827;
+    }
+
+    .email-header {
+      background: #117299;
+      padding: 20px;
+    }
+
+    .email-header .tagline {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .email-body {
+      padding: 24px;
+      background: #ffffff;
+    }
+
+    .email-body .greeting {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+    }
+
+    .email-body .description {
+      font-size: 14px;
+      color: #374151;
+      line-height: 1.6;
+      margin: 0 0 24px 0;
+    }
+
+    .username-box {
+      margin: 0 auto 24px auto;
+      background: #e6f0f6;
+      border-radius: 16px;
+      padding: 24px;
+      border: 2px solid #117299;
+      text-align: center;
+    }
+
+    .username-label {
+      color: #117299;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .username-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0d4f6f;
+      word-break: break-all;
+      line-height: 1.3;
+    }
+
+    .username-sub {
+      color: #6b7280;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    .steps-box {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 4px;
+    }
+
+    .steps-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #117299;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .step-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .step-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #117299;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text {
+      font-size: 13px;
+      color: #374151;
+      line-height: 1.5;
+    }
+
+    .email-security {
+      padding: 20px 24px;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .email-security .icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .email-security .text {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .email-footer {
+      padding: 20px 24px;
+      background: #f3f4f6;
+      text-align: center;
+    }
+
+    .email-footer .company {
+      font-size: 11px;
+      color: #9ca3af;
+      margin: 0 0 4px 0;
+    }
+
+    .email-footer .privacy {
+      font-size: 11px;
+      color: #117299;
+      margin: 0 0 6px 0;
+    }
+
+    .email-footer .copyright {
+      font-size: 10px;
+      color: #d1d5db;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="email-header">
+    <img src="enilive-logo.png" alt="Enilive" style="height:36px;display:block;margin-bottom:4px;">
+    <div class="tagline">I tuoi servizi di mobilità</div>
+  </div>
+
+  <div class="email-body">
+    <p class="greeting" id="greeting">Ciao Cliente,</p>
+    <p class="description">
+      Ti diamo il benvenuto nel mondo Enilive! Il tuo account è stato creato con successo.
+      Qui trovi le tue credenziali di accesso all'app Enilive Mobility+.
+    </p>
+
+    <div class="username-box">
+      <div class="username-label">La tua username</div>
+      <div class="username-value" id="username-value">—</div>
+      <div class="username-sub">Usa questa email per accedere all'app</div>
+    </div>
+
+    <div class="steps-box">
+      <p class="steps-title">Come iniziare</p>
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div class="step-text">Scarica l'app Enilive Mobility+ dal tuo store</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div class="step-text">Accedi con la tua username e il codice fiscale</div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div class="step-text">Gestisci i tuoi servizi di mobilità ovunque tu sia</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="email-security">
+    <span class="icon">⚠️</span>
+    <p class="text">
+      Se non hai richiesto la creazione di questo account, contatta immediatamente
+      il nostro supporto clienti.
+    </p>
+  </div>
+
+  <div class="email-footer">
+    <p class="company">Enilive S.p.A. — P.IVA 15869661004</p>
+    <p class="privacy">privacy@enilive.it</p>
+    <p class="copyright">© 2026 Enilive. Tutti i diritti riservati.</p>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const nome = params.get('nome') || 'Cliente';
+    const username = params.get('username') || '—';
+
+    document.getElementById('greeting').textContent = 'Ciao ' + nome + ',';
+    document.getElementById('username-value').textContent = username;
+  </script>
+
+</body>
+</html>
