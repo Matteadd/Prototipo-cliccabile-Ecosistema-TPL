@@ -4559,7 +4559,7 @@ function tabletApp() {
     quickPagamentoContrattoId: null,
     missingFields: [],
     quickObuNextStep: null,
-    aggiornaDatiForm: { nome: '', cognome: '', telefono: '', email: '', privacy: false },
+    aggiornaDatiForm: { nome: '', cognome: '', telefono: '', email: '', privacy: false, mandatoSdd: false },
     recuperoSearchQuery: '',
     recuperoSearchStatus: null,
     recuperoRawCf: null,
@@ -4588,6 +4588,7 @@ function tabletApp() {
       veicoli: [],
       obuSelezionato: '', nuovoObu: '', obuScanning: false,
       codicePolizzaRsa: '', rsaVeicoloIdSostituzione: null,
+      aggiornaRsaConTarga: true,
       nuovaTarga: '', targaWarning: false,
       vuoleSostitutivo: '',
       obuRicevuto: false,
@@ -6468,6 +6469,7 @@ function tabletApp() {
       this.assistOpSuccess = false;
       this.assistForm.codicePolizzaRsa = '';
       this.assistForm.rsaVeicoloIdSostituzione = null;
+      this.assistForm.aggiornaRsaConTarga = true;
     },
 
     // ============================================================
