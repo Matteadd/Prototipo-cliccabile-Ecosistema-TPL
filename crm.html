@@ -1630,6 +1630,19 @@
          ██████████████████████████████████████████████████████████████ -->
     <div class="col-scroll" style="border-right: 1px solid var(--color-border);">
 
+      <!-- Alert banner ───────────────────────────────────────── -->
+      <template x-if="alertList().length > 0">
+        <div class="rounded-lg px-3 py-2 mb-3 flex flex-wrap gap-1.5 items-center"
+             style="background:#fff7ed;border:1px solid #fed7aa;">
+          <i class="fa-solid fa-triangle-exclamation text-orange-500 text-xs mr-0.5 flex-shrink-0"></i>
+          <template x-for="(alert, idx) in alertList()" :key="idx">
+            <span class="badge"
+                  :class="alert.tipo==='danger'?'bg-red-100 text-red-700':'bg-orange-100 text-orange-700'"
+                  x-text="alert.msg"></span>
+          </template>
+        </div>
+      </template>
+
       <!-- Servizi ────────────────────────────────────────────────── -->
       <div class="card">
         <div class="card-header">
