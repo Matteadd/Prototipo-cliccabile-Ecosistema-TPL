@@ -1540,6 +1540,40 @@
         </div>
       </div>
 
+      <!-- Scadenze Memo ─────────────────────────────────────── -->
+      <template x-if="veicoli.some(v => v.scadenze)">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class="fa-solid fa-calendar-days mr-1.5"></i>Scadenze Memo</span>
+            <span class="text-xs font-semibold"
+                  :class="veicoli.some(v => v.scadenze && ['bollo','revisione','rca'].some(t => scadenzaStato(v.scadenze[t])==='scaduto')) ? 'text-red-500' : 'text-gray-400'"
+                  x-text="veicoli.filter(v => v.scadenze).length + ' veicol' + (veicoli.filter(v => v.scadenze).length===1?'o':'i')"></span>
+          </div>
+          <div class="card-body" style="padding-top:8px;padding-bottom:8px;">
+            <template x-for="v in veicoli.filter(v => v.scadenze)" :key="v.targa">
+              <div class="mb-3 last:mb-0">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <i class="fa-solid fa-car text-gray-400 text-xs"></i>
+                  <span class="font-mono font-bold text-sm" x-text="v.targa"></span>
+                </div>
+                <div class="space-y-1 ml-4">
+                  <template x-for="tipo in ['bollo','revisione','rca']" :key="tipo">
+                    <div x-show="v.scadenze[tipo]" class="flex items-center gap-2">
+                      <span class="w-16 text-xs text-gray-500 capitalize" x-text="tipo"></span>
+                      <span class="text-xs font-mono text-gray-600"
+                            x-text="formatDate(v.scadenze[tipo])"></span>
+                      <span class="badge" style="font-size:10px;"
+                            :class="scadenzaClass(scadenzaStato(v.scadenze[tipo]))"
+                            x-text="scadenzaStato(v.scadenze[tipo])==='ok'?'ok':(scadenzaStato(v.scadenze[tipo])==='in_scadenza'?'in scad.':'scaduto')"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
       <!-- Contratti ──────────────────────────────────────────────── -->
       <div class="card">
         <div class="card-header">
