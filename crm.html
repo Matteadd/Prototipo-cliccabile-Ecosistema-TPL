@@ -1205,6 +1205,37 @@
           }[stato] || 'bg-gray-100 text-gray-400';
         },
 
+        alertList() {
+          const c = this.ac();
+          if (!c || !c.anagrafica) return [];
+          const alerts = [];
+          (c.contratti || []).forEach(ct => {
+            (ct.dispositivi || []).forEach(dev => {
+              const targa = (dev.veicoloId || '').replace('v_', '');
+              if (dev.furtoSmarrimento) {
+                alerts.push({ tipo: 'danger', msg: `Furto/smarrimento: ${targa}` });
+              } else if (dev.stato === 'sospeso') {
+                alerts.push({ tipo: 'warning', msg: `OBU sospeso: ${targa}` });
+              }
+            });
+          });
+          if (c.tcFlags && c.tcFlags.privacy && !c.tcFlags.privacy.accettato) {
+            alerts.push({ tipo: 'warning', msg: 'Consenso privacy mancante' });
+          }
+          (c.veicoli || []).forEach(v => {
+            if (!v.scadenze) return;
+            ['bollo', 'revisione', 'rca'].forEach(tipo => {
+              const stato = this.scadenzaStato(v.scadenze[tipo]);
+              if (stato === 'scaduto') {
+                alerts.push({ tipo: 'danger', msg: `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} scaduto: ${v.targa}` });
+              } else if (stato === 'in_scadenza') {
+                alerts.push({ tipo: 'warning', msg: `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} in scadenza: ${v.targa}` });
+              }
+            });
+          });
+          return alerts;
+        },
+
         tcFlagsList() {
           return Object.entries(this.tcFlags).map(([key, val]) => ({ key, ...val }));
         },
