@@ -1042,7 +1042,25 @@
 
         // ── Computed ────────────────────────────────────────────────
         serviziList() {
-          return Object.entries(this.serviziInfo).map(([key, val]) => ({ key, ...val }));
+          return Object.entries(this.serviziInfo)
+            .filter(([key]) => key === 'strisce_blu' || key === 'memo')
+            .map(([key, val]) => ({ key, ...val }));
+        },
+
+        scadenzaStato(dataStr) {
+          if (!dataStr) return 'nd';
+          const diff = (new Date(dataStr) - new Date()) / (1000 * 60 * 60 * 24);
+          if (diff < 0) return 'scaduto';
+          if (diff <= 30) return 'in_scadenza';
+          return 'ok';
+        },
+        scadenzaClass(stato) {
+          return {
+            ok:          'bg-green-100 text-green-700',
+            in_scadenza: 'bg-amber-100 text-amber-700',
+            scaduto:     'bg-red-100 text-red-700',
+            nd:          'bg-gray-100 text-gray-400',
+          }[stato] || 'bg-gray-100 text-gray-400';
         },
 
         tcFlagsList() {
