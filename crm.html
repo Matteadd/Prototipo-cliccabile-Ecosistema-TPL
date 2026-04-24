@@ -1022,6 +1022,148 @@
           this._addLog('crm:servizio_riattivato', { servizio: key });
         },
 
+        sospendiObu(contrattoId, veicoloId) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const dev = (ct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+          if (!dev) return;
+          dev.stato = 'sospeso';
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rd = (rct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+              if (rd) rd.stato = 'sospeso';
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = veicoloId.replace('v_', '');
+          Bus.emit('crm:servizio_sospeso', { servizio: 'telepedaggio', contrattoId, veicoloId, targa });
+          this._addLog('crm:servizio_sospeso', { servizio: 'telepedaggio', targa });
+        },
+
+        riattivaObu(contrattoId, veicoloId) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const dev = (ct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+          if (!dev) return;
+          dev.stato = 'attivo';
+          dev.furtoSmarrimento = false;
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rd = (rct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+              if (rd) { rd.stato = 'attivo'; rd.furtoSmarrimento = false; }
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = veicoloId.replace('v_', '');
+          Bus.emit('crm:servizio_riattivato', { servizio: 'telepedaggio', contrattoId, veicoloId, targa });
+          this._addLog('crm:servizio_riattivato', { servizio: 'telepedaggio', targa });
+        },
+
+        segnalaFurtoObu(contrattoId, veicoloId) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const dev = (ct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+          if (!dev) return;
+          dev.stato = 'sospeso';
+          dev.furtoSmarrimento = true;
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rd = (rct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+              if (rd) { rd.stato = 'sospeso'; rd.furtoSmarrimento = true; }
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = veicoloId.replace('v_', '');
+          Bus.emit('crm:furto_smarrimento', { contrattoId, veicoloId, targa });
+          this._addLog('crm:furto_smarrimento', { targa });
+        },
+
+        sospendiRsa(contrattoId, rsaId) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const rsa = (ct.serviziRsa || []).find(r => r.id === rsaId);
+          if (!rsa) return;
+          rsa.stato = 'sospeso';
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rr = (rct.serviziRsa || []).find(r => r.id === rsaId);
+              if (rr) rr.stato = 'sospeso';
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = (rsa.veicoloId || '').replace('v_', '');
+          Bus.emit('crm:servizio_sospeso', { servizio: 'rsa', contrattoId, rsaId, targa });
+          this._addLog('crm:servizio_sospeso', { servizio: 'rsa', targa });
+        },
+
+        riattivaRsa(contrattoId, rsaId) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const rsa = (ct.serviziRsa || []).find(r => r.id === rsaId);
+          if (!rsa) return;
+          rsa.stato = 'attivo';
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rr = (rct.serviziRsa || []).find(r => r.id === rsaId);
+              if (rr) rr.stato = 'attivo';
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = (rsa.veicoloId || '').replace('v_', '');
+          Bus.emit('crm:servizio_riattivato', { servizio: 'rsa', contrattoId, rsaId, targa });
+          this._addLog('crm:servizio_riattivato', { servizio: 'rsa', targa });
+        },
+
+        toggleServizioDevice(contrattoId, veicoloId, servizio) {
+          const c = this.ac();
+          const ct = (c.contratti || []).find(x => x.id === contrattoId);
+          if (!ct) return;
+          const dev = (ct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+          if (!dev) return;
+          if (!dev.serviziAbilitati) dev.serviziAbilitati = { areac: { attivo: false }, parcheggi: { attivo: false } };
+          if (!dev.serviziAbilitati[servizio]) dev.serviziAbilitati[servizio] = { attivo: false };
+          const nuovoStato = !dev.serviziAbilitati[servizio].attivo;
+          dev.serviziAbilitati[servizio].attivo = nuovoStato;
+          const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+          const rec = reg[(c.anagrafica.cf || '').toUpperCase()];
+          if (rec) {
+            const rct = (rec.contratti || []).find(x => x.id === contrattoId);
+            if (rct) {
+              const rd = (rct.dispositivi || []).find(d => d.veicoloId === veicoloId);
+              if (rd) {
+                if (!rd.serviziAbilitati) rd.serviziAbilitati = { areac: { attivo: false }, parcheggi: { attivo: false } };
+                if (!rd.serviziAbilitati[servizio]) rd.serviziAbilitati[servizio] = { attivo: false };
+                rd.serviziAbilitati[servizio].attivo = nuovoStato;
+              }
+            }
+            localStorage.setItem('clientiDemo', JSON.stringify(reg));
+          }
+          const targa = veicoloId.replace('v_', '');
+          const evento = nuovoStato ? 'servizio:attivato' : 'servizio:disattivato';
+          Bus.emit(evento, { servizio, contrattoId, veicoloId, targa });
+          this._addLog(evento, { servizio, targa });
+        },
+
         // ── Ricerca targa ────────────────────────────────────────────
         cercaPerTarga() {
           const t = this.targaSearchInput.trim().toUpperCase();
