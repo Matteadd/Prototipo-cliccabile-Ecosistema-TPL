@@ -544,7 +544,7 @@
                 ...(hasObu ? ['telepedaggio'] : []),
                 ...(hasRsa ? ['rsa'] : []),
               ];
-              return { targa: v.targa, veicoloId: v.id, tipo: v.tipo || 'auto', marca: v.marca || '', modello: v.modello || '', servizi };
+              return { targa: v.targa, veicoloId: v.id, tipo: v.tipo || 'auto', marca: v.marca || '', modello: v.modello || '', servizi, scadenze: v.scadenze || null };
             });
             // fallback vecchio schema: _targa singola
             if (veicoli.length === 0 && d._targa) veicoli.push({ targa: d._targa, veicoloId: 'v_' + d._targa, tipo: 'auto', marca: '', modello: '', servizi: [] });
