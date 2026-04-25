@@ -7017,12 +7017,37 @@ function tabletApp() {
             Bus.emit('assistenza:rimodulazione_revocata', { cf, tipo_rimodulazione: this.assistForm.rimodulazioneSelezionata || 'sconto_moto' });
             this.showToastMsg('Rimodulazione revocata. Flusso Discounted List inviato.', 'success', 4000);
             break;
-          case 'disattivazione-servizio':
+          case 'disattivazione-servizio': {
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec) {
+                this.assistForm.serviziDaDisattivare.forEach(s => {
+                  if (['strisceBlu', 'memo'].includes(s)) {
+                    if (!rec.serviziAttivi) rec.serviziAttivi = {};
+                    if (!rec.serviziAttivi[s]) rec.serviziAttivi[s] = {};
+                    rec.serviziAttivi[s].attivo = false;
+                  } else if (['areac', 'parcheggi'].includes(s)) {
+                    (rec.contratti || []).forEach(c =>
+                      (c.dispositivi || []).forEach(d => {
+                        if (d.serviziAbilitati?.[s]) d.serviziAbilitati[s].attivo = false;
+                      })
+                    );
+                  } else if (s === 'rsa') {
+                    (rec.contratti || []).forEach(c =>
+                      (c.serviziRsa || []).forEach(r => { if (r.stato === 'attivo') r.stato = 'cessato'; })
+                    );
+                  }
+                });
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+              }
+            } catch(e) { console.error('disattivazione-servizio write error', e); }
             this.assistForm.serviziDaDisattivare.forEach(s => {
               Bus.emit('assistenza:servizio_disattivato', { cf, servizio: s });
             });
             this.showToastMsg('Servizio disattivato', 'success');
             break;
+          }
           case 'richiesta-fattura':
             Bus.emit('assistenza:documento_inviato', { cf, tipo: 'fattura', email: this.assistCliente.email });
             this.showToastMsg('Fattura inviata a ' + this.assistCliente.email, 'success');
