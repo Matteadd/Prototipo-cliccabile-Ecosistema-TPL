@@ -6846,14 +6846,40 @@ function tabletApp() {
         const cf = this.assistCliente.cf;
 
         switch (azione) {
-          case 'aggiorna-residenza':
+          case 'aggiorna-residenza': {
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec) {
+                if (!rec.indirizzo) rec.indirizzo = {};
+                rec.indirizzo.via    = this.assistForm.resVia.trim();
+                rec.indirizzo.comune = this.assistForm.resCitta.trim();
+                rec.indirizzo.prov   = this.assistForm.resProvincia.trim().toUpperCase();
+                rec.indirizzo.cap    = this.assistForm.resCap.trim();
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+                Bus.emit('cliente:profilo_aggiornato', rec);
+              }
+            } catch(e) { console.error('aggiorna-residenza write error', e); }
             Bus.emit('assistenza:dati_aggiornati', { cf, campo: 'indirizzo', valore: this.assistForm.resVia, canale: 'store' });
             this.showToastMsg('Dati aggiornati', 'success');
             break;
-          case 'aggiorna-contatti':
+          }
+          case 'aggiorna-contatti': {
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec) {
+                if (!rec.contatti) rec.contatti = {};
+                rec.contatti.email    = this.assistForm.email.trim();
+                rec.contatti.telefono = this.assistForm.cellulare.trim();
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+                Bus.emit('cliente:profilo_aggiornato', rec);
+              }
+            } catch(e) { console.error('aggiorna-contatti write error', e); }
             Bus.emit('assistenza:dati_aggiornati', { cf, campo: 'contatti', valore: { email: this.assistForm.email, cellulare: this.assistForm.cellulare }, canale: 'store' });
             this.showToastMsg('Dati di contatto aggiornati', 'success');
             break;
+          }
           case 'aggiorna-veicolo':
             Bus.emit('assistenza:veicolo_aggiornato', { cf, targa: (this.assistForm.veicoli[0] || {}).targa, operazione: 'modifica' });
             this.showToastMsg('Veicolo aggiornato', 'success');
