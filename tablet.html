@@ -3294,10 +3294,10 @@
             <template x-if="recuperoSearchStatus !== 'found'">
               <div class="space-y-4">
                 <div>
-                  <label class="form-label">Codice Fiscale cliente</label>
+                  <label class="form-label">Email o cellulare</label>
                   <div class="flex gap-2">
-                    <input x-model="recuperoSearchQuery" type="text" class="form-input flex-1 uppercase"
-                      placeholder="RSSMRC80A01H501Z" @keydown.enter="cercaClienteRecupero()" />
+                    <input x-model="recuperoSearchQuery" type="text" class="form-input flex-1"
+                      placeholder="es. mario@email.it o +39 333 1234567" @keydown.enter="cercaClienteRecupero()" />
                     <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteRecupero()"
                       :disabled="!recuperoSearchQuery.trim()">
                       <i class="fas fa-search"></i>
@@ -6881,7 +6881,7 @@ function tabletApp() {
     cercaClienteRecupero() {
       if (!this.recuperoSearchQuery.trim()) return;
       this.recuperoSearchStatus = null;
-      const raw = this._searchCfOTarga(this.recuperoSearchQuery);
+      const raw = this._searchClientiDemo(this.recuperoSearchQuery, 'contatto');
       if (!raw) {
         this.recuperoSearchStatus = 'notfound';
         return;
