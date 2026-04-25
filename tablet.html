@@ -3647,7 +3647,7 @@
                   <i class="fas fa-credit-card mr-2 text-green-600"></i>Contratto &amp; Pagamenti
                 </h3>
                 <div class="space-y-2">
-                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-green-50 hover:text-green-700 transition-all text-sm font-medium" @click="avviaAzione('modifica-pagamento')">
+                  <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-green-50 hover:text-green-700 transition-all text-sm font-medium" @click="avviaAzione('cambio-pagamento')">
                     <i class="fas fa-wallet mr-2 text-gray-400"></i>Modifica metodo di pagamento
                   </button>
                   <button class="w-full text-left px-4 py-3 rounded-lg bg-gray-50 hover:bg-green-50 hover:text-green-700 transition-all text-sm font-medium" @click="avviaAzione('adesione-rimodulazione')">
@@ -4076,68 +4076,7 @@
               </div>
             </template>
 
-            <!-- ========== 4.8 — Modifica metodo di pagamento ========== -->
-            <template x-if="assistAzione === 'modifica-pagamento'">
-              <div class="space-y-4">
-                <div class="bg-gray-50 rounded-lg p-3 text-sm">
-                  <span class="text-gray-400">Metodo attuale: </span>
-                  <span class="font-semibold" x-text="assistCliente.metodoPagamento.tipo.toUpperCase() + ' — ' + assistCliente.metodoPagamento.valore"></span>
-                </div>
-                <div>
-                  <label class="form-label">Nuovo metodo</label>
-                  <div class="flex gap-4 mt-1">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" x-model="assistForm.tipoPagamento" value="iban" class="accent-teal" /> <span class="text-sm font-medium">IBAN</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" x-model="assistForm.tipoPagamento" value="carta" class="accent-teal" /> <span class="text-sm font-medium">Carta di credito/debito</span>
-                    </label>
-                  </div>
-                </div>
-                <template x-if="assistForm.tipoPagamento === 'iban'">
-                  <div class="space-y-3">
-                    <div><label class="form-label">IBAN</label><input x-model="assistForm.iban" class="form-input uppercase" placeholder="IT60 XXXX XXXX XXXX XXXX 1234" /></div>
-                    <template x-if="!assistOtpSent">
-                      <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.iban">
-                        <i class="fas fa-sms mr-1"></i> Invia OTP per verifica titolarità
-                      </button>
-                    </template>
-                  </div>
-                </template>
-                <template x-if="assistForm.tipoPagamento === 'carta'">
-                  <div class="space-y-3 border border-gray-200 rounded-xl p-4">
-                    <p class="font-semibold text-sm text-gray-600"><i class="fas fa-credit-card mr-1"></i> POS simulato</p>
-                    <div><label class="form-label">Intestatario</label><input x-model="assistForm.cartaIntestazione" class="form-input" placeholder="MARIO ROSSI" /></div>
-                    <div><label class="form-label">PAN</label><input x-model="assistForm.cartaPan" class="form-input" placeholder="**** **** **** ****" maxlength="19" /></div>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div><label class="form-label">Scadenza</label><input x-model="assistForm.cartaScadenza" class="form-input" placeholder="MM/YY" maxlength="5" /></div>
-                      <div><label class="form-label">CVV</label><input x-model="assistForm.cartaCvv" class="form-input" placeholder="***" maxlength="3" type="password" /></div>
-                    </div>
-                  </div>
-                </template>
-                <template x-if="assistOtpSent && !assistOtpConfirmed">
-                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-                    <p class="text-sm font-semibold text-amber-800">OTP inviato al cliente</p>
-                    <div><label class="form-label">Inserisci OTP (6 cifre)</label><input x-model="assistOtpValue" class="form-input" maxlength="6" placeholder="000000" /></div>
-                    <button class="btn-primary text-sm py-2" @click="confermaOtp()">Verifica OTP</button>
-                  </div>
-                </template>
-                <template x-if="assistOtpConfirmed">
-                  <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center gap-2">
-                    <i class="fas fa-check-circle"></i> OTP verificato
-                  </div>
-                </template>
-                <button class="btn-primary w-full justify-center"
-                  @click="confermaOperazione('modifica-pagamento')"
-                  :disabled="assistOpLoading || (assistForm.tipoPagamento === 'iban' && !assistOtpConfirmed) || !assistForm.tipoPagamento">
-                  <span x-show="assistOpLoading" class="spinner"></span>
-                  <i x-show="!assistOpLoading" class="fas fa-check"></i>
-                  Conferma metodo di pagamento
-                </button>
-              </div>
-            </template>
-
-            <!-- ========== 4.8b — Cambio metodo di pagamento (via azione rapida) ========== -->
+            <!-- ========== 4.8 — Cambio metodo di pagamento ========== -->
             <template x-if="assistAzione === 'cambio-pagamento'">
               <div class="space-y-4">
                 <!-- Contratto selezionato (read-only) -->
@@ -6659,7 +6598,6 @@ function tabletApp() {
         'cambio-targa-obu':        'Cambio targa associata a OBU',
         'furto-obu':               'Furto / Smarrimento OBU',
         'restituzione-obu':        'Restituzione OBU',
-        'modifica-pagamento':      'Modifica metodo di pagamento',
         'adesione-rimodulazione':  'Adesione rimodulazione tariffaria',
         'revoca-rimodulazione':    'Revoca rimodulazione tariffaria',
         'disattivazione-servizio': 'Disattivazione servizio / Recesso',
@@ -7194,10 +7132,6 @@ function tabletApp() {
             this.showToastMsg('Restituzione registrata. Stock aggiornato.', 'success');
             break;
           }
-          case 'modifica-pagamento':
-            Bus.emit('assistenza:pagamento_aggiornato', { cf, tipo: this.assistForm.tipoPagamento });
-            this.showToastMsg('Metodo di pagamento aggiornato', 'success');
-            break;
           case 'cambio-pagamento': {
             try {
               const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
