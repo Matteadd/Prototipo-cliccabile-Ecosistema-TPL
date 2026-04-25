@@ -3037,17 +3037,74 @@
               </div>
             </template>
 
-            <!-- ===== ALTRE AZIONI OBU: ricerca classica CF/targa ===== -->
-            <template x-if="quickObuAction !== 'sostituisci-obu' && quickObuAction !== 'restituzione-obu'">
+            <!-- ===== CAMBIO TARGA OBU: ricerca per vecchia targa ===== -->
+            <template x-if="quickObuAction === 'cambio-targa-obu'">
               <div>
                 <template x-if="quickObuSearchStatus !== 'found'">
                   <div class="mb-5">
-                    <label class="form-label" x-text="'Inserisci CF o targa per ' + assistAzioneLabel(quickObuAction)"></label>
+                    <label class="form-label">Vecchia targa associata all'OBU</label>
                     <div class="flex gap-2">
                       <input x-model="quickObuSearchQuery" type="text" class="form-input flex-1 uppercase"
-                        placeholder="es. AB123CD o BNCMRC85M10F205Z"
-                        @keydown.enter="cercaClienteQuickObu()" />
-                      <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteQuickObu()" :disabled="quickObuSearchLoading || !quickObuSearchQuery.trim()">
+                        placeholder="es. AB123CD"
+                        @keydown.enter="cercaClienteQuickObu('targa')" />
+                      <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteQuickObu('targa')"
+                        :disabled="quickObuSearchLoading || !quickObuSearchQuery.trim()">
+                        <span x-show="quickObuSearchLoading" class="spinner !w-4 !h-4"></span>
+                        <i x-show="!quickObuSearchLoading" class="fas fa-search"></i>
+                      </button>
+                    </div>
+                    <template x-if="quickObuSearchStatus === 'notfound'">
+                      <div class="bg-red-50 border border-red-200 rounded-lg p-3 mt-3 text-sm text-red-700">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        Nessun cliente trovato per questa targa.
+                        <button class="underline ml-1 font-semibold" @click="assistStep = 'ricerca'; assistSearchQuery = quickObuSearchQuery; quickObuAction = null">
+                          Cerca con ricerca completa
+                        </button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="quickObuSearchStatus === 'found' && quickObuSearchResult">
+                  <div class="space-y-4">
+                    <div class="bg-teal-light border border-teal rounded-xl p-4">
+                      <p class="text-xs text-teal font-semibold uppercase tracking-wider mb-2">Cliente trovato</p>
+                      <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-teal text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
+                          x-text="(quickObuSearchResult.nome || '?')[0]"></div>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-bold text-gray-900" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
+                          <p class="text-sm text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
+                          <div class="flex flex-wrap gap-1 mt-1">
+                            <template x-for="v in quickObuSearchResult.veicoli" :key="v.targa">
+                              <span class="text-xs bg-white border border-gray-200 rounded px-2 py-0.5 font-mono" x-text="v.targa"></span>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+                      <button class="btn-primary w-full justify-center mt-4" @click="confermaProcediQuickObu()">
+                        <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi
+                      </button>
+                    </div>
+                    <button class="btn-ghost text-sm" @click="quickObuSearchStatus = null; quickObuSearchQuery = ''">
+                      <i class="fas fa-search mr-1"></i> Cerca un'altra targa
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- ===== FURTO / SMARRIMENTO OBU: ricerca per CF ===== -->
+            <template x-if="quickObuAction === 'furto-obu'">
+              <div>
+                <template x-if="quickObuSearchStatus !== 'found'">
+                  <div class="mb-5">
+                    <label class="form-label">Codice Fiscale cliente</label>
+                    <div class="flex gap-2">
+                      <input x-model="quickObuSearchQuery" type="text" class="form-input flex-1 uppercase"
+                        placeholder="es. RSSMRC80A01H501Z"
+                        @keydown.enter="cercaClienteQuickObu('cf')" />
+                      <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteQuickObu('cf')"
+                        :disabled="quickObuSearchLoading || !quickObuSearchQuery.trim()">
                         <span x-show="quickObuSearchLoading" class="spinner !w-4 !h-4"></span>
                         <i x-show="!quickObuSearchLoading" class="fas fa-search"></i>
                       </button>
@@ -3063,75 +3120,90 @@
                     </template>
                   </div>
                 </template>
-
                 <template x-if="quickObuSearchStatus === 'found' && quickObuSearchResult">
                   <div class="space-y-4">
-
-                    <!-- cambio-pagamento: selezione contratto -->
-                    <template x-if="quickObuAction === 'cambio-pagamento'">
-                      <div class="space-y-4">
-                        <div class="bg-teal-light border border-teal rounded-xl p-3 flex items-center gap-3">
-                          <div class="w-9 h-9 bg-teal text-white rounded-lg flex items-center justify-center flex-shrink-0 font-bold"
-                            x-text="(quickObuSearchResult.nome || '?')[0]"></div>
-                          <div>
-                            <p class="font-bold text-gray-900 text-sm" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
-                            <p class="text-xs text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p class="text-xs text-red-600 font-semibold uppercase tracking-wider mb-2">Cliente identificato — Furto / Smarrimento</p>
+                      <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-red-500 text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
+                          x-text="(quickObuSearchResult.nome || '?')[0]"></div>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-bold text-gray-900" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
+                          <p class="text-sm text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
+                          <div class="flex flex-wrap gap-1 mt-1">
+                            <template x-for="o in quickObuSearchResult.obu" :key="o.codice">
+                              <span class="text-xs bg-white border border-red-200 rounded px-2 py-0.5 font-mono" x-text="o.codice + ' — ' + o.targa"></span>
+                            </template>
                           </div>
                         </div>
-                        <div>
-                          <p class="form-label mb-2">Seleziona contratto da modificare</p>
-                          <template x-for="c in (quickObuSearchResult.contratti || [])" :key="c.id">
-                            <div class="border-2 rounded-xl p-3 mb-2 cursor-pointer transition-all"
-                              :class="quickPagamentoContrattoId === c.id ? 'border-amber-400 bg-amber-50' : 'border-gray-100 hover:border-amber-200'"
-                              @click="quickPagamentoContrattoId = c.id">
-                              <div class="flex items-center gap-2">
-                                <i class="fas fa-circle text-xs" :class="quickPagamentoContrattoId === c.id ? 'text-amber-500' : 'text-gray-300'"></i>
-                                <div class="flex-1 min-w-0">
-                                  <p class="font-semibold text-sm text-gray-800" x-text="c.id"></p>
-                                  <p class="text-xs text-gray-400" x-text="(c.tipo === 'obu' ? 'Telepedaggio OBU' : 'RSA Stand-Alone') + ' — IBAN: ' + c.iban + ' — €' + (c.totale || 0).toFixed(2) + '/mese'"></p>
-                                </div>
-                              </div>
-                            </div>
-                          </template>
-                        </div>
-                        <button class="btn-primary w-full justify-center" @click="confermaProcediQuickObu()" :disabled="!quickPagamentoContrattoId">
-                          <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi
+                      </div>
+                      <button class="btn-primary w-full justify-center mt-4" style="background-color:#dc2626" @click="confermaProcediQuickObu()">
+                        <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi al blocco
+                      </button>
+                    </div>
+                    <button class="btn-ghost text-sm" @click="quickObuSearchStatus = null; quickObuSearchQuery = ''">
+                      <i class="fas fa-search mr-1"></i> Cerca un altro cliente
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- ===== CAMBIO PAGAMENTO: ricerca CF/targa (invariato) ===== -->
+            <template x-if="quickObuAction === 'cambio-pagamento'">
+              <div>
+                <template x-if="quickObuSearchStatus !== 'found'">
+                  <div class="mb-5">
+                    <label class="form-label">Codice Fiscale o Targa</label>
+                    <div class="flex gap-2">
+                      <input x-model="quickObuSearchQuery" type="text" class="form-input flex-1 uppercase"
+                        placeholder="es. AB123CD o BNCMRC85M10F205Z"
+                        @keydown.enter="cercaClienteQuickObu('cf')" />
+                      <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteQuickObu('cf')"
+                        :disabled="quickObuSearchLoading || !quickObuSearchQuery.trim()">
+                        <span x-show="quickObuSearchLoading" class="spinner !w-4 !h-4"></span>
+                        <i x-show="!quickObuSearchLoading" class="fas fa-search"></i>
+                      </button>
+                    </div>
+                    <template x-if="quickObuSearchStatus === 'notfound'">
+                      <div class="bg-red-50 border border-red-200 rounded-lg p-3 mt-3 text-sm text-red-700">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        Cliente non trovato.
+                        <button class="underline ml-1 font-semibold" @click="assistStep = 'ricerca'; assistSearchQuery = quickObuSearchQuery; quickObuAction = null">
+                          Cerca con ricerca completa
                         </button>
                       </div>
                     </template>
-
-                    <!-- altre azioni: card cliente standard -->
-                    <template x-if="quickObuAction !== 'cambio-pagamento'">
-                      <div class="space-y-4">
-                        <div class="bg-teal-light border border-teal rounded-xl p-4">
-                          <p class="text-xs text-teal font-semibold uppercase tracking-wider mb-2">Cliente trovato</p>
-                          <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-teal text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
-                              x-text="(quickObuSearchResult.nome || '?')[0]"></div>
+                  </div>
+                </template>
+                <template x-if="quickObuSearchStatus === 'found' && quickObuSearchResult">
+                  <div class="space-y-4">
+                    <div class="bg-teal-light border border-teal rounded-xl p-3 flex items-center gap-3">
+                      <div class="w-9 h-9 bg-teal text-white rounded-lg flex items-center justify-center flex-shrink-0 font-bold"
+                        x-text="(quickObuSearchResult.nome || '?')[0]"></div>
+                      <div>
+                        <p class="font-bold text-gray-900 text-sm" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
+                        <p class="text-xs text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="form-label mb-2">Seleziona contratto da modificare</p>
+                      <template x-for="c in (quickObuSearchResult.contratti || [])" :key="c.id">
+                        <div class="border-2 rounded-xl p-3 mb-2 cursor-pointer transition-all"
+                          :class="quickPagamentoContrattoId === c.id ? 'border-amber-400 bg-amber-50' : 'border-gray-100 hover:border-amber-200'"
+                          @click="quickPagamentoContrattoId = c.id">
+                          <div class="flex items-center gap-2">
+                            <i class="fas fa-circle text-xs" :class="quickPagamentoContrattoId === c.id ? 'text-amber-500' : 'text-gray-300'"></i>
                             <div class="flex-1 min-w-0">
-                              <p class="font-bold text-gray-900" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
-                              <p class="text-sm text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
-                              <div class="flex flex-wrap gap-1 mt-1">
-                                <template x-for="v in quickObuSearchResult.veicoli" :key="v.targa">
-                                  <span class="text-xs bg-white border border-gray-200 rounded px-2 py-0.5 font-mono" x-text="v.targa"></span>
-                                </template>
-                              </div>
-                            </div>
-                            <div class="flex-shrink-0 text-right">
-                              <template x-for="o in quickObuSearchResult.obu" :key="o.codice">
-                                <div class="text-xs font-mono text-gray-500" x-text="o.codice"></div>
-                              </template>
+                              <p class="font-semibold text-sm text-gray-800" x-text="c.id"></p>
+                              <p class="text-xs text-gray-400" x-text="(c.tipo === 'obu' ? 'Telepedaggio OBU' : 'RSA Stand-Alone') + ' — IBAN: ' + c.iban + ' — €' + (c.totale || 0).toFixed(2) + '/mese'"></p>
                             </div>
                           </div>
-                          <button class="btn-primary w-full justify-center mt-4" @click="confermaProcediQuickObu()">
-                            <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi
-                          </button>
                         </div>
-                      </div>
-                    </template>
-
-                    <button class="btn-ghost text-sm" @click="quickObuSearchStatus = null; quickObuSearchQuery = ''; quickPagamentoContrattoId = null">
-                      <i class="fas fa-search mr-1"></i> Cerca un altro cliente
+                      </template>
+                    </div>
+                    <button class="btn-primary w-full justify-center" @click="confermaProcediQuickObu()" :disabled="!quickPagamentoContrattoId">
+                      <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi
                     </button>
                   </div>
                 </template>
@@ -6695,13 +6767,14 @@ function tabletApp() {
       this.showToastMsg('OBU trovato — cliente identificato', 'success');
     },
 
-    cercaClienteQuickObu() {
+    cercaClienteQuickObu(searchType) {
       if (!this.quickObuSearchQuery.trim()) return;
       this.quickObuSearchLoading = true;
       this.quickObuSearchStatus = null;
       setTimeout(() => {
         this.quickObuSearchLoading = false;
-        const raw = this._searchCfOTarga(this.quickObuSearchQuery);
+        const tipo = searchType || 'cf';
+        const raw = this._searchClientiDemo(this.quickObuSearchQuery, tipo);
         if (!raw) {
           this.quickObuSearchStatus = 'notfound';
           this.quickObuSearchResult = null;
