@@ -3154,10 +3154,10 @@
               <div>
                 <template x-if="quickObuSearchStatus !== 'found'">
                   <div class="mb-5">
-                    <label class="form-label">Codice Fiscale o Targa</label>
+                    <label class="form-label">Codice Fiscale cliente</label>
                     <div class="flex gap-2">
                       <input x-model="quickObuSearchQuery" type="text" class="form-input flex-1 uppercase"
-                        placeholder="es. AB123CD o BNCMRC85M10F205Z"
+                        placeholder="es. RSSMRC80A01H501Z"
                         @keydown.enter="cercaClienteQuickObu('cf')" />
                       <button class="btn-primary px-5 flex-shrink-0" @click="cercaClienteQuickObu('cf')"
                         :disabled="quickObuSearchLoading || !quickObuSearchQuery.trim()">
