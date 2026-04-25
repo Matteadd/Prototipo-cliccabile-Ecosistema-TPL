@@ -7136,6 +7136,15 @@ function tabletApp() {
                     if (d.tipo === 'obu' && (!obuCode || d.codice === obuCode)) d.veicoloId = 'v_' + nuovaTarga;
                   });
                 });
+                if (this.assistForm.aggiornaRsaConTarga) {
+                  const vecchioId = 'v_' + (targaVecchia || '').toUpperCase();
+                  const nuovoId   = 'v_' + nuovaTarga.toUpperCase();
+                  (rec.contratti || []).forEach(c =>
+                    (c.serviziRsa || []).forEach(r => {
+                      if (r.veicoloId === vecchioId) r.veicoloId = nuovoId;
+                    })
+                  );
+                }
                 syncVeicoli(rec);
                 localStorage.setItem('clientiDemo', JSON.stringify(clienti));
               }
