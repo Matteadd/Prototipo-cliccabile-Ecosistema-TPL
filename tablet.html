@@ -2748,6 +2748,17 @@
             </div>
 
           </div>
+
+          <!-- Demo button: visibile solo con ?demo=1 -->
+          <template x-if="isDemoMode">
+            <div class="mt-4 flex justify-center">
+              <button class="flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all text-sm font-semibold"
+                @click="generaClienteDemo()">
+                <i class="fas fa-flask"></i>
+                Genera cliente demo con dati incompleti
+              </button>
+            </div>
+          </template>
         </template>
 
         <!-- ===== STEP: RICERCA RAPIDA OBU ===== -->
@@ -6390,6 +6401,65 @@ function tabletApp() {
       this.creditCheckStatus = 'ko';
       this.currentStep = 3;
       this.showToastMsg('Demo: cliente bloccato (Stop List KO)', 'error');
+    },
+
+    generaClienteDemo() {
+      const ts = Date.now();
+      const cf = 'DMOTST' + String(ts).slice(-10).padStart(10, '0').slice(0, 10);
+      const targa = 'DM' + String(Math.floor(Math.random() * 900) + 100) + 'EN';
+      const veicoloId = 'v_' + targa;
+      const record = {
+        cf: cf.toUpperCase(),
+        nome: 'Cliente',
+        cognome: 'Demo ' + targa,
+        dataNascita: '1985-06-15',
+        contatti: { telefono: '+39 333 1234567', email: 'demo@enilive.it' },
+        indirizzo: { via: 'Via Demo', civico: '1', comune: 'Milano', prov: 'MI', cap: '20100' },
+        dataRegistrazione: new Date().toISOString(),
+        canale: 'stazione',
+        _v3migrated: true,
+        veicoli: [{ id: veicoloId, targa, tipo: 'Auto', marca: 'Demo', modello: 'Test' }],
+        consensi: { informativaPrecontrattuale: true, privacy: true, marketing: false, profilazione: false, mandatoSdd: true, dataFirma: new Date().toISOString() },
+        contratti: [{
+          id: 'c_' + targa, tipo: 'obu', stato: 'attivo', dataAttivazione: new Date().toISOString(),
+          iban: 'IT60X0542811101000000123456', totale: 4.50,
+          dispositivi: [{ tipo: 'obu', codice: 'OBU-DEMO-' + targa, veicoloId, furtoSmarrimento: false, stato: 'attivo', serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } } }],
+          serviziRsa: [{ id: 'rsa_' + targa, veicoloId, stato: 'attivo', costo: 2.00 }],
+        }],
+        serviziAttivi: { strisceBlu: { attivo: false }, memo: { attivo: false } },
+        movimenti: [],
+      };
+      const campiRimuovibili = [
+        () => { record.contatti.telefono = ''; },
+        () => { record.contatti.email = ''; },
+        () => { record.consensi.privacy = false; },
+        () => { record.consensi.mandatoSdd = false; },
+        () => { record.contratti[0].iban = ''; },
+      ];
+      const shuffled = campiRimuovibili.sort(() => Math.random() - 0.5);
+      const quanti = Math.floor(Math.random() * 2) + 1;
+      shuffled.slice(0, quanti).forEach(fn => fn());
+
+      const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+      clienti[record.cf] = record;
+      localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+
+      this.assistCliente = this._clienteDemoToAssist(record);
+      Object.assign(this.assistForm, {
+        resVia: record.indirizzo.via,
+        resCap: record.indirizzo.cap,
+        resCitta: record.indirizzo.comune,
+        resProvincia: record.indirizzo.prov,
+        domVia: record.indirizzo.via,
+        domCap: record.indirizzo.cap,
+        domCitta: record.indirizzo.comune,
+        domProvincia: record.indirizzo.prov,
+        email: record.contatti.email,
+        cellulare: record.contatti.telefono,
+        veicoli: JSON.parse(JSON.stringify(this.assistCliente.veicoli)),
+      });
+      this.assistStep = 'scheda';
+      this.showToastMsg('Cliente demo generato con dati incompleti — CF: ' + record.cf, 'warning', 5000);
     },
 
     // ============================================================
