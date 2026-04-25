@@ -6430,10 +6430,6 @@ function tabletApp() {
       if (!c.email?.trim())     missing.push('email');
       if (!rawRecord?.consensi?.privacy) missing.push('privacy');
       if (!rawRecord?.consensi?.mandatoSdd) missing.push('mandatoSdd');
-      if (['cambio-pagamento'].includes(azione)) {
-        const primoContratto = (rawRecord?.contratti || [])[0];
-        if (!primoContratto?.iban?.trim()) missing.push('iban');
-      }
       if (missing.length === 0) return true;
       this.missingFields = missing;
       this.aggiornaDatiForm = {
@@ -6453,10 +6449,10 @@ function tabletApp() {
     },
 
     avviaAzione(azione) {
+      this.resetAssistOp();
       if (!this._checkAnagraficaPreAzione(azione)) return;
       this.assistAzione = azione;
       this.assistStep = 'flusso';
-      this.resetAssistOp();
       window.scrollTo(0, 0);
     },
 
