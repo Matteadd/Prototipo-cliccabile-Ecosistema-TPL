@@ -3921,6 +3921,22 @@
                   <label class="form-label">Nuova targa</label>
                   <input x-model="assistForm.nuovaTarga" class="form-input uppercase" placeholder="es. CD789EF" @input="checkTarga()" />
                 </div>
+                <template x-if="cambioTargaHasRsa() && assistForm.obuSelezionato">
+                  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex-1">
+                        <p class="font-semibold text-blue-800 text-sm">
+                          <i class="fas fa-ambulance mr-1"></i> Servizio RSA attivo su questa targa
+                        </p>
+                        <p class="text-xs text-blue-600 mt-1">Aggiornare la targa anche per il servizio RSA?</p>
+                      </div>
+                      <label class="toggle-switch flex-shrink-0 mt-0.5">
+                        <input type="checkbox" x-model="assistForm.aggiornaRsaConTarga" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
                 <template x-if="assistForm.targaWarning">
                   <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                     <i class="fas fa-exclamation-triangle mr-1"></i> Targa già associata a un altro contratto.
@@ -6658,6 +6674,17 @@ function tabletApp() {
         'cambio-pagamento':        'Cambio metodo di pagamento',
       };
       return labels[azione] || azione;
+    },
+
+    cambioTargaHasRsa() {
+      if (!this.assistCliente) return false;
+      const obu = (this.assistCliente.obu || []).find(o => o.codice === this.assistForm.obuSelezionato)
+        || (this.assistCliente.obu || [])[0];
+      if (!obu) return false;
+      const vecchiaTargaId = 'v_' + (obu.targa || '').toUpperCase();
+      return (this.assistCliente.contratti || []).some(c =>
+        (c.serviziRsa || []).some(r => r.veicoloId === vecchiaTargaId && r.stato === 'attivo')
+      );
     },
 
     _obuRsaEntry() {
