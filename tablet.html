@@ -6880,10 +6880,27 @@ function tabletApp() {
             this.showToastMsg('Dati di contatto aggiornati', 'success');
             break;
           }
-          case 'aggiorna-veicolo':
+          case 'aggiorna-veicolo': {
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec && Array.isArray(rec.veicoli)) {
+                this.assistForm.veicoli.forEach(v => {
+                  const idx = rec.veicoli.findIndex(rv => rv.targa === v.targa);
+                  if (idx !== -1) {
+                    rec.veicoli[idx].tipo    = v.tipo;
+                    rec.veicoli[idx].marca   = v.marca;
+                    rec.veicoli[idx].modello = v.modello;
+                  }
+                });
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+                Bus.emit('cliente:profilo_aggiornato', rec);
+              }
+            } catch(e) { console.error('aggiorna-veicolo write error', e); }
             Bus.emit('assistenza:veicolo_aggiornato', { cf, targa: (this.assistForm.veicoli[0] || {}).targa, operazione: 'modifica' });
             this.showToastMsg('Veicolo aggiornato', 'success');
             break;
+          }
           case 'sostituisci-obu': {
             const obuVecchio = this.assistForm.obuSelezionato;
             const obuNuovo = this.assistForm.nuovoObu;
@@ -6931,14 +6948,47 @@ function tabletApp() {
             this.showToastMsg('Targa aggiornata. Whitelist in aggiornamento.', 'success');
             break;
           }
-          case 'furto-obu':
-            Bus.emit('assistenza:obu_bloccato', { cf, obu: this.assistForm.obuSelezionato, targa: (this.assistCliente.obu[0] || {}).targa, motivo: 'furto' });
+          case 'furto-obu': {
+            const obuCodeFurto = this.assistForm.obuSelezionato;
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec) {
+                (rec.contratti || []).forEach(c =>
+                  (c.dispositivi || []).forEach(d => {
+                    if (d.tipo === 'obu' && d.codice === obuCodeFurto) {
+                      d.furtoSmarrimento = true;
+                      d.stato = 'smarrito';
+                    }
+                  })
+                );
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+              }
+            } catch(e) { console.error('furto-obu write error', e); }
+            Bus.emit('assistenza:obu_bloccato', { cf, obu: obuCodeFurto, targa: (this.assistCliente.obu[0] || {}).targa, motivo: 'furto' });
             this.showToastMsg('OBU inserito in blacklist entro 12 ore', 'success', 4000);
             break;
-          case 'restituzione-obu':
-            Bus.emit('assistenza:obu_restituito', { cf, obu: this.assistForm.obuSelezionato, targa: (this.assistCliente.obu[0] || {}).targa });
+          }
+          case 'restituzione-obu': {
+            const obuCodeRest = this.assistForm.obuSelezionato;
+            try {
+              const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+              const rec = clienti[cf.toUpperCase()];
+              if (rec) {
+                (rec.contratti || []).forEach(c => {
+                  (c.dispositivi || []).forEach(d => {
+                    if (d.tipo === 'obu' && d.codice === obuCodeRest) d.stato = 'restituito';
+                  });
+                  const obus = (c.dispositivi || []).filter(d => d.tipo === 'obu');
+                  if (obus.length > 0 && obus.every(d => d.stato === 'restituito')) c.stato = 'cessato';
+                });
+                localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+              }
+            } catch(e) { console.error('restituzione-obu write error', e); }
+            Bus.emit('assistenza:obu_restituito', { cf, obu: obuCodeRest, targa: (this.assistCliente.obu[0] || {}).targa });
             this.showToastMsg('Restituzione registrata. Stock aggiornato.', 'success');
             break;
+          }
           case 'modifica-pagamento':
             Bus.emit('assistenza:pagamento_aggiornato', { cf, tipo: this.assistForm.tipoPagamento });
             this.showToastMsg('Metodo di pagamento aggiornato', 'success');
