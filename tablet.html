@@ -2943,8 +2943,102 @@
               </div>
             </template>
 
+            <!-- ===== RESTITUZIONE OBU: scan OBU ===== -->
+            <template x-if="quickObuAction === 'restituzione-obu'">
+              <div>
+                <template x-if="quickObuSearchStatus === 'found' && quickObuSearchResult">
+                  <div class="space-y-4">
+                    <div class="bg-teal-light border border-teal rounded-xl p-4">
+                      <p class="text-xs text-teal font-semibold uppercase tracking-wider mb-2">OBU e cliente identificati</p>
+                      <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-teal text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
+                          x-text="(quickObuSearchResult.nome || '?')[0]"></div>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-bold text-gray-900" x-text="quickObuSearchResult.nome + ' ' + quickObuSearchResult.cognome"></p>
+                          <p class="text-sm text-gray-500 font-mono" x-text="quickObuSearchResult.cf"></p>
+                          <p class="text-xs text-gray-400 mt-1 font-mono" x-text="'OBU: ' + obuScannedCode"></p>
+                        </div>
+                      </div>
+                      <button class="btn-primary w-full justify-center mt-4" @click="confermaProcediQuickObu()">
+                        <i class="fas fa-arrow-right mr-2"></i> Conferma e procedi
+                      </button>
+                    </div>
+                    <button class="btn-ghost text-sm" @click="quickObuSearchStatus = null; obuScannerStatus = null; obuScannedCode = ''; obuManualCode = ''; obuManualSearchStatus = null">
+                      <i class="fas fa-redo mr-1"></i> Scansiona un altro OBU
+                    </button>
+                  </div>
+                </template>
+                <template x-if="quickObuSearchStatus !== 'found'">
+                  <div class="space-y-6">
+                    <div>
+                      <p class="form-label mb-2">Scansiona il codice a barre dell'OBU da restituire</p>
+                      <div class="relative bg-gray-900 rounded-2xl overflow-hidden flex items-center justify-center" style="height:180px;">
+                        <template x-if="obuScannerStatus === null">
+                          <div class="flex flex-col items-center gap-4 z-10">
+                            <div class="relative" style="width:200px;height:60px;">
+                              <div class="scanner-corner tl" style="top:0;bottom:auto;"></div>
+                              <div class="scanner-corner tr" style="top:0;bottom:auto;"></div>
+                              <div class="scanner-corner bl" style="bottom:0;top:auto;"></div>
+                              <div class="scanner-corner br" style="bottom:0;top:auto;"></div>
+                              <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="flex gap-0.5">
+                                  <template x-for="i in [3,6,4,7,2,5,8,3,6,4,5,7,2,4,6,3,5,8,4,6]" :key="i">
+                                    <div class="bg-gray-600 rounded-sm" :style="'width:2px;height:' + (i * 4) + 'px'"></div>
+                                  </template>
+                                </div>
+                              </div>
+                            </div>
+                            <button class="btn-primary text-sm px-5 py-2" @click="simulaScansionObu()">
+                              <i class="fas fa-barcode mr-2"></i> Avvia scansione
+                            </button>
+                          </div>
+                        </template>
+                        <template x-if="obuScannerStatus === 'scanning'">
+                          <div class="absolute inset-0">
+                            <div class="scanner-corner tl"></div><div class="scanner-corner tr"></div>
+                            <div class="scanner-corner bl"></div><div class="scanner-corner br"></div>
+                            <div class="scan-line"></div>
+                            <div class="absolute inset-0 flex items-end justify-center pb-4">
+                              <span class="text-teal text-xs font-semibold tracking-widest uppercase scanning-anim">Scansione in corso…</span>
+                            </div>
+                          </div>
+                        </template>
+                        <template x-if="obuScannerStatus === 'found'">
+                          <div class="absolute inset-0 bg-emerald-900/80 flex flex-col items-center justify-center gap-2">
+                            <i class="fas fa-check-circle text-emerald-400 text-3xl"></i>
+                            <span class="text-white font-bold text-sm font-mono" x-text="obuScannedCode"></span>
+                            <span class="text-emerald-300 text-xs">OBU riconosciuto</span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <div class="flex-1 h-px bg-gray-200"></div>
+                      <span class="text-xs text-gray-400 font-medium uppercase tracking-wider">oppure inserisci codice OBU</span>
+                      <div class="flex-1 h-px bg-gray-200"></div>
+                    </div>
+                    <div>
+                      <label class="form-label mb-2">Codice OBU</label>
+                      <div class="flex gap-2">
+                        <input x-model="obuManualCode" type="text" class="form-input flex-1 uppercase font-mono"
+                          placeholder="es. OBU-001-2024" @keydown.enter="cercaObuManuale()" />
+                        <button class="btn-secondary px-5 flex-shrink-0" @click="cercaObuManuale()" :disabled="!obuManualCode.trim()">
+                          <i class="fas fa-search"></i>
+                        </button>
+                      </div>
+                      <template x-if="obuManualSearchStatus === 'notfound'">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 mt-3 text-sm text-red-700">
+                          <i class="fas fa-exclamation-circle mr-1"></i> OBU non trovato nel sistema.
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
             <!-- ===== ALTRE AZIONI OBU: ricerca classica CF/targa ===== -->
-            <template x-if="quickObuAction !== 'sostituisci-obu'">
+            <template x-if="quickObuAction !== 'sostituisci-obu' && quickObuAction !== 'restituzione-obu'">
               <div>
                 <template x-if="quickObuSearchStatus !== 'found'">
                   <div class="mb-5">
