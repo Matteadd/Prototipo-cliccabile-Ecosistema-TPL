@@ -6916,8 +6916,10 @@ function tabletApp() {
                 const rsaVid = this.assistForm.rsaVeicoloIdSostituzione;
                 const codicePolizza = this.assistForm.codicePolizzaRsa.trim();
                 if (rsaVid && codicePolizza) {
-                  const rsaEntry = (rec.serviziRsa || []).find(r => r.veicoloId === rsaVid && r.stato === 'attivo');
-                  if (rsaEntry) rsaEntry.codicePolizza = codicePolizza;
+                  for (const ct of (rec.contratti || [])) {
+                    const rsaEntry = (ct.serviziRsa || []).find(r => r.veicoloId === rsaVid && r.stato === 'attivo');
+                    if (rsaEntry) { rsaEntry.codicePolizza = codicePolizza; break; }
+                  }
                 }
                 localStorage.setItem('clientiDemo', JSON.stringify(clienti));
               }
