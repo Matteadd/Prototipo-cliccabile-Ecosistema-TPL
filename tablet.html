@@ -3093,13 +3093,24 @@
                   </span>
                 </label>
               </div>
+              <div x-show="missingFields.includes('mandatoSdd')" class="bg-gray-50 rounded-xl p-4">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" x-model="aggiornaDatiForm.mandatoSdd" class="accent-teal mt-1 flex-shrink-0" />
+                  <span class="text-sm text-gray-700">
+                    <span class="font-semibold">Mandato SDD obbligatorio</span>
+                    <span class="text-red-500"> *</span><br>
+                    <span class="text-xs text-gray-500">Autorizzazione addebito diretto SEPA per i contratti attivi</span>
+                  </span>
+                </label>
+              </div>
             </div>
             <button class="btn-primary w-full justify-center mt-6" @click="salvaAggiornaDati()"
               :disabled="(missingFields.includes('nome') && !aggiornaDatiForm.nome.trim())
                       || (missingFields.includes('cognome') && !aggiornaDatiForm.cognome.trim())
                       || (missingFields.includes('telefono') && !aggiornaDatiForm.telefono.trim())
                       || (missingFields.includes('email') && !aggiornaDatiForm.email.trim())
-                      || (missingFields.includes('privacy') && !aggiornaDatiForm.privacy)">
+                      || (missingFields.includes('privacy') && !aggiornaDatiForm.privacy)
+                      || (missingFields.includes('mandatoSdd') && !aggiornaDatiForm.mandatoSdd)">
               <i class="fas fa-save mr-2"></i> Salva e procedi
             </button>
           </div>
@@ -6681,6 +6692,10 @@ function tabletApp() {
       if (this.missingFields.includes('privacy')) {
         if (!r.consensi) r.consensi = {};
         r.consensi.privacy = !!this.aggiornaDatiForm.privacy;
+      }
+      if (this.missingFields.includes('mandatoSdd')) {
+        if (!r.consensi) r.consensi = {};
+        r.consensi.mandatoSdd = !!this.aggiornaDatiForm.mandatoSdd;
       }
       this._saveClienteDemo(r);
       Bus.emit('cliente:profilo_aggiornato', r);
