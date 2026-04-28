@@ -12,17 +12,28 @@
  *   migrateClienteRecord(record) — migra old-schema → new-schema (idempotente)
  *
  * Catalogo eventi:
- *   cliente:registrato    | tablet → app, crm  | { nome, cf, targhe[], dataRegistrazione }
- *   servizio:attivato     | tablet, app → crm  | { servizio, targa, veicoloId, data }
- *   servizio:disattivato  | app → crm          | { servizio, targa, veicoloId, data }
- *   pagamento:confermato  | app → crm          | { servizio, importo, metodo, data }
- *   sosta:avviata         | app → crm          | { zona, targa, durata }
- *   sosta:terminata       | app → crm          | { zona, targa, importo }
- *   rsa:chiamata          | app → crm          | { targa, posizione, tipo }
- *   memo:scadenza         | app → crm          | { tipo, targa, data }
- *   crm:aggiornato        | crm → app          | { campo, valore }
- *   scenario:trigger      | emulatore → app    | { nome, params }
- *   email:outbound        | tablet → (mock)    | { id, to, template, subject, otpCode, nome, preview }
+ *   cliente:registrato        | tablet → app, crm         | { nome, cf, targhe[], dataRegistrazione }
+ *   servizio:attivato         | tablet, app → crm         | { servizio, targa, veicoloId, data }
+ *   servizio:disattivato      | app → crm                 | { servizio, targa, veicoloId, data }
+ *   pagamento:confermato      | app, emulatore → crm      | { cf, movimento, servizio, importo, metodo, data }
+ *   sosta:avviata             | app → crm                 | { zona, targa, durata }
+ *   sosta:terminata           | app → crm                 | { zona, targa, importo }
+ *   rsa:chiamata              | app → crm                 | { targa, posizione, tipo }
+ *   memo:scadenza             | app → crm                 | { tipo, targa, data }
+ *   crm:aggiornato            | crm → app                 | { campo, valore }
+ *   crm:movimento_aggiornato  | crm → app, emulatore      | { cf, id, ...campiAggiornati } — usato per disconoscimento transiti
+ *   scenario:trigger          | emulatore → app           | { nome, params }
+ *   sms:outbound              | tablet → emulatore        | { id, to, template, preview, documenti?, dati? }
+ *   documento:firmato         | app (webview) → tablet    | { template }
+ *   cliente:cambiato          | emulatore → app, crm      | { cf }
+ *   cliente:profilo_aggiornato| tablet, emulatore → app   | profilo aggiornato (triggera reload iframe)
+ *   email:outbound            | tablet → (mock)           | { id, to, template, subject, otpCode, nome, preview }
+ *   dispositivo:sostituito    | tablet → crm              | { cf, obu_vecchio, obu_nuovo, motivo }
+ *   fattura:emessa            | tablet → crm              | { cf, fattura }
+ *   assistenza:caso_aperto    | tablet → crm              | { cf, caso }
+ *
+ * SMS template aggiuntivi (non-OTP):
+ *   RESET_PASSWORD            | sms:outbound to: email    | link mock reset password
  */
 
 /**
@@ -203,8 +214,12 @@ const Bus = (() => {
         _dispatch(e.data.event, e.data.payload);
     });
 
-    // Fallback: rileva eventi da localStorage (per browser senza BroadcastChannel)
+    // Fallback: rileva eventi da localStorage SOLO se BroadcastChannel non è disponibile
+    // o non ha ancora consegnato l'evento (browser legacy). Se BroadcastChannel funziona
+    // questo handler NON deve scattare per evitare dispatch doppi cross-tab.
+    let _bcSupported = true; // BroadcastChannel è nativo in tutti i browser target
     window.addEventListener('storage', (e) => {
+        if (_bcSupported) return; // BroadcastChannel gestisce la consegna — skip fallback
         if (e.key !== LS_KEY || !e.newValue) return;
         try {
             const { event, payload } = JSON.parse(e.newValue);

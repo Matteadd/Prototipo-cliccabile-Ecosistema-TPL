@@ -365,6 +365,79 @@
     <span x-text="toastMessage" class="text-sm leading-snug"></span>
   </div>
 
+  <!-- ===================== MODAL VERIFICA TARGA (A2) ===================== -->
+  <template x-if="verificaTargaModal">
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9999;background:rgba(0,0,0,0.45);">
+      <div class="card p-6 max-w-sm w-full mx-4" style="box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+
+        <!-- CASO: altro_cliente — STEP 'richiedi' (step 1 trasferimento) -->
+        <template x-if="verificaTargaModal.tipo === 'altro_cliente' && trasferimentoTargaStep === 'richiedi'">
+          <div>
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-red-600"></i>
+              </div>
+              <h3 class="font-semibold text-gray-800">Targa già registrata</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-5">
+              La targa <strong x-text="verificaTargaModal.targa"></strong> risulta già associata ad un altro cliente.
+              Richiedere al cliente il libretto di circolazione per verificare la proprietà del veicolo.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button class="btn-ghost text-sm" @click="verificaTargaModal = null; trasferimentoTargaStep = null; if (_trasferimentoTargaSourceField) { try { const parts = _trasferimentoTargaSourceField.split('.'); if (parts.length === 1) { $data[parts[0]] = ''; } } catch(_){} _trasferimentoTargaSourceField = null; }">
+                Annulla
+              </button>
+              <button class="btn-primary text-sm" @click="trasferimentoTargaStep = 'conferma'">
+                Il cliente ha dimostrato la proprietà
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- CASO: altro_cliente — STEP 'conferma' (step 2 trasferimento) -->
+        <template x-if="verificaTargaModal.tipo === 'altro_cliente' && trasferimentoTargaStep === 'conferma'">
+          <div>
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-exchange-alt text-amber-600"></i>
+              </div>
+              <h3 class="font-semibold text-gray-800">Conferma trasferimento</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-5">
+              Confermando, la targa <strong x-text="verificaTargaModal.targa"></strong> verrà associata a questo cliente.
+              Sul cliente precedente verrà aperto un caso di assistenza automatico.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button class="btn-ghost text-sm" @click="trasferimentoTargaStep = 'richiedi'">
+                Annulla
+              </button>
+              <button class="btn-primary text-sm" @click="_eseguiTrasferimentoTarga()">
+                Conferma trasferimento
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- CASO: NON altro_cliente — modal semplice (obu_stesso / rsa_stesso) -->
+        <template x-if="verificaTargaModal.tipo !== 'altro_cliente'">
+          <div>
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-amber-600"></i>
+              </div>
+              <h3 class="font-semibold text-gray-800">Attenzione targa</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-5" x-text="verificaTargaModal.messaggio"></p>
+            <div class="flex justify-end gap-2">
+              <button class="btn-secondary text-sm" @click="verificaTargaModal = null">Ho capito</button>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </template>
+
   <!-- ===================== MAIN CONTENT ===================== -->
   <main class="p-6">
 
@@ -409,9 +482,15 @@
     <template x-if="currentStep === 2">
       <div>
         <div class="mb-6 flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-bold text-gray-900">Registrazione Cliente</h2>
-            <p class="text-gray-500 text-sm">Acquisizione dati anagrafici e verifica contatti</p>
+          <div class="flex items-center gap-3">
+            <button class="btn-ghost text-sm py-1.5 px-3 flex-shrink-0"
+              @click="tabletMode = null; currentStep = 1; step2Sub = 'doc'; scanStatus = null; cfAlreadyExists = false; clienteReadonly = false; cliente = { cf:'', nome:'', cognome:'', dataNascita:'', indirizzo:'', civico:'', comune:'', provincia:'', cap:'', stato:'Italia', telefono:'', email:'' }; targhe = ['']">
+              <i class="fas fa-arrow-left mr-1"></i> Indietro
+            </button>
+            <div>
+              <h2 class="text-xl font-bold text-gray-900">Registrazione Cliente</h2>
+              <p class="text-gray-500 text-sm">Acquisizione dati anagrafici e verifica contatti</p>
+            </div>
           </div>
           <!-- Sub-step indicator -->
           <div class="flex gap-2">
@@ -1347,7 +1426,7 @@
                 <div class="mb-4">
                   <label class="form-label">Targa veicolo *</label>
                   <select :value="obu1Targa" class="form-input"
-                    @change="if ($event.target.value === '__new__') { obu1AddNew = true } else { obu1Targa = $event.target.value; obu1AddNew = false }">
+                    @change="if ($event.target.value === '__new__') { obu1AddNew = true } else { obu1Targa = $event.target.value; obu1AddNew = false; verificaTarga(obu1Targa, cliente?.cf); }">
                     <option value="">— Seleziona targa —</option>
                     <template x-for="t in targhe.filter(t => t.trim())" :key="t">
                       <option :value="t" x-text="t.toUpperCase()"></option>
@@ -1426,7 +1505,7 @@
                 <div class="mb-4">
                   <label class="form-label">Targa veicolo OBU #2</label>
                   <select :value="obu2Targa" class="form-input"
-                    @change="if ($event.target.value === '__new__') { obu2AddNew = true } else { obu2Targa = $event.target.value; obu2AddNew = false }">
+                    @change="if ($event.target.value === '__new__') { obu2AddNew = true } else { obu2Targa = $event.target.value; obu2AddNew = false; verificaTarga(obu2Targa, cliente?.cf); }">
                     <option value="">— Seleziona targa —</option>
                     <template x-for="t in targhe.filter(t => t.trim())" :key="t">
                       <option :value="t" x-text="t.toUpperCase()"></option>
@@ -1549,38 +1628,48 @@
               </div>
             </template>
 
-            <!-- Totale contratto 1 -->
+            <!-- Totale contratto 1 + Promozioni (A3) -->
             <div class="card p-4 sticky bottom-4">
-              <!-- Toggle abbonamento annuale -->
-              <div class="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                <div>
-                  <span class="font-semibold text-gray-700 text-sm">Abbonamento annuale</span>
-                  <span class="ml-2 text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">2 mesi omaggio</span>
+              <!-- Promozioni e sconti -->
+              <div class="mb-3 pb-3 border-b border-gray-100">
+                <p class="font-semibold text-gray-700 text-sm mb-2"><i class="fas fa-tags mr-1 text-teal"></i>Promozioni e sconti</p>
+                <div class="flex flex-col gap-2 mb-2">
+                  <label class="flex items-center gap-2 cursor-pointer p-2 border rounded-lg text-sm hover:border-teal transition"
+                    :class="promoSelezionata === 'black_friday' ? 'border-teal bg-teal-light' : 'border-gray-200'">
+                    <input type="radio" name="promo" value="black_friday"
+                      x-model="promoSelezionata" @change="codiceScontoApplicato = null; codiceScontoErrore = ''" class="accent-teal" />
+                    <span>Black Friday — <strong>80% sconto</strong> per 8 mesi</span>
+                    <span class="ml-auto text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">-80%</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer p-2 border rounded-lg text-sm hover:border-teal transition"
+                    :class="promoSelezionata === 'welcome_promo' ? 'border-teal bg-teal-light' : 'border-gray-200'">
+                    <input type="radio" name="promo" value="welcome_promo"
+                      x-model="promoSelezionata" @change="codiceScontoApplicato = null; codiceScontoErrore = ''" class="accent-teal" />
+                    <span>Welcome Promo — <strong>12 mesi gratuiti</strong> per nuovi clienti</span>
+                    <span class="ml-auto text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">GRATIS</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer p-2 border rounded-lg text-sm hover:border-teal transition border-gray-200"
+                    :class="promoSelezionata === null && !codiceScontoApplicato ? 'border-gray-300' : ''">
+                    <input type="radio" name="promo" :value="null"
+                      :checked="promoSelezionata === null" @change="promoSelezionata = null; codiceScontoErrore = ''" class="accent-teal" />
+                    <span class="text-gray-500">Nessuna promo</span>
+                  </label>
                 </div>
-                <button
-                  type="button"
-                  @click="abbonamentoAnnuale = !abbonamentoAnnuale"
-                  :class="abbonamentoAnnuale ? 'bg-teal' : 'bg-gray-200'"
-                  class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
-                  <span
-                    :class="abbonamentoAnnuale ? 'translate-x-5' : 'translate-x-1'"
-                    class="inline-block h-4 w-4 mt-1 rounded-full bg-white shadow transform transition duration-200 ease-in-out"></span>
-                </button>
+                <div class="flex gap-2 items-start">
+                  <input x-model="codiceScontoInput" type="text" class="form-input flex-1 text-sm uppercase" placeholder="Codice sconto (es. ENILIVE10)"
+                    @keyup.enter="applicaCodiceSconto()" />
+                  <button class="btn-secondary text-sm !py-2" @click="applicaCodiceSconto()">Applica</button>
+                </div>
+                <template x-if="codiceScontoErrore">
+                  <p class="text-red-500 text-xs mt-1" x-text="codiceScontoErrore"></p>
+                </template>
+                <template x-if="codiceScontoApplicato">
+                  <p class="text-green-600 text-xs mt-1"><i class="fas fa-check-circle mr-1"></i><span x-text="codiceScontoApplicato.label + ' applicato (' + codiceScontoApplicato.codice + ')'"></span></p>
+                </template>
               </div>
               <div class="flex items-center justify-between">
                 <span class="font-bold text-gray-900">Totale mensile contratto</span>
-                <div class="text-right">
-                  <template x-if="abbonamentoAnnuale">
-                    <div>
-                      <span class="text-gray-400 line-through text-base">€<span x-text="calcContratto1Total().toFixed(2)"></span>/mese</span>
-                      <div class="text-2xl font-bold text-teal">€<span x-text="(calcContratto1Total() * 10/12).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></div>
-                      <span class="text-xs text-green-600 font-medium">10 mesi al prezzo di 12</span>
-                    </div>
-                  </template>
-                  <template x-if="!abbonamentoAnnuale">
-                    <span class="text-2xl font-bold text-teal">€<span x-text="calcContratto1Total().toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
-                  </template>
-                </div>
+                <span class="text-2xl font-bold text-teal">€<span x-text="calcContratto1Total().toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
               </div>
             </div>
 
@@ -1869,7 +1958,7 @@
                   <div class="mb-3">
                     <label class="form-label">Targa veicolo</label>
                     <select :value="c2obu1Targa" class="form-input"
-                      @change="if ($event.target.value === '__new__') { c2obu1AddNew = true } else { c2obu1Targa = $event.target.value; c2obu1AddNew = false }">
+                      @change="if ($event.target.value === '__new__') { c2obu1AddNew = true } else { c2obu1Targa = $event.target.value; c2obu1AddNew = false; verificaTarga(c2obu1Targa, cliente?.cf); }">
                       <option value="">— Seleziona targa —</option>
                       <template x-for="t in targhe.filter(t => t.trim())" :key="t">
                         <option :value="t" x-text="t.toUpperCase()"></option>
@@ -1920,7 +2009,7 @@
                     <div class="mb-2">
                       <label class="form-label text-xs">Targa</label>
                       <select :value="c2obu2Targa" class="form-input text-sm"
-                        @change="if ($event.target.value === '__new__') { c2obu2AddNew = true } else { c2obu2Targa = $event.target.value; c2obu2AddNew = false }">
+                        @change="if ($event.target.value === '__new__') { c2obu2AddNew = true } else { c2obu2Targa = $event.target.value; c2obu2AddNew = false; verificaTarga(c2obu2Targa, cliente?.cf); }">
                         <option value="">— Seleziona —</option>
                         <template x-for="t in targhe.filter(t => t.trim())" :key="t">
                           <option :value="t" x-text="t.toUpperCase()"></option>
@@ -2015,38 +2104,17 @@
               </div>
             </template>
 
-            <!-- Totale generale -->
+            <!-- Totale generale (A3: sconto già applicato nei calc) -->
             <div class="card p-4 bg-gray-50">
-              <!-- Toggle abbonamento annuale -->
-              <div class="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
-                <div>
-                  <span class="font-semibold text-gray-700 text-sm">Abbonamento annuale</span>
-                  <span class="ml-2 text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">2 mesi omaggio</span>
-                </div>
-                <button
-                  type="button"
-                  @click="abbonamentoAnnuale = !abbonamentoAnnuale"
-                  :class="abbonamentoAnnuale ? 'bg-teal' : 'bg-gray-200'"
-                  class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
-                  <span
-                    :class="abbonamentoAnnuale ? 'translate-x-5' : 'translate-x-1'"
-                    class="inline-block h-4 w-4 mt-1 rounded-full bg-white shadow transform transition duration-200 ease-in-out"></span>
-                </button>
-              </div>
+              <template x-if="codiceScontoApplicato || promoSelezionata">
+                <p class="text-xs text-green-600 mb-2 font-medium">
+                  <i class="fas fa-tags mr-1"></i>
+                  <span x-text="codiceScontoApplicato ? codiceScontoApplicato.label + ' attivo' : (promoSelezionata === 'welcome_promo' ? 'Welcome Promo — 12 mesi gratuiti' : 'Black Friday — 80% per 8 mesi')"></span>
+                </p>
+              </template>
               <div class="flex items-center justify-between">
                 <span class="font-bold text-gray-900">Totale generale mensile</span>
-                <div class="text-right">
-                  <template x-if="abbonamentoAnnuale">
-                    <div>
-                      <span class="text-gray-400 line-through text-base">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</span>
-                      <div class="text-2xl font-bold text-teal">€<span x-text="((calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)) * 10/12).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></div>
-                      <span class="text-xs text-green-600 font-medium">10 mesi al prezzo di 12</span>
-                    </div>
-                  </template>
-                  <template x-if="!abbonamentoAnnuale">
-                    <span class="text-2xl font-bold text-teal">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
-                  </template>
-                </div>
+                <span class="text-2xl font-bold text-teal">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span><span class="text-sm font-medium text-gray-500">/mese</span></span>
               </div>
             </div>
 
@@ -2060,44 +2128,105 @@
         </template>
         </div><!-- /OBU path -->
 
-        <!-- RSA Standalone path -->
+        <!-- RSA Standalone path — IBAN + pagamento -->
         <template x-if="tabletServizioSelezionato === 'rsa_standalone'">
           <div>
             <div class="mb-6">
-              <h2 class="text-xl font-bold text-gray-900">RSA — Riepilogo Contratto</h2>
-              <p class="text-gray-500 text-sm">Verifica i dettagli e inserisci l'IBAN per l'addebito mensile</p>
+              <h2 class="text-xl font-bold text-gray-900">Configurazione RSA</h2>
+              <p class="text-gray-500 text-sm">Riepilogo contratto e metodo di pagamento</p>
             </div>
 
-            <!-- Riepilogo RSA -->
-            <div class="card p-6 mb-4">
-              <h3 class="font-semibold text-gray-800 mb-4"><i class="fas fa-shield-alt mr-2 text-teal"></i>Dettagli contratto RSA</h3>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between py-1.5 border-b border-gray-100">
-                  <span class="text-gray-500">Servizio</span>
-                  <span class="font-medium">RSA — Assistenza Stradale</span>
-                </div>
-                <div class="flex justify-between py-1.5 border-b border-gray-100">
-                  <span class="text-gray-500">Veicoli abilitati</span>
-                  <span class="font-medium font-mono" x-text="rsaStandaloneTarghe.filter(t => t.targa.trim()).map(t => t.targa.toUpperCase()).join(', ')"></span>
-                </div>
-                <div class="flex justify-between py-1.5 border-b border-gray-100">
-                  <span class="text-gray-500">Costo unitario</span>
-                  <span class="font-medium">€2,50/mese per veicolo</span>
-                </div>
-                <div class="flex justify-between py-1.5 border-b border-gray-100">
-                  <span class="text-gray-500">Decorrenza</span>
-                  <span class="font-medium">Immediata</span>
-                </div>
-                <div class="flex justify-between py-2">
+            <!-- Riepilogo veicoli RSA -->
+            <div class="card p-5 mb-4">
+              <h5 class="font-semibold text-gray-700 text-sm mb-3"><i class="fas fa-shield-alt mr-2 text-teal"></i>Veicoli inclusi nel contratto RSA</h5>
+              <div class="space-y-2">
+                <template x-for="(t, idx) in rsaStandaloneTarghe.filter(t => t.targa.trim())" :key="idx">
+                  <div class="flex justify-between items-center py-1.5 border-b border-gray-100 text-sm">
+                    <span class="font-mono font-semibold text-gray-800 uppercase" x-text="t.targa.toUpperCase()"></span>
+                    <span class="text-gray-500">RSA Assistenza Stradale — <span class="font-medium text-gray-700">€2,50/mese</span></span>
+                  </div>
+                </template>
+                <div class="flex justify-between items-center pt-2">
                   <span class="font-semibold text-gray-700">Totale mensile</span>
-                  <span class="text-lg font-bold text-teal" x-text="'€' + (rsaStandaloneTarghe.filter(t => t.targa.trim()).length * 2.50).toFixed(2) + '/mese'"></span>
+                  <span class="text-lg font-bold text-teal" x-text="'€' + calcContratto1Total().toFixed(2) + '/mese'"></span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Promozioni e sconti RSA (A3) -->
+            <div class="card p-5 mb-4">
+              <p class="font-semibold text-gray-700 text-sm mb-2"><i class="fas fa-tags mr-1 text-teal"></i>Promozioni e sconti</p>
+              <div class="flex flex-col gap-2 mb-2">
+                <label class="flex items-center gap-2 cursor-pointer p-2 border rounded-lg text-sm hover:border-teal transition"
+                  :class="promoSelezionata === 'black_friday' ? 'border-teal bg-teal-light' : 'border-gray-200'">
+                  <input type="radio" name="promo_rsa" value="black_friday"
+                    x-model="promoSelezionata" @change="codiceScontoApplicato = null; codiceScontoErrore = ''" class="accent-teal" />
+                  <span>Black Friday — <strong>80% sconto</strong> per 8 mesi</span>
+                  <span class="ml-auto text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">-80%</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer p-2 border rounded-lg text-sm hover:border-teal transition"
+                  :class="promoSelezionata === 'welcome_promo' ? 'border-teal bg-teal-light' : 'border-gray-200'">
+                  <input type="radio" name="promo_rsa" value="welcome_promo"
+                    x-model="promoSelezionata" @change="codiceScontoApplicato = null; codiceScontoErrore = ''" class="accent-teal" />
+                  <span>Welcome Promo — <strong>12 mesi gratuiti</strong> per nuovi clienti</span>
+                  <span class="ml-auto text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">GRATIS</span>
+                </label>
+              </div>
+              <div class="flex gap-2 items-start">
+                <input x-model="codiceScontoInput" type="text" class="form-input flex-1 text-sm uppercase" placeholder="Codice sconto (es. ENILIVE10)"
+                  @keyup.enter="applicaCodiceSconto()" />
+                <button class="btn-secondary text-sm !py-2" @click="applicaCodiceSconto()">Applica</button>
+              </div>
+              <template x-if="codiceScontoErrore">
+                <p class="text-red-500 text-xs mt-1" x-text="codiceScontoErrore"></p>
+              </template>
+              <template x-if="codiceScontoApplicato">
+                <p class="text-green-600 text-xs mt-1"><i class="fas fa-check-circle mr-1"></i><span x-text="codiceScontoApplicato.label + ' applicato (' + codiceScontoApplicato.codice + ')'"></span></p>
+              </template>
+              <template x-if="promoSelezionata || codiceScontoApplicato">
+                <div class="mt-3 pt-3 border-t border-gray-100 flex justify-between text-sm">
+                  <span class="text-gray-500">Totale mensile scontato</span>
+                  <span class="font-bold text-teal" x-text="'€' + calcContratto1Total().toFixed(2) + '/mese'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- IBAN RSA Standalone (B4 — allineato a OBU IBAN card) -->
+            <div class="card p-5 mb-4">
+              <h5 class="font-semibold text-gray-700 text-sm mb-3"><i class="fas fa-university mr-2 text-teal"></i>Metodo di pagamento</h5>
+              <div class="relative mb-2">
+                <input x-model="iban" type="text" class="form-input uppercase pr-10"
+                  placeholder="IT60 X054 2811 1010 0000 0123 456" @input="ibanVerifyStatus = null" />
+                <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                  <template x-if="ibanVerifyStatus === 'checking'"><div class="spinner"></div></template>
+                  <template x-if="ibanVerifyStatus === 'ok'"><i class="fas fa-check-circle text-green-500"></i></template>
+                  <template x-if="ibanVerifyStatus === 'ko'"><i class="fas fa-times-circle text-red-500"></i></template>
+                </div>
+              </div>
+              <button class="btn-secondary text-sm" @click="verifyIban()">
+                <i class="fas fa-search"></i> Verifica IBAN
+              </button>
+              <p class="text-xs text-gray-400 mt-2">
+                <i class="fas fa-info-circle mr-1"></i>Es.: <span class="font-mono select-all cursor-text">IT60 X054 2811 1010 0000 0123 456</span>
+              </p>
+              <template x-if="ibanVerifyStatus === 'ok'">
+                <p class="text-green-600 text-sm mt-1.5"><i class="fas fa-check-circle mr-1"></i>IBAN verificato</p>
+              </template>
+              <template x-if="ibanVerifyStatus === 'ko'">
+                <p class="text-red-500 text-xs mt-2"><i class="fas fa-exclamation-circle mr-1"></i>IBAN non valido. Verifica il codice e riprova.</p>
+              </template>
+              <!-- Riepilogo importo -->
+              <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span class="text-sm text-gray-600">Totale mensile</span>
+                <span class="text-lg font-bold text-teal">€<span x-text="calcContratto1Total().toFixed(2)"></span>/mese</span>
               </div>
             </div>
 
             <div class="flex justify-between">
               <button class="btn-ghost" @click="prevStep()"><i class="fas fa-arrow-left"></i> Indietro</button>
-              <button class="btn-primary" @click="goToStep(7)">
+              <button class="btn-primary" :disabled="ibanVerifyStatus !== 'ok'"
+                :class="ibanVerifyStatus !== 'ok' ? 'opacity-50 cursor-not-allowed' : ''"
+                @click="nextStep()">
                 Procedi alla firma <i class="fas fa-arrow-right ml-1"></i>
               </button>
             </div>
@@ -2116,8 +2245,8 @@
           <p class="text-gray-500 text-sm">Scansiona il dispositivo e associalo alla targa del cliente</p>
         </div>
 
-        <!-- RSA-only: skip step -->
-        <template x-if="creditCheckStatus === 'ok_rsa_only'">
+        <!-- RSA-only / RSA standalone: skip step -->
+        <template x-if="creditCheckStatus === 'ok_rsa_only' || tabletServizioSelezionato === 'rsa_standalone'">
           <div class="card p-8 text-center max-w-lg mx-auto">
             <i class="fas fa-info-circle text-4xl text-blue-400 mb-4"></i>
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Step non necessario</h3>
@@ -2301,20 +2430,26 @@
               <p class="text-gray-600 mb-4">Il contratto ha durata indeterminata con rinnovo mensile. Disdetta con preavviso di 30 giorni.</p>
               <p class="font-semibold text-gray-700 mb-2">Servizi inclusi:</p>
               <ul class="list-disc list-inside space-y-1 text-gray-600">
-                <template x-if="creditCheckStatus !== 'ok_rsa_only'">
+                <!-- Path OBU: mostrato solo quando il servizio selezionato NON è rsa_standalone -->
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && creditCheckStatus !== 'ok_rsa_only'">
                   <li>Telepedaggio Enilive — OBU #1 targa <span x-text="obu1Targa ? obu1Targa.toUpperCase() : (targaSelezionata || 'da assegnare')"></span></li>
                 </template>
-                <template x-if="obu1Rsa && creditCheckStatus !== 'ok_rsa_only'"><li>RSA — Assistenza Stradale (OBU #1)</li></template>
-                <template x-if="obu1Furto && creditCheckStatus !== 'ok_rsa_only'"><li>Furto / Smarrimento OBU #1</li></template>
-                <template x-if="hasObu2 && creditCheckStatus !== 'ok_rsa_only'">
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && obu1Rsa && creditCheckStatus !== 'ok_rsa_only'"><li>RSA — Assistenza Stradale (OBU #1)</li></template>
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && obu1Furto && creditCheckStatus !== 'ok_rsa_only'"><li>Furto / Smarrimento OBU #1</li></template>
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && hasObu2 && creditCheckStatus !== 'ok_rsa_only'">
                   <li>Telepedaggio Enilive — OBU #2 targa <span x-text="obu2Targa ? obu2Targa.toUpperCase() : (targaSelezionata2 || 'da assegnare')"></span></li>
                 </template>
-                <template x-if="hasObu2 && obu2Rsa"><li>RSA — Assistenza Stradale (OBU #2)</li></template>
-                <template x-if="hasObu2 && obu2Furto"><li>Furto / Smarrimento OBU #2</li></template>
-                <template x-for="rsa in rsaStandalone.filter(r => r.targa.trim())" :key="rsa.targa">
-                  <li>RSA Standalone — targa <span x-text="rsa.targa.toUpperCase()"></span></li>
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && hasObu2 && obu2Rsa && creditCheckStatus !== 'ok_rsa_only'"><li>RSA — Assistenza Stradale (OBU #2)</li></template>
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone' && hasObu2 && obu2Furto && creditCheckStatus !== 'ok_rsa_only'"><li>Furto / Smarrimento OBU #2</li></template>
+                <!-- RSA Standalone aggiuntive nel path OBU (non nel path rsa_standalone) -->
+                <template x-if="tabletServizioSelezionato !== 'rsa_standalone'">
+                  <template x-for="rsa in rsaStandalone.filter(r => r.targa.trim())" :key="rsa.targa">
+                    <li>RSA Standalone — targa <span x-text="rsa.targa.toUpperCase()"></span></li>
+                  </template>
                 </template>
+                <!-- Path RSA-only da Cerved (creditCheckStatus === 'ok_rsa_only') -->
                 <template x-if="creditCheckStatus === 'ok_rsa_only'"><li>RSA Stand-Alone — Assistenza Stradale Illimitata</li></template>
+                <!-- Path RSA Standalone selezionato dall'operatore (tabletServizioSelezionato === 'rsa_standalone') -->
                 <template x-if="tabletServizioSelezionato === 'rsa_standalone'">
                   <template x-for="item in rsaStandaloneTarghe.filter(x => x.targa.trim())" :key="item.targa">
                     <li>RSA Standalone — targa <span x-text="item.targa.toUpperCase()"></span></li>
@@ -2481,14 +2616,12 @@
               <i class="fas fa-euro-sign w-5 text-center text-teal"></i>
               <div>
                 <p class="text-xs text-gray-400">Canone mensile totale</p>
-                <template x-if="abbonamentoAnnuale">
-                  <div>
-                    <p class="font-semibold text-gray-800">€<span x-text="((calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)) * 10/12).toFixed(2)"></span>/mese</p>
-                    <p class="text-xs text-green-600 font-medium">Annuale — 10 mesi al prezzo di 12</p>
-                  </div>
-                </template>
-                <template x-if="!abbonamentoAnnuale">
-                  <p class="font-semibold text-gray-800">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</p>
+                <p class="font-semibold text-gray-800">€<span x-text="(calcContratto1Total() + contrattiAggiuntivi.reduce((s,c) => s + calcContrattoAggiuntoTotal(c), 0)).toFixed(2)"></span>/mese</p>
+                <template x-if="codiceScontoApplicato || promoSelezionata">
+                  <p class="text-xs text-green-600 font-medium">
+                    <i class="fas fa-tags mr-0.5"></i>
+                    <span x-text="codiceScontoApplicato ? codiceScontoApplicato.label : (promoSelezionata === 'welcome_promo' ? 'Welcome Promo attiva' : 'Black Friday -80% attivo')"></span>
+                  </p>
                 </template>
               </div>
             </div>
@@ -3299,7 +3432,7 @@
         <template x-if="assistStep === 'recupero-credenziali'">
           <div class="card p-8 max-w-2xl mx-auto">
             <div class="flex items-center gap-3 mb-6">
-              <button class="btn-ghost text-sm py-1.5 px-3" @click="assistStep = 'ricerca'; recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false">
+              <button class="btn-ghost text-sm py-1.5 px-3" @click="assistStep = 'ricerca'; recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false; recuperoOtpSent = false; recuperoOtpInput = ''; recuperoOtpConfirmed = false; recuperoOtpFieldEnabled = false; recuperoResetLinkSent = false;">
                 <i class="fas fa-arrow-left mr-1"></i> Torna
               </button>
               <h2 class="text-lg font-bold text-gray-900">Recupero credenziali cliente</h2>
@@ -3330,6 +3463,7 @@
                   <i class="fas fa-shield-alt"></i>
                   <span class="font-semibold">Visibile solo a operatore autorizzato</span>
                 </div>
+                <!-- Dati anagrafici -->
                 <div class="bg-gray-50 rounded-xl p-5 space-y-3">
                   <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -3342,30 +3476,77 @@
                     </div>
                   </div>
                   <div>
-                    <p class="text-xs text-gray-400 mb-1">Email</p>
-                    <template x-if="!recuperoEmailEditing">
-                      <div class="flex items-center justify-between gap-3">
-                        <p class="font-semibold text-gray-900 font-mono text-sm" x-text="recuperoResult.email || '—'"></p>
-                        <button class="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
-                          @click="recuperoEmailEditing = true; recuperoNewEmail = recuperoResult.email || ''">
-                          <i class="fas fa-edit mr-1"></i> Aggiorna email
-                        </button>
-                      </div>
-                    </template>
-                    <template x-if="recuperoEmailEditing">
-                      <div class="space-y-2">
-                        <input x-model="recuperoNewEmail" type="email" class="form-input" placeholder="nuova@email.it" />
-                        <div class="flex gap-2">
-                          <button class="btn-primary text-sm py-2 px-4" @click="salvaEmailRecupero()" :disabled="!recuperoNewEmail.trim()">
-                            <i class="fas fa-save mr-1"></i> Salva
-                          </button>
-                          <button class="btn-ghost text-sm" @click="recuperoEmailEditing = false">Annulla</button>
-                        </div>
-                      </div>
-                    </template>
+                    <p class="text-xs text-gray-400 mb-1">Email attuale</p>
+                    <p class="font-semibold text-gray-900 font-mono text-sm" x-text="recuperoResult.email || '—'"></p>
                   </div>
                 </div>
-                <button class="btn-ghost text-sm" @click="recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false">
+
+                <!-- B2 — Cambio email con OTP -->
+                <div class="card p-4 border border-blue-200 space-y-3">
+                  <p class="font-semibold text-gray-800 text-sm"><i class="fas fa-envelope mr-1 text-blue-500"></i>Aggiorna email</p>
+                  <div class="flex gap-2">
+                    <input x-model="recuperoNewEmail" type="email" class="form-input flex-1 text-sm"
+                      placeholder="nuova@email.it" :disabled="recuperoOtpConfirmed" />
+                    <button class="btn-secondary text-sm flex-shrink-0"
+                      :disabled="!recuperoNewEmail.trim() || recuperoOtpConfirmed"
+                      @click="recuperoOtpSent = true; recuperoOtpFieldEnabled = true;
+                        const _cf = recuperoRawCf;
+                        const _tel = (() => { try { const r = JSON.parse(localStorage.getItem('clientiDemo') || '{}')[_cf?.toUpperCase()]; return r?.contatti?.telefono || ''; } catch(_){return '';} })();
+                        Bus.emit('sms:outbound', { id: 'sms_rec_otp_' + Date.now(), to: _tel, template: 'OTP_ASSISTENZA', preview: 'Enilive: il tuo codice OTP per aggiornamento email è 1234', dati: { cf: _cf } });
+                        showToastMsg('OTP inviato al cliente', 'info');">
+                      Invia OTP
+                    </button>
+                  </div>
+                  <template x-if="recuperoOtpSent && !recuperoOtpConfirmed">
+                    <div class="space-y-2">
+                      <div class="flex gap-2">
+                        <input x-model="recuperoOtpInput" type="text" class="form-input flex-1 text-sm font-mono"
+                          placeholder="Codice OTP (1234)" maxlength="6" :disabled="!recuperoOtpFieldEnabled" />
+                        <button class="btn-primary text-sm flex-shrink-0"
+                          :disabled="!recuperoOtpInput.trim()"
+                          @click="if (recuperoOtpInput.trim() === '1234') {
+                            recuperoOtpConfirmed = true;
+                            salvaEmailRecupero();
+                          } else {
+                            showToastMsg('OTP non valido — codice corretto: 1234', 'error');
+                          }">
+                          Verifica
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="recuperoOtpConfirmed">
+                    <div class="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2">
+                      <i class="fas fa-check-circle"></i> Email aggiornata a: <span class="font-mono font-semibold" x-text="recuperoResult.email"></span>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- B2 — Invia link reset password -->
+                <div class="card p-4 border border-gray-200 space-y-3">
+                  <p class="font-semibold text-gray-800 text-sm"><i class="fas fa-key mr-1 text-gray-500"></i>Reset password</p>
+                  <p class="text-xs text-gray-500">Invia all'email del cliente un link per reimpostare la password dell'app.</p>
+                  <template x-if="!recuperoResetLinkSent">
+                    <button class="btn-secondary text-sm w-full justify-center"
+                      :disabled="!recuperoResult.email"
+                      @click="Bus.emit('sms:outbound', {
+                        id: 'sms_reset_' + Date.now(),
+                        to: recuperoResult.email,
+                        template: 'RESET_PASSWORD',
+                        preview: 'Enilive: clicca qui per reimpostare la tua password → [link mock]',
+                        dati: { cf: recuperoRawCf, email: recuperoResult.email }
+                      }); recuperoResetLinkSent = true; showToastMsg('Link reset inviato', 'success');">
+                      <i class="fas fa-paper-plane mr-1"></i> Invia link reset via email
+                    </button>
+                  </template>
+                  <template x-if="recuperoResetLinkSent">
+                    <div class="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2">
+                      <i class="fas fa-check-circle"></i> Link inviato a <span class="font-mono ml-1" x-text="recuperoResult.email"></span>
+                    </div>
+                  </template>
+                </div>
+
+                <button class="btn-ghost text-sm" @click="recuperoSearchStatus = null; recuperoResult = null; recuperoSearchQuery = ''; recuperoEmailEditing = false; recuperoOtpSent = false; recuperoOtpInput = ''; recuperoOtpConfirmed = false; recuperoOtpFieldEnabled = false; recuperoResetLinkSent = false;">
                   <i class="fas fa-search mr-1"></i> Cerca un altro cliente
                 </button>
               </div>
@@ -3485,6 +3666,24 @@
               </button>
             </div>
 
+            <!-- Banner anagrafica incompleta (C3) -->
+            <template x-if="_schedaMissingFields().length > 0">
+              <div class="mb-5 bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+                <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 flex-shrink-0"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-amber-800 text-sm">Anagrafica incompleta</p>
+                  <p class="text-xs text-amber-700 mt-0.5">
+                    Campi obbligatori mancanti:
+                    <span class="font-semibold" x-text="_schedaMissingFields().join(', ')"></span>
+                  </p>
+                </div>
+                <button class="btn-secondary text-xs py-1.5 px-3 flex-shrink-0 border-amber-400 text-amber-700 hover:bg-amber-100"
+                  @click="missingFields = _schedaMissingFieldsKeys(); aggiornaDatiForm = { nome: assistCliente.nome || '', cognome: assistCliente.cognome || '', telefono: assistCliente.cellulare || '', email: assistCliente.email || '', privacy: !!(_getClientiDemo()[assistCliente.cf?.toUpperCase()]?.consensi?.privacy), mandatoSdd: !!(_getClientiDemo()[assistCliente.cf?.toUpperCase()]?.consensi?.mandatoSdd) }; quickObuNextStep = 'scheda'; assistStep = 'aggiorna-scheda'; $nextTick(() => window.scrollTo(0,0))">
+                  <i class="fas fa-pencil-alt mr-1"></i> Completa anagrafica
+                </button>
+              </div>
+            </template>
+
             <div class="grid grid-cols-2 gap-4 mb-4">
               <div class="bg-gray-50 rounded-xl p-4">
                 <p class="text-xs text-gray-400 mb-1">Cliente</p>
@@ -3575,6 +3774,22 @@
                           <span class="text-xs px-1.5 py-0.5 rounded-full"
                             :class="rs.stato==='attivo'?'bg-green-100 text-green-600':'bg-gray-100 text-gray-500'"
                             x-text="rs.stato"></span>
+                        </div>
+                      </template>
+                      <!-- B3 — Veicoli associati (solo contratti RSA standalone) -->
+                      <template x-if="c.tipo !== 'obu' && (c.serviziRsa || []).length > 0">
+                        <div class="pt-2 border-t border-gray-100">
+                          <p class="text-xs text-gray-400 mb-1.5">Veicoli associati</p>
+                          <div class="flex flex-wrap gap-1.5">
+                            <template x-for="rs in (c.serviziRsa || [])" :key="rs.id">
+                              <span class="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 text-sm font-mono"
+                                x-text="(() => { const rec = _getClientiDemo()[assistCliente.cf?.toUpperCase()]; const v = (rec?.veicoli || []).find(v => v.id === rs.veicoloId); return v ? v.targa : (rs.veicoloId?.replace('v_','') || '—'); })()">
+                              </span>
+                            </template>
+                            <template x-if="(c.serviziRsa || []).length === 0">
+                              <span class="text-xs text-gray-400">Nessun veicolo associato</span>
+                            </template>
+                          </div>
                         </div>
                       </template>
                       <!-- IBAN + Totale -->
@@ -3848,19 +4063,75 @@
             <!-- ========== 4.4 — Sostituisci OBU ========== -->
             <template x-if="assistAzione === 'sostituisci-obu'">
               <div class="space-y-4">
+                <!-- OBU da sostituire — scanner se non ancora identificato (arrivo da griglia), badge se già noto (arrivo da quick-obu) -->
                 <div>
                   <label class="form-label">OBU da sostituire</label>
-                  <div class="border border-teal bg-teal-light rounded-lg p-3 flex items-center gap-3">
-                    <i class="fas fa-broadcast-tower text-teal"></i>
-                    <div class="flex-1">
-                      <p class="font-mono font-semibold text-sm text-gray-800" x-text="assistForm.obuSelezionato || '—'"></p>
-                      <template x-if="assistCliente.obu && assistCliente.obu.length > 0">
-                        <p class="text-xs text-gray-500"
-                          x-text="'Targa: ' + ((assistCliente.obu.find(o => o.codice === assistForm.obuSelezionato) || assistCliente.obu[0]).targa)"></p>
-                      </template>
+                  <!-- Già identificato via quick-obu -->
+                  <template x-if="assistForm.obuSelezionato">
+                    <div class="border border-teal bg-teal-light rounded-lg p-3 flex items-center gap-3">
+                      <i class="fas fa-broadcast-tower text-teal"></i>
+                      <div class="flex-1">
+                        <p class="font-mono font-semibold text-sm text-gray-800" x-text="assistForm.obuSelezionato"></p>
+                        <template x-if="assistCliente.obu && assistCliente.obu.length > 0">
+                          <p class="text-xs text-gray-500"
+                            x-text="'Targa: ' + ((assistCliente.obu.find(o => o.codice === assistForm.obuSelezionato) || assistCliente.obu[0]).targa)"></p>
+                        </template>
+                      </div>
+                      <button class="text-xs text-gray-400 hover:text-red-500 px-2 py-1" @click="assistForm.obuSelezionato = ''; obuScannerStatus = null; obuScannedCode = ''; obuManualCode = ''" title="Scansiona un OBU diverso">
+                        <i class="fas fa-times"></i>
+                      </button>
+                      <span class="text-xs text-teal font-semibold px-2 py-1 bg-white rounded-lg border border-teal">Identificato</span>
                     </div>
-                    <span class="text-xs text-teal font-semibold px-2 py-1 bg-white rounded-lg border border-teal">Identificato</span>
-                  </div>
+                  </template>
+                  <!-- Non ancora identificato: scanner OBU -->
+                  <template x-if="!assistForm.obuSelezionato">
+                    <div class="space-y-3">
+                      <p class="text-xs text-gray-500">Scansiona il codice a barre dell'OBU da sostituire oppure inseriscilo manualmente.</p>
+                      <!-- Scanner -->
+                      <div class="relative bg-gray-900 rounded-2xl overflow-hidden flex items-center justify-center" style="height:160px;">
+                        <template x-if="obuScannerStatus === null">
+                          <div class="flex flex-col items-center gap-3 z-10">
+                            <div class="flex gap-1">
+                              <template x-for="w in [18,10,14,8,16,10,18]" :key="w">
+                                <div class="bg-gray-500 rounded-sm" :style="'width:' + w + 'px; height:72px;'"></div>
+                              </template>
+                            </div>
+                            <button class="btn-primary text-sm px-5 py-2" @click="simulaScanObuVecchio()">
+                              <i class="fas fa-barcode mr-2"></i> Scansiona OBU
+                            </button>
+                          </div>
+                        </template>
+                        <template x-if="obuScannerStatus === 'scanning'">
+                          <div class="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                            <div class="w-48 h-1 bg-red-500 opacity-80 animate-pulse rounded"></div>
+                            <span class="text-gray-300 text-xs mt-2">Scansione in corso...</span>
+                          </div>
+                        </template>
+                        <template x-if="obuScannerStatus === 'found'">
+                          <div class="absolute inset-0 bg-emerald-900/80 flex flex-col items-center justify-center gap-2">
+                            <i class="fas fa-check-circle text-emerald-400 text-3xl"></i>
+                            <span class="text-white font-bold text-sm font-mono" x-text="obuScannedCode"></span>
+                            <span class="text-emerald-300 text-xs">OBU riconosciuto</span>
+                          </div>
+                        </template>
+                        <template x-if="obuScannerStatus === 'notfound'">
+                          <div class="absolute inset-0 bg-red-900/70 flex flex-col items-center justify-center gap-2">
+                            <i class="fas fa-times-circle text-red-400 text-3xl"></i>
+                            <span class="text-white text-xs">OBU non trovato</span>
+                            <button class="text-xs text-red-200 underline mt-1" @click="obuScannerStatus = null; obuScannedCode = ''">Riprova</button>
+                          </div>
+                        </template>
+                      </div>
+                      <!-- Inserimento manuale -->
+                      <div class="flex gap-2 items-center">
+                        <input x-model="obuManualCode" class="form-input text-sm font-mono" placeholder="Inserisci codice OBU manualmente"
+                          @keydown.enter="confermaCodiceObuVecchio()" />
+                        <button class="btn-secondary px-3 flex-shrink-0 text-sm" @click="confermaCodiceObuVecchio()" :disabled="!obuManualCode.trim()">
+                          <i class="fas fa-check"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
                 </div>
                 <div>
                   <label class="form-label">Nuovo codice OBU</label>
@@ -3932,7 +4203,7 @@
                 </div>
                 <div>
                   <label class="form-label">Nuova targa</label>
-                  <input x-model="assistForm.nuovaTarga" class="form-input uppercase" placeholder="es. CD789EF" @input="checkTarga()" />
+                  <input x-model="assistForm.nuovaTarga" class="form-input uppercase" placeholder="es. CD789EF" @input="checkTarga()" @blur="verificaTarga(assistForm.nuovaTarga, assistCliente?.cf)" />
                 </div>
                 <template x-if="cambioTargaHasRsa() && assistForm.obuSelezionato">
                   <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -4014,8 +4285,49 @@
                   </div>
                 </div>
                 <template x-if="assistForm.vuoleSostitutivo === 'si'">
-                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-                    <i class="fas fa-info-circle mr-1"></i> Dopo il blocco, usa "Sostituisci OBU" dalla griglia azioni.
+                  <div class="card p-4 border border-amber-200 bg-amber-50 space-y-3">
+                    <p class="text-sm font-semibold text-amber-800"><i class="fas fa-exchange-alt mr-1"></i>Assegna nuovo OBU sostitutivo</p>
+                    <template x-if="!assistForm.nuovoObuFurtoConfermato">
+                      <div class="flex gap-2">
+                        <input x-model="assistForm.nuovoObuFurto" type="text" class="form-input flex-1 font-mono uppercase text-sm"
+                          placeholder="es. OBU-002-2026" />
+                        <button class="btn-secondary text-sm !px-3"
+                          @click="if (assistForm.nuovoObuFurto.trim()) {
+                            const cf = assistCliente?.cf;
+                            const obuVecchio = assistForm.obuSelezionato;
+                            const obuNuovo = assistForm.nuovoObuFurto.trim();
+                            if (cf && obuVecchio && obuNuovo) {
+                              try {
+                                const clienti = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+                                const rec = clienti[cf.toUpperCase()];
+                                if (rec) {
+                                  (rec.contratti || []).forEach(c =>
+                                    (c.dispositivi || []).forEach(d => {
+                                      if (d.tipo === 'obu' && d.codice === obuVecchio) d.codice = obuNuovo;
+                                    })
+                                  );
+                                  localStorage.setItem('clientiDemo', JSON.stringify(clienti));
+                                }
+                              } catch(e) { console.error('furto sostitutivo write error', e); }
+                              Bus.emit('dispositivo:sostituito', { cf, obu_vecchio: obuVecchio, obu_nuovo: obuNuovo, motivo: 'furto' });
+                              assistForm.nuovoObuFurtoConfermato = true;
+                              showToastMsg('Nuovo OBU registrato: ' + obuNuovo, 'success');
+                            } else {
+                              showToastMsg('Inserisci il codice del nuovo OBU', 'error');
+                            }
+                          } else {
+                            showToastMsg('Inserisci il codice del nuovo OBU', 'error');
+                          }">
+                          <i class="fas fa-check"></i>
+                        </button>
+                      </div>
+                    </template>
+                    <template x-if="assistForm.nuovoObuFurtoConfermato">
+                      <div class="flex items-center gap-2 text-sm text-green-700">
+                        <i class="fas fa-check-circle"></i>
+                        Nuovo OBU registrato: <span class="font-mono font-semibold" x-text="assistForm.nuovoObuFurto"></span>
+                      </div>
+                    </template>
                   </div>
                 </template>
                 <template x-if="!assistOtpSent">
@@ -4060,12 +4372,8 @@
                     </div>
                   </template>
                 </div>
-                <label class="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-lg hover:border-teal transition-all">
-                  <input type="checkbox" x-model="assistForm.obuRicevuto" class="accent-teal w-5 h-5" />
-                  <span class="text-sm font-medium">OBU ricevuto fisicamente dal cliente</span>
-                </label>
                 <template x-if="!assistOtpSent">
-                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato || !assistForm.obuRicevuto">
+                  <button class="btn-secondary w-full justify-center" @click="inviaOtp()" :disabled="!assistForm.obuSelezionato">
                     <i class="fas fa-sms mr-1"></i> Invia OTP al cliente per conferma
                   </button>
                 </template>
@@ -4597,7 +4905,15 @@
         Il cliente <strong x-text="cliente.nome + ' ' + cliente.cognome"></strong> ha ricevuto la mail di benvenuto all'indirizzo:
       </p>
       <div class="bg-gray-50 rounded-lg px-4 py-3 mb-5 font-mono text-sm text-teal font-semibold" x-text="cliente.email || '—'"></div>
-      <p class="text-xs text-gray-400 mb-5">La mail contiene: copia del contratto, codici OBU, istruzioni di attivazione e link all'app.</p>
+      <template x-if="welcomeEmailServizi && welcomeEmailServizi.length > 0">
+        <ul class="text-left text-xs text-gray-500 mb-4 space-y-0.5 bg-gray-50 rounded-lg px-4 py-3">
+          <li class="font-semibold text-gray-600 mb-1">Servizi inclusi:</li>
+          <template x-for="linea in welcomeEmailServizi" :key="linea">
+            <li class="flex items-start gap-1.5"><i class="fas fa-check text-teal mt-0.5 flex-shrink-0"></i><span x-text="linea"></span></li>
+          </template>
+        </ul>
+      </template>
+      <p class="text-xs text-gray-400 mb-5">La mail include anche istruzioni di attivazione e link all'app.</p>
       <button class="btn-primary w-full justify-center" @click="showWelcomeModal = false">
         <i class="fas fa-check mr-2"></i>Chiudi
       </button>
@@ -4665,6 +4981,10 @@
           <input type="checkbox" x-model="ocrAlwaysNewClient" class="accent-teal" />
           OCR: genera sempre nuovo cliente
         </label>
+        <span class="text-slate-600 text-xs self-center mx-2">|</span>
+        <button class="demo-btn" @click="demoGeneraFattura()" title="Genera fattura del mese precedente per il cliente attivo">
+          <i class="fas fa-file-invoice mr-1 text-green-300"></i> Genera fattura mese prec.
+        </button>
       </div>
     </div>
   </template>
@@ -4711,6 +5031,11 @@ function tabletApp() {
     recuperoResult: null,
     recuperoEmailEditing: false,
     recuperoNewEmail: '',
+    recuperoOtpSent: false,
+    recuperoOtpInput: '',
+    recuperoOtpConfirmed: false,
+    recuperoOtpFieldEnabled: false,
+    recuperoResetLinkSent: false,
     cambioPagSearchQuery: '',
     cambioPagSearchStatus: null,
     cambioPagRawCf: null,
@@ -4720,6 +5045,7 @@ function tabletApp() {
     assistOtpSent: false,
     assistOtpValue: '',
     assistOtpConfirmed: false,
+    assistOtpFieldEnabled: false,  // true dopo documento:firmato (OTP_ASSISTENZA)
 
     // === ASSISTENZA — Operazione corrente ===
     assistOpLoading: false,
@@ -4731,7 +5057,7 @@ function tabletApp() {
       domVia: '', domCap: '', domCitta: '', domProvincia: '',
       email: '', cellulare: '',
       veicoli: [],
-      obuSelezionato: '', nuovoObu: '', obuScanning: false,
+      obuSelezionato: '', nuovoObu: '', nuovoObuFurto: '', nuovoObuFurtoConfermato: false, obuScanning: false,
       codicePolizzaRsa: '', rsaVeicoloIdSostituzione: null,
       aggiornaRsaConTarga: true,
       nuovaTarga: '', targaWarning: false,
@@ -4763,7 +5089,7 @@ function tabletApp() {
     step2Sub: 'doc',
     scanMode: 'manual',
     scanStatus: null,
-    ocrAlwaysNewClient: false, // DEMO: toggle OCR
+    ocrAlwaysNewClient: true, // DEMO: toggle OCR — default ON, OCR genera sempre nuovo cliente salvo deflag
     // Ricerca manuale
     manualSearchMode: 'cf',
     manualSearchCf: '',
@@ -4870,6 +5196,18 @@ function tabletApp() {
 
     abbonamentoAnnuale: false,
 
+    // === PROMOZIONI E SCONTI (A3) ===
+    promoSelezionata: null,          // null | 'black_friday' | 'welcome_promo'
+    codiceScontoInput: '',
+    codiceScontoApplicato: null,     // null | { codice, percentuale, label }
+    codiceScontoErrore: '',
+
+    // === VERIFICA TARGA (A2) ===
+    verificaTargaModal: null,  // null | { tipo: 'rsa_stesso'|'obu_stesso'|'altro_cliente', targa, messaggio }
+    trasferimentoTargaStep: null,          // null | 'richiedi' | 'conferma' — sub-step nel flusso trasferimento targa
+    _trasferimentoTargaSourceField: null,  // nome campo x-data che ha triggerato verificaTarga (per clear su Annulla)
+    _trasferimentoTargaCfVecchio: null,    // CF del proprietario precedente della targa (usato in _eseguiTrasferimentoTarga)
+
     // === STEP 6 ===
     contrattoSmsInviato: false,
     firmaOtpInput: '',
@@ -4878,6 +5216,7 @@ function tabletApp() {
     flowCompleted: false,
     emailConfermaVisible: false,
     showWelcomeModal: false,
+    welcomeEmailServizi: [],   // lista servizi effettivamente sottoscritti (A2)
 
     // === TOAST ===
     toastMessage: '',
@@ -4938,6 +5277,10 @@ function tabletApp() {
           this.mktCustomerProfilazione = !!p.profilazione;
           this.showToastMsg('Cliente ha selezionato i consensi — inserisci OTP', 'success');
         }
+        if (p.template === 'OTP_ASSISTENZA') {
+          this.assistOtpFieldEnabled = true;
+          this.showToastMsg('Cliente ha confermato tramite app — inserisci il codice OTP', 'success');
+        }
       });
     },
 
@@ -4981,6 +5324,7 @@ function tabletApp() {
       } else {
         this.rsaStandaloneTarghe[idx].targa = val;
         this.rsaStandaloneTarghe[idx]._addNew = false;
+        this.verificaTarga(val, this.cliente?.cf);
       }
     },
 
@@ -4993,6 +5337,7 @@ function tabletApp() {
       this.rsaStandaloneTarghe[idx].targa = val;
       this.rsaStandaloneTarghe[idx]._addNew = false;
       this.rsaStandaloneTarghe[idx]._newVal = '';
+      this.verificaTarga(val, this.cliente?.cf);
     },
 
     rsaStandaloneObjOnSelect(obj, val) {
@@ -5001,6 +5346,7 @@ function tabletApp() {
       } else {
         obj.targa = val;
         obj._addNew = false;
+        this.verificaTarga(val, this.cliente?.cf);
       }
     },
 
@@ -5013,6 +5359,7 @@ function tabletApp() {
       obj.targa = val;
       obj._addNew = false;
       obj._newVal = '';
+      this.verificaTarga(val, this.cliente?.cf);
     },
 
     confirmNewTarga(field) {
@@ -5024,6 +5371,8 @@ function tabletApp() {
       this[field + 'Targa'] = val;
       this[field + 'AddNew'] = false;
       this[field + 'NewVal'] = '';
+      // A2: verifica duplicati targa
+      this.verificaTarga(val, this.cliente?.cf);
     },
 
     validateTargheUniqueness() {
@@ -5090,6 +5439,12 @@ function tabletApp() {
         if (this.currentStep === 2) this.step2Sub = 'doc';
         if (this.currentStep === 5) this.step4Sub = 'contratto';
         if (this.currentStep === 6) {
+          // Auto-skip step 6 (OBU association) when RSA-only path — no OBU to associate
+          if (this.creditCheckStatus === 'ok_rsa_only' || this.tabletServizioSelezionato === 'rsa_standalone') {
+            this.currentStep = 7;
+            window.scrollTo(0, 0);
+            return;
+          }
           this.targaSelezionata  = this.obu1Targa  || this.targaSelezionata;
           this.targaSelezionata2 = this.obu2Targa  || this.targaSelezionata2;
         }
@@ -5324,7 +5679,7 @@ function tabletApp() {
       setTimeout(() => {
         // DEMO: se il toggle è attivo, genera sempre un nuovo cliente
         let dati, eraGiaCensito;
-        if (this.isDemoMode && this.ocrAlwaysNewClient) {
+        if (this.ocrAlwaysNewClient) {
           dati = this.generaDatiRandom();
           eraGiaCensito = false;
         } else {
@@ -5728,26 +6083,59 @@ function tabletApp() {
     // ============================================================
     // STEP 4 — CONFIGURAZIONE CONTRATTO
     // ============================================================
+    // A3: calcola sconto attivo (promo o codice)
+    _scontoAttivo() {
+      if (this.codiceScontoApplicato) return this.codiceScontoApplicato.percentuale / 100;
+      if (this.promoSelezionata === 'black_friday') return 0.80;
+      if (this.promoSelezionata === 'welcome_promo') return 0; // 12 mesi gratis → totale 0
+      return 0;
+    },
+    _promoGratisAttiva() {
+      return this.promoSelezionata === 'welcome_promo';
+    },
+
+    applicaCodiceSconto() {
+      const codice = (this.codiceScontoInput || '').trim().toUpperCase();
+      const mappa = {
+        'ENILIVE10': { percentuale: 10, label: 'Sconto 10%' },
+        'PARTNER20': { percentuale: 20, label: 'Sconto 20%' },
+        'VIP50':     { percentuale: 50, label: 'Sconto 50%' },
+      };
+      if (mappa[codice]) {
+        this.codiceScontoApplicato = { codice, ...mappa[codice] };
+        this.codiceScontoErrore = '';
+        this.promoSelezionata = null; // disattiva promo se codice applicato
+        this.showToastMsg('Codice sconto applicato: ' + mappa[codice].label, 'success');
+      } else {
+        this.codiceScontoApplicato = null;
+        this.codiceScontoErrore = 'Codice non valido o scaduto';
+      }
+    },
+
     calcContratto1Total() {
       // Prezzi: OBU #1 €2.50 | OBU #2 €1.00 | RSA €2.50 | Furto €0.30 | RSA Standalone €2.50
       let t = 0;
       // Nuovo path RSA standalone (step 4 selezione servizio)
       if (this.tabletServizioSelezionato === 'rsa_standalone') {
-        return this.rsaStandaloneTarghe.filter(t => t.targa.trim()).length * 2.50;
-      }
-      if (this.creditCheckStatus !== 'ok_rsa_only') {
-        t += 2.50; // OBU #1 (telepedaggio incluso)
-        if (this.obu1Rsa)   t += 2.50;
-        if (this.obu1Furto) t += 0.30;
-        if (this.hasObu2) {
-          t += 1.00; // OBU #2
-          if (this.obu2Rsa)   t += 2.50;
-          if (this.obu2Furto) t += 0.30;
+        t = this.rsaStandaloneTarghe.filter(x => x.targa.trim()).length * 2.50;
+      } else {
+        if (this.creditCheckStatus !== 'ok_rsa_only') {
+          t += 2.50; // OBU #1 (telepedaggio incluso)
+          if (this.obu1Rsa)   t += 2.50;
+          if (this.obu1Furto) t += 0.30;
+          if (this.hasObu2) {
+            t += 1.00; // OBU #2
+            if (this.obu2Rsa)   t += 2.50;
+            if (this.obu2Furto) t += 0.30;
+          }
         }
+        // RSA standalone aggiuntive
+        t += this.rsaStandalone.filter(r => r.targa.trim()).length * 2.50;
       }
-      // RSA standalone
-      t += this.rsaStandalone.filter(r => r.targa.trim()).length * 2.50;
-      return t;
+      // A3: applica sconto promo/codice
+      if (this._promoGratisAttiva()) return 0;
+      const sc = this._scontoAttivo();
+      return sc > 0 ? t * (1 - sc) : t;
     },
 
     calcContratto2Total() {
@@ -5761,7 +6149,10 @@ function tabletApp() {
         if (this.c2obu2Furto) t += 0.30;
       }
       t += this.c2rsaStandalone.filter(r => r.targa.trim()).length * 2.50;
-      return t;
+      // A3: applica sconto promo/codice
+      if (this._promoGratisAttiva()) return 0;
+      const sc = this._scontoAttivo();
+      return sc > 0 ? t * (1 - sc) : t;
     },
 
     addUpsellRsa() {
@@ -6212,6 +6603,43 @@ function tabletApp() {
         }
       }
 
+      // Costruisce lista servizi sottoscritti per email e modal (A2 fix)
+      const serviziEmailLines = [];
+      if (!isRsaOnly) {
+        serviziEmailLines.push('Telepedaggio OBU — targa ' + (obu1Targa || '—'));
+        if (this.obu1Rsa)   serviziEmailLines.push('RSA — Assistenza Stradale (OBU #1)');
+        if (this.obu1Furto) serviziEmailLines.push('Furto / Smarrimento OBU #1');
+        if (this.hasObu2 && obu2Targa) {
+          serviziEmailLines.push('Telepedaggio OBU — targa ' + obu2Targa);
+          if (this.obu2Rsa)   serviziEmailLines.push('RSA — Assistenza Stradale (OBU #2)');
+          if (this.obu2Furto) serviziEmailLines.push('Furto / Smarrimento OBU #2');
+        }
+        this.rsaStandalone.filter(r => r.targa.trim()).forEach(r =>
+          serviziEmailLines.push('RSA Standalone — targa ' + r.targa.toUpperCase())
+        );
+        this.contrattiAggiuntivi.forEach((c, i) => {
+          serviziEmailLines.push('Contratto ' + (i + 2) + ' OBU — targa ' + c.obu1Targa.toUpperCase());
+          if (c.obu1Rsa)   serviziEmailLines.push('RSA — Assistenza Stradale (contratto ' + (i + 2) + ' OBU #1)');
+          if (c.obu1Furto) serviziEmailLines.push('Furto / Smarrimento (contratto ' + (i + 2) + ' OBU #1)');
+          if (c.hasObu2 && c.obu2Targa) {
+            serviziEmailLines.push('Contratto ' + (i + 2) + ' OBU #2 — targa ' + c.obu2Targa.toUpperCase());
+            if (c.obu2Rsa)   serviziEmailLines.push('RSA — Assistenza Stradale (contratto ' + (i + 2) + ' OBU #2)');
+            if (c.obu2Furto) serviziEmailLines.push('Furto / Smarrimento (contratto ' + (i + 2) + ' OBU #2)');
+          }
+          (c.rsaStandalone || []).filter(r => r.targa && r.targa.trim()).forEach(r =>
+            serviziEmailLines.push('RSA Standalone contratto ' + (i + 2) + ' — targa ' + r.targa.toUpperCase())
+          );
+        });
+      } else if (this.tabletServizioSelezionato === 'rsa_standalone') {
+        this.rsaStandaloneTarghe.filter(t => t.targa.trim()).forEach(t =>
+          serviziEmailLines.push('RSA Standalone — targa ' + t.targa.toUpperCase())
+        );
+      } else {
+        // creditCheckStatus === 'ok_rsa_only'
+        serviziEmailLines.push('RSA Stand-Alone — Assistenza Stradale Illimitata');
+      }
+      this.welcomeEmailServizi = serviziEmailLines;
+
       // Email benvenuto dopo 1.5s
       setTimeout(() => {
         this.emailConfermaVisible = true;
@@ -6220,8 +6648,9 @@ function tabletApp() {
           to: this.cliente.email,
           template: 'BENVENUTO',
           subject: 'Benvenuto in Enilive Mobility+ — copia contratto',
-          preview: 'Benvenuto! In allegato la tua copia del contratto e le istruzioni di attivazione...',
+          preview: 'Benvenuto ' + this.cliente.nome + '! Servizi attivati: ' + serviziEmailLines.join('; ') + '.',
           nome: this.cliente.nome,
+          serviziAttivati: serviziEmailLines,
         });
         this.showToastMsg('Email di benvenuto inviata a ' + (this.cliente.email || 'cliente'), 'success');
       }, 1500);
@@ -6285,7 +6714,7 @@ function tabletApp() {
         obuCode: '', obuScanStatus: null, obuAssociazioneConfermata: false, targaSelezionata: '',
         obuCode2: '', obuScanStatus2: null, obuAssociazioneConfermata2: false, targaSelezionata2: '',
         contrattoSmsInviato: false, firmaOtpInput: '', firmaOtpFieldEnabled: false, firmaStatus: null,
-        flowCompleted: false, emailConfermaVisible: false, showWelcomeModal: false,
+        flowCompleted: false, emailConfermaVisible: false, showWelcomeModal: false, welcomeEmailServizi: [],
         clienteReadonly: false,
         consensiCrm: { privacy: true, informativaPrecontrattuale: false, nAndCMemo: false, marketing: false, profilazione: false },
         consensiSmsOpzionale: false,
@@ -6621,6 +7050,44 @@ function tabletApp() {
     },
 
     // ============================================================
+    // ASSISTENZA — HELPER COMPLETEZZA ANAGRAFICA (usato da scheda e _checkAnagraficaPreAzione)
+    // ============================================================
+    // Ritorna array di etichette leggibili per i campi mancanti nel record clientiDemo del cliente corrente
+    _schedaMissingFields() {
+      if (!this.assistCliente) return [];
+      const c = this.assistCliente;
+      const rawRecord = this._getClientiDemo()[c.cf?.toUpperCase()] || {};
+      const addr = rawRecord.indirizzo || {};
+      const contatti = rawRecord.contatti || {};
+      const labels = [];
+      if (!c.nome?.trim())                                              labels.push('Nome');
+      if (!c.cognome?.trim())                                           labels.push('Cognome');
+      if (!(rawRecord.dataNascita || rawRecord.data_nascita)?.trim())   labels.push('Data di nascita');
+      if (!(contatti.telefono || rawRecord.telefono)?.trim())           labels.push('Telefono');
+      if (!(contatti.email    || rawRecord.email)?.trim())              labels.push('Email');
+      if (!addr.via?.trim())                                            labels.push('Via');
+      if (!addr.civico?.trim())                                         labels.push('Civico');
+      if (!addr.comune?.trim())                                         labels.push('Comune');
+      if (!addr.prov?.trim())                                           labels.push('Provincia');
+      if (!addr.cap?.trim())                                            labels.push('CAP');
+      return labels;
+    },
+
+    // Ritorna array di chiavi interne per passaggio a aggiorna-scheda
+    _schedaMissingFieldsKeys() {
+      if (!this.assistCliente) return [];
+      const c = this.assistCliente;
+      const rawRecord = this._getClientiDemo()[c.cf?.toUpperCase()] || {};
+      const contatti = rawRecord.contatti || {};
+      const keys = [];
+      if (!c.nome?.trim())                                            keys.push('nome');
+      if (!c.cognome?.trim())                                         keys.push('cognome');
+      if (!(contatti.telefono || rawRecord.telefono)?.trim())         keys.push('telefono');
+      if (!(contatti.email    || rawRecord.email)?.trim())            keys.push('email');
+      return keys;
+    },
+
+    // ============================================================
     // ASSISTENZA — NAVIGAZIONE GRIGLIA
     // ============================================================
     _checkAnagraficaPreAzione(azione) {
@@ -6709,11 +7176,14 @@ function tabletApp() {
       this.assistOtpSent = false;
       this.assistOtpValue = '';
       this.assistOtpConfirmed = false;
+      this.assistOtpFieldEnabled = false;
       this.assistOpLoading = false;
       this.assistOpSuccess = false;
       this.assistForm.codicePolizzaRsa = '';
       this.assistForm.rsaVeicoloIdSostituzione = null;
       this.assistForm.aggiornaRsaConTarga = true;
+      this.assistForm.nuovoObuFurto = '';
+      this.assistForm.nuovoObuFurtoConfermato = false;
     },
 
     // ============================================================
@@ -7001,16 +7471,26 @@ function tabletApp() {
     // ============================================================
     inviaOtp() {
       this.assistOtpSent = true;
+      this.assistOtpFieldEnabled = true;
+      const tel = (this.assistCliente && this.assistCliente.cellulare) || '';
+      const nome = (this.assistCliente && (this.assistCliente.nome || this.assistCliente.cf)) || 'Cliente';
+      Bus.emit('sms:outbound', {
+        id: 'sms_assist_otp_' + Date.now(),
+        to: tel,
+        template: 'OTP_ASSISTENZA',
+        preview: 'Enilive: il tuo codice OTP per conferma operazione è 1234',
+        dati: { nome, operazione: this.assistAzione || 'assistenza' },
+      });
       this.showToastMsg('OTP inviato al cliente', 'info');
     },
 
     confermaOtp() {
-      const val = this.assistOtpValue.trim();
-      if (/^\d{6}$/.test(val)) {
+      const val = (this.assistOtpValue || '').trim();
+      if (val === '1234') {
         this.assistOtpConfirmed = true;
         this.showToastMsg('OTP verificato', 'success');
       } else {
-        this.showToastMsg('OTP non valido — inserisci 6 cifre', 'error');
+        this.showToastMsg('OTP non valido — codice corretto: 1234', 'error');
       }
     },
 
@@ -7026,8 +7506,187 @@ function tabletApp() {
       }, 1200);
     },
 
+    // Scansiona il VECCHIO OBU da sostituire (flusso 4.4 da griglia — cliente già noto)
+    // NON modifica quickObuSearchResult/quickObuSearchStatus: il cliente è già in assistCliente.
+    simulaScanObuVecchio() {
+      this.obuScannerStatus = 'scanning';
+      // Trova il primo OBU del cliente corrente già identificato
+      const obuList = this.assistCliente && this.assistCliente.obu ? this.assistCliente.obu : [];
+      const firstObu = obuList.length > 0 ? obuList[0] : null;
+      setTimeout(() => {
+        if (!firstObu) {
+          // Fallback: cerca nel registry come ultima risorsa
+          const reg = this._getClientiDemo();
+          let found = null;
+          for (const record of Object.values(reg)) {
+            for (const c of (record.contratti || [])) {
+              const obus = Array.isArray(c.dispositivi)
+                ? c.dispositivi.filter(d => d.tipo === 'obu')
+                : (c.obu || []);
+              if (obus.length > 0) { found = obus[0].codice; break; }
+            }
+            if (found) break;
+          }
+          if (!found) {
+            this.obuScannerStatus = 'notfound';
+            this.showToastMsg('Nessun OBU trovato per questo cliente', 'error', 3000);
+            return;
+          }
+          this.obuScannedCode = found;
+        } else {
+          this.obuScannedCode = firstObu.codice;
+        }
+        setTimeout(() => {
+          this.obuScannerStatus = 'found';
+          this.assistForm.obuSelezionato = this.obuScannedCode;
+          // Pre-popola rsaVeicoloIdSostituzione se RSA attiva
+          const rsaEntry = this._obuRsaEntry();
+          if (rsaEntry) this.assistForm.rsaVeicoloIdSostituzione = rsaEntry.veicoloId;
+          this.showToastMsg('OBU riconosciuto: ' + this.obuScannedCode, 'success');
+        }, 350);
+      }, 1500);
+    },
+
+    // Conferma codice OBU inserito manualmente (vecchio OBU, flusso 4.4 da griglia)
+    confermaCodiceObuVecchio() {
+      const code = this.obuManualCode.trim();
+      if (!code) return;
+      this.assistForm.obuSelezionato = code;
+      this.obuScannedCode = code;
+      this.obuScannerStatus = 'found';
+      const rsaEntry = this._obuRsaEntry();
+      if (rsaEntry) this.assistForm.rsaVeicoloIdSostituzione = rsaEntry.veicoloId;
+      this.showToastMsg('OBU impostato: ' + code, 'success');
+    },
+
     checkTarga() {
       this.assistForm.targaWarning = this.assistForm.nuovaTarga.toUpperCase().trim() === 'AA000AA';
+    },
+
+    // ============================================================
+    // TASK A2 — VERIFICA TARGA DUPLICATA (contratto + assistenza)
+    // ============================================================
+    verificaTarga(targa, cfClienteCorrente) {
+      const t = (targa || '').trim().toUpperCase();
+      if (!t) return;
+      const vId = 'v_' + t;
+      const cfCorr = (cfClienteCorrente || '').toUpperCase();
+      let reg = {};
+      try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+
+      for (const [cfKey, record] of Object.entries(reg)) {
+        const stessoCf = cfKey === cfCorr;
+        for (const contratto of (record.contratti || [])) {
+          // Controlla OBU
+          const hasObu = (contratto.dispositivi || []).some(d => d.tipo === 'obu' && d.veicoloId === vId);
+          if (hasObu) {
+            if (stessoCf) {
+              this.verificaTargaModal = {
+                tipo: 'obu_stesso',
+                targa: t,
+                messaggio: 'La targa ' + t + ' ha già un contratto OBU attivo per questo cliente.',
+              };
+            } else {
+              this.verificaTargaModal = {
+                tipo: 'altro_cliente',
+                targa: t,
+                messaggio: 'La targa ' + t + ' è già registrata con un contratto OBU per un altro cliente.',
+              };
+              this.trasferimentoTargaStep = 'richiedi';
+              this._trasferimentoTargaCfVecchio = cfKey;
+            }
+            return;
+          }
+          // Controlla RSA
+          const hasRsa = (contratto.serviziRsa || []).some(r => r.veicoloId === vId && r.stato === 'attivo');
+          if (hasRsa) {
+            if (stessoCf) {
+              this.verificaTargaModal = {
+                tipo: 'rsa_stesso',
+                targa: t,
+                messaggio: 'La targa ' + t + ' ha già RSA attiva per questo cliente.',
+              };
+            } else {
+              this.verificaTargaModal = {
+                tipo: 'altro_cliente',
+                targa: t,
+                messaggio: 'La targa ' + t + ' è già registrata con RSA attiva per un altro cliente.',
+              };
+              this.trasferimentoTargaStep = 'richiedi';
+              this._trasferimentoTargaCfVecchio = cfKey;
+            }
+            return;
+          }
+        }
+      }
+    },
+
+    // Helper: trova il CF proprietario attuale della targa (diverso da quello corrente)
+    _trovaCfDaTarga(targa) {
+      let reg = {};
+      try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+      const targaUp = String(targa).toUpperCase();
+      const veicoloId = 'v_' + targaUp;
+      for (const cf in reg) {
+        const r = reg[cf];
+        if ((r.contratti || []).some(c =>
+          (c.dispositivi || []).some(d => d.veicoloId === veicoloId) ||
+          (c.serviziRsa || []).some(s => s.veicoloId === veicoloId)
+        )) return cf;
+      }
+      return null;
+    },
+
+    // Esegui trasferimento targa: marca contratto vecchio + apre caso assistenza + chiude modal
+    _eseguiTrasferimentoTarga() {
+      const targa = this.verificaTargaModal?.targa;
+      if (!targa) { this.verificaTargaModal = null; this.trasferimentoTargaStep = null; return; }
+      const targaUp = targa.toUpperCase();
+      const veicoloId = 'v_' + targaUp;
+      const cfVecchio = this._trasferimentoTargaCfVecchio || this._trovaCfDaTarga(targaUp);
+
+      if (cfVecchio) {
+        let reg = {};
+        try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+        const recVecchio = reg[cfVecchio];
+        if (recVecchio) {
+          // Trova contratto contenente la targa e marca targheSottratte
+          for (const contratto of (recVecchio.contratti || [])) {
+            const inDispositivi = (contratto.dispositivi || []).some(d => d.veicoloId === veicoloId);
+            const inRsa = (contratto.serviziRsa || []).some(s => s.veicoloId === veicoloId);
+            if (inDispositivi || inRsa) {
+              if (!contratto.targheSottratte) contratto.targheSottratte = [];
+              if (!contratto.targheSottratte.includes(targaUp)) contratto.targheSottratte.push(targaUp);
+              break;
+            }
+          }
+          // Crea caso di assistenza automatico
+          const casoId = 'caso_' + Date.now();
+          const caso = {
+            id: casoId,
+            tipo: 'trasferimento_targa',
+            targa: targaUp,
+            data: new Date().toISOString(),
+            stato: 'aperto',
+            descrizione: 'Targa ' + targaUp + ' trasferita ad altro cliente su richiesta dell\'operatore. Verificare la proprietà del veicolo.',
+          };
+          if (!recVecchio.casiAssistenza) recVecchio.casiAssistenza = [];
+          recVecchio.casiAssistenza.push(caso);
+          reg[cfVecchio] = recVecchio;
+          try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(e) { console.warn('_eseguiTrasferimentoTarga: save failed', e); }
+          Bus.emit('assistenza:caso_aperto', { cf: cfVecchio, caso });
+        } else {
+          console.warn('_eseguiTrasferimentoTarga: record vecchio CF non trovato', cfVecchio);
+        }
+      } else {
+        console.warn('_eseguiTrasferimentoTarga: CF precedente non trovato per targa', targaUp);
+      }
+
+      // Reset modal e stati — il campo targa rimane valorizzato (trasferimento confermato)
+      this.verificaTargaModal = null;
+      this.trasferimentoTargaStep = null;
+      this._trasferimentoTargaSourceField = null;
+      this._trasferimentoTargaCfVecchio = null;
     },
 
     simulaScanRmpp() {
@@ -7320,6 +7979,58 @@ function tabletApp() {
     demoAssistenzaTicketAperto() {
       Bus.emit('assistenza:ticket_aperto', { cf: 'BNCMRC85M10F205Z', numero_ticket: 'TKT-2026-00123', categoria: 'telepedaggio', tipologia: 'reclamo' });
       this.showToastMsg('Demo: ticket TKT-2026-00123 aperto in store', 'info', 4000);
+    },
+
+    // ============================================================
+    // C1 — GENERA FATTURA MESE PRECEDENTE
+    // ============================================================
+    demoGeneraFattura() {
+      const cf = (localStorage.getItem('clienteAttivo') || '').toUpperCase();
+      if (!cf) {
+        this.showToastMsg('Nessun cliente attivo — selezionane uno nell\'emulatore', 'error');
+        return;
+      }
+      let reg = {};
+      try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+      const rec = reg[cf];
+      if (!rec) {
+        this.showToastMsg('Cliente non trovato in registry: ' + cf, 'error');
+        return;
+      }
+      // Determina periodo: mese prima dell'ultima fattura o mese prima di oggi
+      if (!Array.isArray(rec.fatture)) rec.fatture = [];
+      const now = new Date();
+      let targetDate;
+      if (rec.fatture.length > 0) {
+        const sorted = [...rec.fatture].sort((a, b) => {
+          const da = new Date(a.periodo.anno, a.periodo.mese - 1);
+          const db = new Date(b.periodo.anno, b.periodo.mese - 1);
+          return db - da;
+        });
+        const ultima = sorted[0];
+        targetDate = new Date(ultima.periodo.anno, ultima.periodo.mese - 2); // mese prima dell'ultima
+      } else {
+        targetDate = new Date(now.getFullYear(), now.getMonth() - 1); // mese scorso
+      }
+      const mese = targetDate.getMonth() + 1;
+      const anno = targetDate.getFullYear();
+      const nomeMese = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'][mese - 1];
+      const fattura = {
+        id: 'FAT_' + Date.now(),
+        periodo: { mese, anno },
+        importo: 45.50,
+        stato: 'emessa',
+        dataEmissione: new Date().toISOString(),
+        voci: [
+          { descrizione: 'Telepedaggio — ' + nomeMese + ' ' + anno, importo: 30.00 },
+          { descrizione: 'RSA Stand-Alone — ' + nomeMese + ' ' + anno, importo: 15.50 },
+        ],
+      };
+      rec.fatture.push(fattura);
+      reg[cf] = rec;
+      try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(e) { console.error('fattura write error', e); }
+      Bus.emit('fattura:emessa', { cf, fattura });
+      this.showToastMsg('Fattura ' + nomeMese + '/' + anno + ' generata con successo', 'success');
     },
 
     async demoCompletaOnboarding() {

@@ -203,6 +203,30 @@
       color: white;
     }
 
+    /* ─── Demo panel ──────────────────────────────────────────── */
+    .demo-panel-crm {
+      background: #1e293b;
+      border-top: 3px solid var(--color-primary);
+      padding: 0.75rem 1.25rem;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+    }
+    .demo-btn-crm {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .demo-btn-crm:hover { background: #475569; border-color: var(--color-primary); color: white; }
+
     /* ─── Log panel ───────────────────────────────────────────── */
     .log-panel {
       background: #0f172a;
@@ -417,6 +441,11 @@
         logPaused: false,
         logBuffer: [],
 
+        // ── Demo mode ────────────────────────────────────────────────
+        isDemoMode: new URLSearchParams(window.location.search).get('demo') === '1',
+        demoToastMsg: '',
+        demoToastVisible: false,
+
         // ────────────────────────────────────────────────────────────
         init() {
           // Carica clienti persistiti + importa da clientiDemo
@@ -485,6 +514,11 @@
           Object.values(reg).forEach(d => {
             const cf = (d.cf || '').toUpperCase();
             if (!cf) return;
+
+            // A3 fix: recupera cervedStatus dall'Alpine state esistente se il record
+            // non ce l'ha (es. dopo _salvaClienteParziale che non preserva cervedStatus)
+            const existingEntry = this.clienti.find(c => (c.anagrafica?.cf || '').toUpperCase() === cf);
+            const cervedStatusFallback = existingEntry?.anagrafica?.cervedStatus || null;
 
             // serviziInfo: telepedaggio derivato da contratti[].dispositivi[], rsa da serviziRsa[]
             const si = _emptyServiziInfo();
@@ -561,7 +595,7 @@
                 dataNascita:    d.dataNascita || '',
                 dataIscrizione: (d.dataRegistrazione || '').split('T')[0] || new Date().toISOString().split('T')[0],
                 canale:         d.canale    || 'stazione',
-                cervedStatus:   d.cervedStatus || null,
+                cervedStatus:   d.cervedStatus || cervedStatusFallback,
               },
               veicoli,
               serviziInfo: si,
@@ -672,8 +706,16 @@
 
         // ── Log helpers ─────────────────────────────────────────────
         _addLog(evento, payload) {
+          // Deduplicazione anti-flood: ignora lo stesso evento se è già arrivato
+          // entro 200 ms con lo stesso payload serializzato (protezione vs doppio dispatch bus).
+          const now = Date.now();
+          const sig = evento + '|' + JSON.stringify(payload || {});
+          if (!this._lastLogSig) this._lastLogSig = {};
+          if (this._lastLogSig[evento] && now - this._lastLogSig[evento].ts < 200 && this._lastLogSig[evento].sig === sig) return;
+          this._lastLogSig[evento] = { ts: now, sig };
+
           const entry = {
-            id: Date.now() + '_' + Math.random().toString(36).slice(2),
+            id: now + '_' + Math.random().toString(36).slice(2),
             ts: new Date().toLocaleTimeString('it-IT'),
             evento,
             payload: payload || {},
@@ -774,17 +816,26 @@
         },
 
         on_pagamento_confermato(p) {
-          const c = this._clienteByTarga(p.targa);
-          c.movimenti.unshift({
+          // Usa il movimento già persistito in clientiDemo (emesso da emulatore/app con id stabile)
+          // oppure costruisce un entry sintetico se manca. Deduplicizza per id.
+          const c = p.veicoloId
+            ? (this.clienti.find(cl => cl.veicoli.some(v => v.veicoloId === p.veicoloId)) || this._clienteByTarga(p.targa))
+            : this._clienteByTarga(p.targa);
+          const mov = p.movimento && p.movimento.id ? p.movimento : {
             id: 'm' + Date.now(),
             data: p.data || new Date().toISOString(),
             servizio: p.servizio || 'altro',
             descrizione: p.descrizione || ('Pagamento ' + (p.servizio || '')),
             targa: p.targa || (c.veicoli[0]?.targa || ''),
+            veicoloId: p.veicoloId || null,
             importo: p.importo || 0,
             stato: 'pagato',
             source: 'app',
-          });
+          };
+          // Evita duplicati: non aggiunge se un movimento con lo stesso id è già presente
+          if (!c.movimenti.some(m => m.id === mov.id)) {
+            c.movimenti.unshift(mov);
+          }
         },
 
         on_pagamento_errore(p) {
@@ -1054,6 +1105,8 @@
           const targa = veicoloId.replace('v_', '');
           Bus.emit('crm:servizio_riattivato', { servizio: 'telepedaggio', contrattoId, veicoloId, targa });
           this._addLog('crm:servizio_riattivato', { servizio: 'telepedaggio', targa });
+          // Ricarica da localStorage per triggerare reattività Alpine su banner e badge
+          this._loadClienti();
         },
 
         segnalaFurtoObu(contrattoId, veicoloId) {
@@ -1077,6 +1130,8 @@
           const targa = veicoloId.replace('v_', '');
           Bus.emit('crm:furto_smarrimento', { contrattoId, veicoloId, targa });
           this._addLog('crm:furto_smarrimento', { targa });
+          // Ricarica da localStorage per triggerare reattività Alpine su banner e badge
+          this._loadClienti();
         },
 
         sospendiRsa(contrattoId, rsaId) {
@@ -1198,16 +1253,34 @@
           const c = this.ac();
           if (!c || !c.anagrafica) return [];
           const alerts = [];
-          (c.contratti || []).forEach(ct => {
-            (ct.dispositivi || []).forEach(dev => {
-              const targa = (dev.veicoloId || '').replace('v_', '');
-              if (dev.furtoSmarrimento) {
-                alerts.push({ tipo: 'danger', msg: `Furto/smarrimento: ${targa}` });
-              } else if (dev.stato === 'sospeso') {
-                alerts.push({ tipo: 'warning', msg: `OBU sospeso: ${targa}` });
-              }
+          // A1/A2 fix: usa _deviceFurtoSmarrimento (fonte unica — legge da clientiDemo) per
+          // ogni dispositivo, eliminando la duplicazione del read inline.
+          // _hasFurtoSmarrimento(cf) viene usato come guard rapido prima di iterare.
+          const cf = (c.anagrafica.cf || '').toUpperCase();
+          if (this._hasFurtoSmarrimento(cf)) {
+            // Itera solo i contratti con dispositivi (OBU) — i contratti RSA puri
+            // hanno dispositivi: [] quindi non entrano mai nel loop.
+            (c.contratti || []).forEach(ct => {
+              (ct.dispositivi || []).forEach(dev => {
+                const targa = (dev.veicoloId || '').replace('v_', '');
+                if (this._deviceFurtoSmarrimento(cf, dev.veicoloId)) {
+                  alerts.push({ tipo: 'danger', msg: `Furto/smarrimento: ${targa}` });
+                } else if (dev.stato === 'sospeso') {
+                  alerts.push({ tipo: 'warning', msg: `OBU sospeso: ${targa}` });
+                }
+              });
             });
-          });
+          } else {
+            // Nessun furto: controlla solo sospensioni OBU (senza ri-leggere localStorage)
+            (c.contratti || []).forEach(ct => {
+              (ct.dispositivi || []).forEach(dev => {
+                if (dev.stato === 'sospeso') {
+                  const targa = (dev.veicoloId || '').replace('v_', '');
+                  alerts.push({ tipo: 'warning', msg: `OBU sospeso: ${targa}` });
+                }
+              });
+            });
+          }
           if (c.tcFlags && c.tcFlags.privacy && !c.tcFlags.privacy.accettato) {
             alerts.push({ tipo: 'warning', msg: 'Consenso privacy mancante' });
           }
@@ -1301,6 +1374,197 @@
 
         sourceIcon(s) {
           return { app: 'fa-mobile-screen', crm: 'fa-building' }[s] || null;
+        },
+
+        // ── Furto/Smarrimento — lettura diretta da clientiDemo (E2/E3) ─────
+        // Fonte di verità: clientiDemo[cf].contratti[].dispositivi[].furtoSmarrimento
+        // _hasFurtoSmarrimento  → true se ALMENO un dispositivo ha il flag (usata da E2 alertList)
+        // _deviceFurtoSmarrimento → true per un dispositivo specifico (usata da E3 badge inline)
+        // Entrambe leggono da localStorage per evitare stato derivato stale.
+        _hasFurtoSmarrimento(cf) {
+          if (!cf) return false;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[(cf + '').toUpperCase()];
+            if (!record) return false;
+            return (record.contratti || []).some(ct =>
+              (ct.dispositivi || []).some(d => !!d.furtoSmarrimento)
+            );
+          } catch(_) { return false; }
+        },
+
+        _deviceFurtoSmarrimento(cf, veicoloId) {
+          if (!cf || !veicoloId) return false;
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[(cf + '').toUpperCase()];
+            if (!record) return false;
+            return (record.contratti || []).some(ct =>
+              (ct.dispositivi || []).some(d => d.veicoloId === veicoloId && !!d.furtoSmarrimento)
+            );
+          } catch(_) { return false; }
+        },
+
+        // ── Demo E1 — genera contratto casuale ──────────────────────
+        demoGeneraContratto() {
+          const c = this.ac();
+          const cf = (c.anagrafica.cf || '').toUpperCase();
+          if (!cf) return;
+          let reg = {};
+          try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+          const record = reg[cf];
+          if (!record) { alert('Cliente non trovato in clientiDemo. Registra prima un cliente reale.'); return; }
+
+          // Costruisce set di veicoloId già usati come OBU
+          const obuUsati = new Set(
+            (record.contratti || []).flatMap(ct => (ct.dispositivi || []).map(d => d.veicoloId))
+          );
+          // Costruisce set di veicoloId già coperti da RSA
+          const rsaUsati = new Set(
+            (record.contratti || []).flatMap(ct => (ct.serviziRsa || []).map(r => r.veicoloId))
+          );
+
+          // Combinazioni libere: veicolo non ancora OBU → può avere OBU
+          //                      veicolo non ancora RSA → può avere RSA
+          const liberiObu = (record.veicoli || []).filter(v => !obuUsati.has(v.id));
+          const liberiRsa = (record.veicoli || []).filter(v => !rsaUsati.has(v.id));
+
+          if (liberiObu.length === 0 && liberiRsa.length === 0) {
+            alert('Non è possibile generare nessun contratto, le combinazioni sono tutte occupate.');
+            return;
+          }
+
+          // Sceglie OBU se disponibile, altrimenti RSA standalone su veicolo libero
+          const now = new Date().toISOString();
+          const nonce = Date.now().toString(36);
+          let nuovoContratto;
+
+          if (liberiObu.length > 0) {
+            const v = liberiObu[Math.floor(Math.random() * liberiObu.length)];
+            const conRsa = liberiRsa.some(r => r.id === v.id);
+            const ibanMock = 'IT60X054281110' + String(Math.floor(Math.random() * 1e10)).padStart(10, '0');
+            nuovoContratto = {
+              id: 'c_demo_' + nonce,
+              tipo: 'obu',
+              stato: 'attivo',
+              dataAttivazione: now,
+              iban: ibanMock,
+              totale: conRsa ? 4.50 : 2.50,
+              dispositivi: [{
+                tipo: 'obu',
+                codice: 'OBU-' + String(Math.floor(Math.random() * 1e6)).padStart(6, '0'),
+                veicoloId: v.id,
+                furtoSmarrimento: false,
+                stato: 'attivo',
+                serviziAbilitati: { areac: { attivo: false }, parcheggi: { attivo: false } }
+              }],
+              serviziRsa: conRsa
+                ? [{ id: 'rsa_demo_' + nonce, veicoloId: v.id, stato: 'attivo', costo: 2.00 }]
+                : []
+            };
+            const servizio = conRsa ? 'telepedaggio+rsa' : 'telepedaggio';
+            Bus.emit('servizio:attivato', { servizio: 'telepedaggio', targa: v.targa, veicoloId: v.id, data: now });
+            if (conRsa) Bus.emit('servizio:attivato', { servizio: 'rsa', targa: v.targa, veicoloId: v.id, data: now });
+            this._addLog('demo:contratto_generato', { tipo: 'obu', targa: v.targa, servizio });
+          } else {
+            // Solo RSA standalone
+            const v = liberiRsa[Math.floor(Math.random() * liberiRsa.length)];
+            const ibanMock = 'IT60X054281110' + String(Math.floor(Math.random() * 1e10)).padStart(10, '0');
+            nuovoContratto = {
+              id: 'c_demo_rsa_' + nonce,
+              tipo: 'rsa',
+              stato: 'attivo',
+              dataAttivazione: now,
+              iban: ibanMock,
+              totale: 2.00,
+              dispositivi: [],
+              serviziRsa: [{ id: 'rsa_demo_' + nonce, veicoloId: v.id, stato: 'attivo', costo: 2.00 }]
+            };
+            Bus.emit('servizio:attivato', { servizio: 'rsa', targa: v.targa, veicoloId: v.id, data: now });
+            this._addLog('demo:contratto_generato', { tipo: 'rsa_standalone', targa: v.targa });
+          }
+
+          if (!Array.isArray(record.contratti)) record.contratti = [];
+          record.contratti.push(nuovoContratto);
+          syncVeicoli(record);
+          try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(_) {}
+          this._loadClienti();
+        },
+
+        // ── Demo E1 — elimina contratto casuale ─────────────────────
+        demoEliminaContratto() {
+          const c = this.ac();
+          const cf = (c.anagrafica.cf || '').toUpperCase();
+          if (!cf) return;
+          let reg = {};
+          try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+          const record = reg[cf];
+          if (!record || !(record.contratti || []).length) {
+            alert('Nessun contratto da eliminare per questo cliente.');
+            return;
+          }
+          const idx = Math.floor(Math.random() * record.contratti.length);
+          const rimosso = record.contratti.splice(idx, 1)[0];
+          try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(_) {}
+          this._addLog('demo:contratto_eliminato', { id: rimosso.id, tipo: rimosso.tipo });
+          this._loadClienti();
+        },
+
+        // ── Demo E2 — corrompi anagrafica ────────────────────────────
+        demoCorrompiAnagrafica() {
+          // Determina il CF target: cliente attivo, o fallback random da clientiDemo
+          let reg = {};
+          try { reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}'); } catch(_) {}
+
+          const cfAttivo = (this.ac()?.anagrafica?.cf || '').toUpperCase();
+          let cf = (cfAttivo && reg[cfAttivo]) ? cfAttivo : null;
+          if (!cf) {
+            const keys = Object.keys(reg);
+            if (!keys.length) { alert('Nessun cliente in clientiDemo.'); return; }
+            cf = keys[Math.floor(Math.random() * keys.length)];
+          }
+
+          const record = reg[cf];
+          if (!record) { alert('Cliente non trovato in clientiDemo.'); return; }
+
+          // Pool di campi candidati (path: [nested obj, leaf key])
+          const pool = [
+            { label: 'nome',              get: r => r,             key: 'nome' },
+            { label: 'cognome',           get: r => r,             key: 'cognome' },
+            { label: 'dataNascita',       get: r => r,             key: 'dataNascita' },
+            { label: 'contatti.telefono', get: r => r.contatti || (r.contatti = {}), key: 'telefono' },
+            { label: 'contatti.email',    get: r => r.contatti || (r.contatti = {}), key: 'email' },
+            { label: 'indirizzo.via',     get: r => r.indirizzo || (r.indirizzo = {}), key: 'via' },
+            { label: 'indirizzo.comune',  get: r => r.indirizzo || (r.indirizzo = {}), key: 'comune' },
+          ];
+
+          // Estrae 2 o 3 campi distinti a caso
+          const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+          const numCampi = Math.random() < 0.5 ? 2 : 3;
+          const selezionati = shuffled.slice(0, numCampi);
+
+          selezionati.forEach(({ get, key }) => {
+            const obj = get(record);
+            obj[key] = '';
+          });
+
+          // Persisti
+          reg[cf] = record;
+          try { localStorage.setItem('clientiDemo', JSON.stringify(reg)); } catch(_) {}
+
+          // Log + bus
+          this._addLog('demo:anagrafica_corrotta', { cf, campi: selezionati.map(f => f.label) });
+          Bus.emit('cliente:profilo_aggiornato', record);
+
+          // Ricarica vista CRM
+          this._loadClienti();
+
+          // Toast
+          const campiStr = selezionati.map(f => f.label).join(', ');
+          this.demoToastMsg = `Anagrafica ${cf} corrotta per test (${campiStr}) — vai su tablet per vedere il banner`;
+          this.demoToastVisible = true;
+          clearTimeout(this._demoToastTimer);
+          this._demoToastTimer = setTimeout(() => { this.demoToastVisible = false; }, 4000);
         },
       };
     }
@@ -1429,7 +1693,7 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        MAIN GRID
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="crm-layout" :class="{ 'log-collapsed': logCollapsed }">
+  <div class="crm-layout" :class="{ 'log-collapsed': logCollapsed }" :style="isDemoMode ? 'padding-bottom: 68px;' : ''">
 
     <!-- ██████████████████████████████████████████████████████████████
          COLONNA SINISTRA — Scheda cliente
@@ -1703,24 +1967,25 @@
                       <span class="font-mono text-xs font-bold text-gray-700"
                             x-text="(dev.veicoloId||'').replace('v_','')"></span>
                       <span class="text-xs text-gray-400 font-mono" x-text="dev.codice"></span>
-                      <span x-show="dev.furtoSmarrimento"
+                      <!-- E3: badge Furto/Smarr. — condizione letta da clientiDemo via _deviceFurtoSmarrimento -->
+                      <span x-show="_deviceFurtoSmarrimento(cliente.cf, dev.veicoloId)"
                             class="badge bg-red-100 text-red-700" style="font-size:10px;">
                         <i class="fa-solid fa-triangle-exclamation mr-0.5"></i>Furto/Smarr.
                       </span>
                       <span class="badge ml-auto" style="font-size:10px;"
                             :class="dev.stato==='attivo'?'bg-green-100 text-green-700':(dev.stato==='sospeso'?'bg-orange-100 text-orange-700':'bg-gray-100 text-gray-500')"
                             x-text="dev.stato||'—'"></span>
-                      <button x-show="dev.stato==='attivo' && !dev.furtoSmarrimento"
+                      <button x-show="dev.stato==='attivo' && !_deviceFurtoSmarrimento(cliente.cf, dev.veicoloId)"
                               @click="sospendiObu(ct.id, dev.veicoloId)"
                               class="text-xs px-2 py-0.5 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 transition">
                         Sospendi
                       </button>
-                      <button x-show="dev.stato==='sospeso' && !dev.furtoSmarrimento"
+                      <button x-show="dev.stato==='sospeso' && !_deviceFurtoSmarrimento(cliente.cf, dev.veicoloId)"
                               @click="riattivaObu(ct.id, dev.veicoloId)"
                               class="text-xs px-2 py-0.5 rounded border border-green-200 text-green-600 hover:bg-green-50 transition">
                         Riattiva
                       </button>
-                      <button x-show="!dev.furtoSmarrimento"
+                      <button x-show="!_deviceFurtoSmarrimento(cliente.cf, dev.veicoloId)"
                               @click="segnalaFurtoObu(ct.id, dev.veicoloId)"
                               class="text-xs px-2 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition">
                         Furto
@@ -2115,6 +2380,46 @@
     </div><!-- /col-destra wrapper -->
 
   </div><!-- /crm-layout -->
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       DEMO PANEL — visibile solo con ?demo=1
+       ═══════════════════════════════════════════════════════════════════ -->
+  <template x-if="isDemoMode">
+    <div class="demo-panel-crm">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">
+          <i class="fa-solid fa-flask mr-1"></i>Pannello Demo
+        </span>
+        <span class="text-xs text-slate-400">
+          Cliente attivo: <span class="font-mono text-slate-300" x-text="cliente.cf"></span>
+          — visibile solo con ?demo=1
+        </span>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button class="demo-btn-crm" @click="demoGeneraContratto()">
+          <i class="fa-solid fa-plus mr-1 text-green-400"></i>Genera contratto casuale
+        </button>
+        <button class="demo-btn-crm" @click="demoEliminaContratto()">
+          <i class="fa-solid fa-trash mr-1 text-red-400"></i>Elimina contratto casuale
+        </button>
+        <button class="demo-btn-crm" @click="demoCorrompiAnagrafica()">
+          🗑️ Corrompi anagrafica
+        </button>
+      </div>
+      <!-- Toast demo -->
+      <div x-show="demoToastVisible"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 translate-y-2"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-150"
+           x-transition:leave-start="opacity-100 translate-y-0"
+           x-transition:leave-end="opacity-0 translate-y-2"
+           class="mt-2 px-3 py-2 rounded text-xs text-amber-200 bg-amber-900/60 border border-amber-600/50"
+           x-text="demoToastMsg">
+      </div>
+    </div>
+  </template>
 
 </body>
 </html>

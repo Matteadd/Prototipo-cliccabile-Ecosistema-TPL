@@ -898,6 +898,29 @@
           }
         });
 
+        // Riceve pagamenti confermati da altri pannelli (es. CRM, tablet)
+        // e li appende alle liste movimenti mantenendo la reattività Alpine.
+        Bus.on('pagamento:confermato', (p) => {
+          if (!p || !p.cf) return; // payload senza cf non riguarda questo cliente
+          const cfAttivo = (localStorage.getItem('clienteAttivo') || '').toUpperCase();
+          if (p.cf.toUpperCase() !== cfAttivo) return;
+          // Ricarica FRESH da clientiDemo per avere il movimento già persistito
+          try {
+            const reg = JSON.parse(localStorage.getItem('clientiDemo') || '{}');
+            const record = reg[cfAttivo];
+            if (!record) return;
+            const freschi = (record.movimenti || []).slice().sort((a, b) => b.data.localeCompare(a.data));
+            // Aggiorna movimenti con dedup per id
+            freschi.forEach(m => {
+              const exists = this.movimenti.findIndex(x => x.id === m.id);
+              if (exists < 0) this.movimenti.unshift(m);
+              else this.movimenti[exists] = m;
+            });
+            // Ri-ordina
+            this.movimenti = this.movimenti.slice().sort((a, b) => b.data.localeCompare(a.data));
+          } catch(_) {}
+        });
+
         Bus.on('servizio:attivato', (p) => {
           const now = new Date().toISOString();
           if (p.servizio === 'telepedaggio') {
@@ -1031,9 +1054,31 @@
         // --- Movimenti: carica da clientiDemo, ordina per data desc ---
         const movPersistiti = p.movimenti || [];
         this.movimenti   = movPersistiti.slice().sort((a, b) => b.data.localeCompare(a.data));
-        this.tpMovimenti = [];
-        this.acMovimenti = [];
-        this.pgMovimenti = [];
+        // Ricostruisce liste per-servizio dai movimenti persistiti
+        this.tpMovimenti = this.movimenti
+          .filter(m => m.servizio === 'telepedaggio')
+          .map(m => ({
+            id: m.id, data: m.data,
+            casello:    m.dettagli?.casello    || m.descrizione?.split('—')[1]?.trim() || '',
+            autostrada: m.dettagli?.autostrada || m.descrizione?.split('—')[0]?.replace('Transito ','').trim() || '',
+            importo: m.importo, targa: m.targa,
+          }));
+        this.acMovimenti = this.movimenti
+          .filter(m => m.servizio === 'areac')
+          .map(m => ({
+            id: m.id, data: m.data,
+            targa: m.targa, importo: m.importo, stato: m.stato,
+            note: m.dettagli?.note || m.descrizione || '',
+          }));
+        this.pgMovimenti = this.movimenti
+          .filter(m => m.servizio === 'parcheggi')
+          .map(m => ({
+            id: m.id,
+            parcheggio: m.dettagli?.parcheggio || m.descrizione?.split('—')[0]?.trim() || '',
+            ingresso: m.data, uscita: m.dettagli?.uscita || null,
+            durata: m.dettagli?.durata || m.descrizione?.split('—')[1]?.trim() || '',
+            importo: m.importo, targa: m.targa, stato: m.stato,
+          }));
       },
 
       /* ========================
@@ -1296,7 +1341,7 @@
         </div>
         <div style="flex:1;">
           <div style="color:white;font-weight:700;font-size:15px;line-height:1.2;">Enilive</div>
-          <div style="color:rgba(255,255,255,0.75);font-size:11px;" x-text="smsCurrentDoc?.template === 'OTP_CONSENSI' ? 'Documenti contrattuali' : smsCurrentDoc?.template === 'CONSENSI_MARKETING' ? 'Consensi facoltativi' : 'Contratto'"></div>
+          <div style="color:rgba(255,255,255,0.75);font-size:11px;" x-text="smsCurrentDoc?.template === 'OTP_CONSENSI' ? 'Documenti contrattuali' : smsCurrentDoc?.template === 'CONSENSI_MARKETING' ? 'Consensi facoltativi' : smsCurrentDoc?.template === 'OTP_ASSISTENZA' ? 'Messaggio SMS' : 'Contratto'"></div>
         </div>
         <button style="color:white;background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;" @click="smsCloseWebview()">
           <i class="fa fa-times"></i>
@@ -1492,6 +1537,40 @@
           </div>
         </div>
       </template>
+
+      <!-- Contenuto webview — OTP_ASSISTENZA (SMS semplice con codice OTP) -->
+      <template x-if="smsCurrentDoc?.template === 'OTP_ASSISTENZA'">
+        <div style="flex:1;display:flex;flex-direction:column;background:#f9fafb;overflow-y:auto;">
+          <div style="padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+            <div style="width:56px;height:56px;background:#e6f0f6;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
+              <i class="fa fa-comment-dots" style="color:#117299;font-size:24px;"></i>
+            </div>
+            <p style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:4px;">Mittente</p>
+            <p style="font-size:15px;font-weight:700;color:#111827;margin-bottom:18px;">Enilive</p>
+
+            <div style="width:100%;background:white;border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+              <p style="font-size:14px;color:#374151;line-height:1.55;margin-bottom:14px;">
+                Enilive: per confermare l'operazione di assistenza richiesta allo sportello, comunica all'operatore il codice OTP qui sotto. Codice valido per 5 minuti.
+              </p>
+              <div style="background:#f0f9ff;border:2px dashed #117299;border-radius:12px;padding:16px;text-align:center;">
+                <p style="font-size:11px;color:#6b7280;margin-bottom:4px;letter-spacing:1px;">CODICE OTP</p>
+                <p style="font-size:42px;font-weight:900;color:#117299;letter-spacing:10px;font-family:monospace;">1234</p>
+              </div>
+            </div>
+
+            <p style="font-size:11px;color:#9ca3af;text-align:center;line-height:1.5;">
+              <i class="fa fa-shield-alt mr-1"></i>Non condividere questo codice con nessuno tranne l'operatore Enilive allo sportello.
+            </p>
+          </div>
+
+          <div style="padding:14px 16px;background:white;border-top:1px solid #e5e7eb;flex-shrink:0;">
+            <button style="width:100%;background:#117299;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;"
+              @click="smsCloseWebview()">
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </template>
       </div><!-- /inner flex wrapper -->
     </div>
 
@@ -1500,7 +1579,7 @@
 
       <!-- HOME -->
       <div x-show="currentPage === 'home'" x-transition.opacity>
-        <h1 class="text-2xl font-bold mb-6 text-eni-teal text-center mt-8">EniLive</h1>
+        <h1 class="text-2xl font-bold mb-6 text-eni-teal text-center mt-8">Enilive</h1>
 
         <div class="px-4 py-4">
           <div class="h-64 relative overflow-hidden rounded-xl shadow-md" style="background: linear-gradient(135deg, #f0e5d8 0%, #e8dcc8 50%, #d4e8d4 100%);">
