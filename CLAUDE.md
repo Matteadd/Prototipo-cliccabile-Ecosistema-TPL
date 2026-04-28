@@ -31,7 +31,10 @@ Simula nel browser l'ecosistema digitale: app cliente, tablet operatore stazione
 Onboarding/sottoscrizione: in-app o canale fisico tramite tablet Enilive Station.
 
 ## Ultimo aggiornamento
-2026-04-22 (schema ClienteRecord v3: serviziRsa[] → contratti[].serviziRsa[], areac/parcheggi → dispositivi[].serviziAbilitati, CRM con card Contratti + ricerca targa)
+2026-04-28 (multi-step modal trasferimento targa, casiAssistenza[], targheSottratte[], fatture[], promo system, OTP_ASSISTENZA, fix Alpine reactivity in CRM)
 
 ## OTP mock
-`OTP_CONSENSI` → `1234` | `FIRMA_CONTRATTO` → `5678`
+`OTP_CONSENSI` → `1234` | `FIRMA_CONTRATTO` → `5678` | `OTP_ASSISTENZA` → `1234`
+
+`OTP_ASSISTENZA` usato nel flusso assistenza tablet (aggiorna-contatti, sostituisci-obu, cambio-targa-obu, furto-obu, restituzione-obu, cambio-pagamento, adesione/revoca-rimodulazione, disattivazione-servizio, recupero-credenziali).
+`RESET_PASSWORD` → link mock (reset password tramite recupero credenziali).
